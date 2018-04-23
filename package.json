@@ -2,7 +2,7 @@
   "name": "nvhug.github.io",
   "version": "0.1.0",
   "private": true,
-  "homepage": "http://nvhug.github.io/react-gh-pages",
+  "homepage": "http://nvhug.github.io",
   "dependencies": {
     "gh-pages": "^1.1.0",
     "npm": "^5.8.0",
