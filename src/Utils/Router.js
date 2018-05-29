@@ -18,7 +18,7 @@ class Router extends Component {
         <React.Fragment>
             <Header />
             <Switch>
-              <Route exact path="/" component={Cover} />
+              <Route exact path="/" component={OldStuff} />
               <Route path="/about" component={About} />
               <Route path="/archives/:archiveId/:keyOldStuff" component={OldStuffDetail} />
               <Route path="/archives" component={OldStuff} />

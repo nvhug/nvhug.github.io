@@ -18,7 +18,7 @@ class OldStuff extends Component {
       snapshot.forEach(function(childSnapshot) {
         var childKey = childSnapshot.key;
         var childData = childSnapshot.val();
-        
+
         archives_list.push({'key': childKey, 'title': childData.title, 'current_time': childData.curTime});
       });
       that.setState({archives: archives_list});
@@ -35,7 +35,7 @@ class OldStuff extends Component {
       var title_link = archive.title.replace(/\s/g, '-');
       return (
         <tr>
-        	<td>
+        	<td width="77%">
 						<Link to={{pathname: `/archives/${title_link}/${archive.key}`, state: archive.key}} >
 							{archive.title}
 						</Link>
