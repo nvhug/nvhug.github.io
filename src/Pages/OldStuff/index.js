@@ -1,6 +1,7 @@
 import React, { Component } from 'react';
 import { withRouter, Link } from "react-router-dom";
-import { Grid, Row, Col, Table } from 'react-bootstrap';
+import { Grid, Row, Col, Table, PageHeader } from 'react-bootstrap';
+import firebase from 'firebase';
 
 class OldStuff extends Component {
 	constructor(props) {
@@ -11,61 +12,62 @@ class OldStuff extends Component {
   }
 
   componentDidMount() {
-    const data = {
-                    "Items": [
-                        {
-                            "key": "1",
-                            "name": "I start to implement nvhug.github.io",
-                            "date": "2018/04/23"
-                        },
-                        {
-                            "key": "2",
-                            "name": "I try to implement page with react",
-                            "date": "2018/04/24"
-                        }
-                    ]
-                };
-        this.setState({
-          archives: data.Items
-        });
+    var that = this;
+    var archives_list = [];
+    firebase.database().ref('/posts').once('value', function(snapshot) {
+      snapshot.forEach(function(childSnapshot) {
+        var childKey = childSnapshot.key;
+        var childData = childSnapshot.val();
+        
+        archives_list.push({'key': childKey, 'title': childData.title, 'current_time': childData.curTime});
+      });
+      that.setState({archives: archives_list});
+    });
   }
 
 
 	handleOnClick = (event, key) => {
     // Path is itemId
-    //event.preventDefault();
-    console.log(key);
     this.props.history.push(`/archives/${key}`);
   };
   render() {
-  	console.log('we');
   	const listItems = this.state.archives.map((archive) => {
+      var title_link = archive.title.replace(/\s/g, '-');
       return (
         <tr>
         	<td>
-						<Link to={`/archives/${archive.key}`}>
-							{archive.name}
+						<Link to={{pathname: `/archives/${title_link}/${archive.key}`, state: archive.key}} >
+							{archive.title}
 						</Link>
         	</td>
+          <td>
+              {archive.current_time}
+          </td>
         </tr>
       );
     });
 
     return (
     	<Grid>
+          <PageHeader>
+            Old Stuff
+          </PageHeader>
 			  <Row className="show-grid">
-			    <Col xs={6} md={3}>
-			      sider bar
-			    </Col>
-			    <Col xs={12} md={9}>
-			    	<Table>
-						  <tbody>
-						    { listItems }
-						  </tbody>
-						</Table>
+			    <Col xs={12} md={8} mdOffset={2}>
+			      <Table condensed>
+            <thead>
+              <tr>
+                <th>Title</th>
+                <th></th>
+               
+              </tr>
+            </thead>
+              <tbody>
+                {listItems}
+              </tbody>
+            </Table>
 			    </Col>
 			  </Row>
-
   		</Grid>
     );
   }
