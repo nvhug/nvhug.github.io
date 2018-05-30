@@ -18,11 +18,11 @@ class OldStuffDetail extends Component {
     firebase.database().ref('/posts/' + key).once('value').then(function(snapshot) {
       var body = snapshot.val().body;
       var title = snapshot.val().title;
-      console.log(snapshot.val());
       that.setState({
         body: body,
         title: title
       });
+      document.title = "nvhug | " + title;
     });
   }
   

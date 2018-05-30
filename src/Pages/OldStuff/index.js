@@ -14,7 +14,12 @@ class OldStuff extends Component {
   componentDidMount() {
     var that = this;
     var archives_list = [];
-    firebase.database().ref('/posts').once('value', function(snapshot) {
+
+    console.log(this.state);
+    document.title = "nvhug | Old Stuff";
+
+    firebase.database().ref('/posts').orderByChild('curTime').once('value', function(snapshot) {
+      console.log(snapshot);
       snapshot.forEach(function(childSnapshot) {
         var childKey = childSnapshot.key;
         var childData = childSnapshot.val();
@@ -31,10 +36,12 @@ class OldStuff extends Component {
     this.props.history.push(`/archives/${key}`);
   };
   render() {
-  	const listItems = this.state.archives.map((archive) => {
+  	const listItems = this.state.archives
+    .sort((a, b) => a.current_time < b.current_time)
+    .map((archive, i) => {
       var title_link = archive.title.replace(/\s/g, '-');
       return (
-        <tr>
+        <tr key={i}>
         	<td width="77%">
 						<Link to={{pathname: `/archives/${title_link}/${archive.key}`, state: archive.key}} >
 							{archive.title}
