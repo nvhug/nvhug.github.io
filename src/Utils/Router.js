@@ -8,6 +8,7 @@ import Portfolio from '../Pages/Portfolio';
 import Admin from '../Pages/Admin';
 import AdminEdit from '../Pages/Admin/edit.js';
 import AdminCreate from '../Pages/Admin/create.js';
+import AdminAbout from '../Pages/Admin/About';
 import Login from '../Pages/Login';
 import Header from '../Components/Header';
 
@@ -26,6 +27,7 @@ class Router extends Component {
               <Route path="/admin" component={Admin} />
               <Route path="/admin-edit/:keyOldStuff" component={AdminEdit} />
               <Route path="/admin-create" component={AdminCreate} />
+              <Route path="/admin-about" component={AdminAbout} />
               <Route path="/login" component={Login} />
             </Switch>
         </React.Fragment>

@@ -2,6 +2,7 @@ import React, { Component } from 'react';
 import { withRouter } from "react-router-dom";
 import { Grid, Row, FormGroup, ControlLabel, FormControl, HelpBlock, Button } from 'react-bootstrap';
 import firebase from 'firebase';
+import { dbName } from '../../Utils/Variable.js';
 
 class AdminCreate extends Component {
 
@@ -52,9 +53,9 @@ class AdminCreate extends Component {
           curTime : new Date().toLocaleString()
         };
 
-    var newPostKey = firebase.database().ref().child('posts').push().key;
+    var newPostKey = firebase.database().ref().child(dbName+ '/posts').push().key;
     var updates = {};
-    updates['/posts/' + newPostKey] = postData;
+    updates[dbName + '/posts/' + newPostKey] = postData;
     firebase.database().ref().update(updates);
     alert('finished create');
   }
