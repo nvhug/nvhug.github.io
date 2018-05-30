@@ -1,6 +1,6 @@
 import React, { Component } from 'react';
 import { HashRouter, Route, Switch } from "react-router-dom";
-import Cover from '../Pages/Cover';
+//import Cover from '../Pages/Cover';
 import About from '../Pages/About';
 import OldStuff from '../Pages/OldStuff';
 import OldStuffDetail from '../Pages/OldStuffDetail';
