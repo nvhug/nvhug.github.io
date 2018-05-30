@@ -5,6 +5,7 @@ import firebase from 'firebase';
 import ReactMarkdown from 'react-markdown';
 import 'highlightjs/styles/atom-one-dark.css';
 import highlightjs from'highlightjs';
+import { dbName } from '../../Utils/Variable.js';
 
 class OldStuffDetail extends Component {
 
@@ -18,7 +19,7 @@ class OldStuffDetail extends Component {
 
     const key = props.match.params.keyOldStuff;
     var that = this;
-    firebase.database().ref('/posts/' + key).once('value').then(function(snapshot) {
+    firebase.database().ref(dbName + '/posts/' + key).once('value').then(function(snapshot) {
       var body = snapshot.val().body;
       var title = snapshot.val().title;
       that.setState({

@@ -1,6 +1,6 @@
 import React, { Component } from 'react';
 import { Link } from 'react-router-dom';
-import { Nav, NavItem, Navbar } from 'react-bootstrap';
+import { Nav, NavItem, Navbar, NavDropdown, MenuItem } from 'react-bootstrap';
 import firebase from 'firebase';
 
 class Header extends Component {
@@ -39,9 +39,10 @@ class Header extends Component {
   render() {
     const isLoggedIn = this.state.isLoggedIn;
     const adminButton = isLoggedIn ? (
-        <NavItem eventKey={5} href="#admin">
-          Admin
-        </NavItem>
+        <NavDropdown eventKey="5" title="Admin" id="nav-dropdown">
+          <MenuItem eventKey="5.1" href="#admin">Old stuff</MenuItem>
+          <MenuItem eventKey="5.2" href="#admin-about">About</MenuItem>
+        </NavDropdown>
       ) : '';
     const button = isLoggedIn ? (
       <NavItem eventKey={2} href="#logout" onClick={this.handleLogout}>

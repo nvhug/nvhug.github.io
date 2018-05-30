@@ -2,6 +2,7 @@ import React, { Component } from 'react';
 import { withRouter, Link } from "react-router-dom";
 import { Grid, Row, Col, Table, PageHeader } from 'react-bootstrap';
 import firebase from 'firebase';
+import { dbName } from '../../Utils/Variable.js';
 
 class OldStuff extends Component {
 	constructor(props) {
@@ -15,15 +16,17 @@ class OldStuff extends Component {
     var that = this;
     var archives_list = [];
 
-    console.log(this.state);
+    console.log(document.domain);
+
     document.title = "nvhug | Old Stuff";
 
-    firebase.database().ref('/posts').orderByChild('curTime').once('value', function(snapshot) {
+    firebase.database().ref(dbName +'/posts').orderByChild('curTime').once('value', function(snapshot) {
       console.log(snapshot);
       snapshot.forEach(function(childSnapshot) {
+
         var childKey = childSnapshot.key;
         var childData = childSnapshot.val();
-
+        console.log(childData);
         archives_list.push({'key': childKey, 'title': childData.title, 'current_time': childData.curTime});
       });
       that.setState({archives: archives_list});

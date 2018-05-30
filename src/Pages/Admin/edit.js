@@ -2,6 +2,7 @@ import React, { Component } from 'react';
 import { withRouter } from "react-router-dom";
 import { Grid, Row, FormGroup, ControlLabel, FormControl, HelpBlock, Button } from 'react-bootstrap';
 import firebase from 'firebase';
+import { dbName } from '../../Utils/Variable.js';
 
 class AdminEdit extends Component {
 
@@ -21,7 +22,7 @@ class AdminEdit extends Component {
 
     //set data to state
     var that = this;
-    firebase.database().ref('/posts/' + key).once('value').then(function(snapshot) {
+    firebase.database().ref(dbName + '/posts/' + key).once('value').then(function(snapshot) {
       var body = snapshot.val().body;
       var title = snapshot.val().title;
       that.setState({
@@ -64,7 +65,7 @@ class AdminEdit extends Component {
         };
 
     var updates = {};
-    updates['/posts/' + this.state.key] = postData;
+    updates[dbName + '/posts/' + this.state.key] = postData;
     firebase.database().ref().update(updates);
     alert('finished create');
   }

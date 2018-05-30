@@ -2,6 +2,7 @@ import React, { Component } from 'react';
 import { withRouter, Link } from "react-router-dom";
 import { Grid, Row, Button, PageHeader, Col, Table, Glyphicon } from 'react-bootstrap';
 import firebase from 'firebase';
+import { dbName } from '../../Utils/Variable.js';
 
 class Admin extends Component {
 
@@ -28,7 +29,7 @@ class Admin extends Component {
 
     var that = this;
     var archives_list = [];
-    firebase.database().ref('/posts').once('value', function(snapshot) {
+    firebase.database().ref(dbName + '/posts').once('value', function(snapshot) {
       snapshot.forEach(function(childSnapshot) {
         var childKey = childSnapshot.key;
         var childData = childSnapshot.val();
@@ -40,10 +41,9 @@ class Admin extends Component {
   }
 
   handleDelete(key) {
-    firebase.database().ref('posts/' + key).remove();
+    firebase.database().ref(dbName + '/posts/' + key).remove();
     const arrayCopy = this.state.archives.filter((row) => row.key !== key);
     this.setState({archives: arrayCopy})
-    firebase.database().ref('posts/' + key).remove();
   }
 
   handleEdit() {
