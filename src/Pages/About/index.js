@@ -35,6 +35,8 @@ I'm still learning English, so please excuse my mistakes.
     this.state = {
       body: about
     }
+
+    document.title = "nvhug | About";
   }
 
 

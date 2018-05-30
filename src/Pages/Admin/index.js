@@ -52,7 +52,9 @@ class Admin extends Component {
 
   render() {
     //load title list
-    const listItems = this.state.archives.map((archive) => {
+    const listItems = this.state.archives
+    .sort((a, b) => a.current_time < b.current_time)
+    .map((archive) => {
       return (
         <tr>
           <td width="80%">
@@ -83,7 +85,7 @@ class Admin extends Component {
               <tr>
                 <th>Title</th>
                 <th></th>
-                <th></th>
+                <th><Button href="#/admin-create" bsClass='btn btn-default pull-right'>Create</Button></th>
               </tr>
             </thead>
               <tbody>
