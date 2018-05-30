@@ -3,6 +3,8 @@ import { withRouter } from "react-router-dom";
 import { Grid, Row, Col, PageHeader } from 'react-bootstrap';
 import firebase from 'firebase';
 import ReactMarkdown from 'react-markdown';
+import 'highlightjs/styles/atom-one-dark.css';
+import highlightjs from'highlightjs';
 
 class OldStuffDetail extends Component {
 
@@ -12,6 +14,7 @@ class OldStuffDetail extends Component {
     this.state = {
       body: ''
     }
+    highlightjs.initHighlightingOnLoad();
 
     const key = props.match.params.keyOldStuff;
     var that = this;
@@ -22,8 +25,17 @@ class OldStuffDetail extends Component {
         body: body,
         title: title
       });
-      document.title = "nvhug | " + title;
+      document.title = title;
     });
+  }
+
+  componentDidUpdate() {
+    var els = document.querySelectorAll('pre code');
+    for (var i = 0; i < els.length; i++) {
+        if (!els[i].classList.contains('hljs')) {
+            highlightjs.highlightBlock(els[i]);
+        }
+    }
   }
   
   render() {
