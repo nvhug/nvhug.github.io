@@ -11,6 +11,7 @@ import AdminCreate from '../Pages/Admin/create.js';
 import AdminAbout from '../Pages/Admin/About';
 import Login from '../Pages/Login';
 import Header from '../Components/Header';
+import Footer from '../Components/Footer';
 
 class Router extends Component {
   render() {
@@ -30,6 +31,7 @@ class Router extends Component {
               <Route path="/admin-about" component={AdminAbout} />
               <Route path="/login" component={Login} />
             </Switch>
+            <Footer />
         </React.Fragment>
       </HashRouter>
     );

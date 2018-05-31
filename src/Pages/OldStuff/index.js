@@ -15,6 +15,7 @@ class OldStuff extends Component {
   }
 
   componentDidMount() {
+    //if data not loading before, get data from firebase
     if(this.state.archives.length === 0) {
       var that = this;
       var archives_list = [];

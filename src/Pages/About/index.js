@@ -10,10 +10,11 @@ class About extends Component {
   constructor(props) {
     super(props);
 
-    console.log(about);
     this.state = {
       about: about
     }
+
+    document.title = "nvhug | About";
   }
 
   componentDidMount() {
