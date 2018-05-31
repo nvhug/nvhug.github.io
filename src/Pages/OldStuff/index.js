@@ -3,34 +3,32 @@ import { withRouter, Link } from "react-router-dom";
 import { Grid, Row, Col, Table, PageHeader } from 'react-bootstrap';
 import firebase from 'firebase';
 import { dbName } from '../../Utils/Variable.js';
-
+import { archivesList } from '../../Utils/FbData.js';
 class OldStuff extends Component {
 	constructor(props) {
     super(props);
     this.state = {
-      archives: []
+      archives: archivesList
     };
+
+    document.title = "nvhug | Old Stuff";
   }
 
   componentDidMount() {
-    var that = this;
-    var archives_list = [];
+    if(this.state.archives.length === 0) {
+      var that = this;
+      var archives_list = [];
+      firebase.database().ref(dbName +'/posts').orderByChild('curTime').once('value', function(snapshot) {
+        
+        snapshot.forEach(function(childSnapshot) {
+          var childKey = childSnapshot.key;
+          var childData = childSnapshot.val();
 
-    console.log(document.domain);
-
-    document.title = "nvhug | Old Stuff";
-
-    firebase.database().ref(dbName +'/posts').orderByChild('curTime').once('value', function(snapshot) {
-      console.log(snapshot);
-      snapshot.forEach(function(childSnapshot) {
-
-        var childKey = childSnapshot.key;
-        var childData = childSnapshot.val();
-        console.log(childData);
-        archives_list.push({'key': childKey, 'title': childData.title, 'current_time': childData.curTime});
+          archives_list.push({'key': childKey, 'title': childData.title, 'current_time': childData.curTime});
+        });
+        that.setState({archives: archives_list});
       });
-      that.setState({archives: archives_list});
-    });
+    }
   }
 
 
