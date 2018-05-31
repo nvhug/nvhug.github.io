@@ -9,19 +9,6 @@ import { Provider } from 'react-redux';
 import productsReducer from './Reducers/products-reducer';
 import userReducer from './Reducers/user-reducer';
 import postsReducer from './Reducers/posts-reducer';
-import firebase from "firebase";
-
-// initialize firebase
-var config = {
-      apiKey: "AIzaSyAucNLoiTXvsfgonkAnCjnuxVRFlsgJNWM",
-      authDomain: "nvhug-1dcfd.firebaseapp.com",
-      databaseURL: "https://nvhug-1dcfd.firebaseio.com",
-      projectId: "nvhug-1dcfd",
-      storageBucket: "",
-      messagingSenderId: "214786625463"
-    };
-firebase.initializeApp(config);
-
 
 const allReducer = combineReducers({
 	products: productsReducer,

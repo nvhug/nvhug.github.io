@@ -4,28 +4,27 @@ import { Grid, Row, Col, PageHeader } from 'react-bootstrap';
 import ReactMarkdown from 'react-markdown';
 import firebase from 'firebase';
 import { dbName } from '../../Utils/Variable.js';
-
+import { about } from '../../Utils/FbData.js';
 class About extends Component {
 
   constructor(props) {
     super(props);
- 
+
+    console.log(about);
     this.state = {
-      about: ''
+      about: about
     }
-
-    var that = this;
-    document.title = "nvhug | About";
-    firebase.database().ref(dbName + '/about').once('value').then(function(snapshot) {
-      var about = snapshot.val() ? snapshot.val() : '';
-
-      that.setState({
-        about: about
-      });
-    });
-    
   }
 
+  componentDidMount() {
+    var that = this;
+    if(about === ""){
+      firebase.database().ref(dbName + '/about').once('value').then(function(snapshot) {
+        var value = snapshot.val() ? snapshot.val() : '';
+        that.setState({about: value});
+      });
+    }
+  }
 
   render() {
     return (

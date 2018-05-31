@@ -3,6 +3,7 @@ import { withRouter, Link } from "react-router-dom";
 import { Grid, Row, Button, PageHeader, Col, Table, Glyphicon } from 'react-bootstrap';
 import firebase from 'firebase';
 import { dbName } from '../../Utils/Variable.js';
+import { archivesList } from '../../Utils/FbData.js';
 
 class Admin extends Component {
 
@@ -12,7 +13,7 @@ class Admin extends Component {
     this.handleDelete = this.handleDelete.bind(this);
 
     this.state = {
-      archives: []
+      archives: archivesList
     };
   }
 
@@ -26,18 +27,20 @@ class Admin extends Component {
       }
     });
 
+    if(this.state.archives.length === 0) {
+      var that = this;
+      var archives_list = [];
+      firebase.database().ref(dbName +'/posts').orderByChild('curTime').once('value', function(snapshot) {
+        
+        snapshot.forEach(function(childSnapshot) {
+          var childKey = childSnapshot.key;
+          var childData = childSnapshot.val();
 
-    var that = this;
-    var archives_list = [];
-    firebase.database().ref(dbName + '/posts').once('value', function(snapshot) {
-      snapshot.forEach(function(childSnapshot) {
-        var childKey = childSnapshot.key;
-        var childData = childSnapshot.val();
-
-        archives_list.push({'key': childKey, 'title': childData.title, 'current_time': childData.curTime});
+          archives_list.push({'key': childKey, 'title': childData.title, 'current_time': childData.curTime});
+        });
+        that.setState({archives: archives_list});
       });
-      that.setState({archives: archives_list});
-    });
+    }
   }
 
   handleDelete(key) {
@@ -46,17 +49,13 @@ class Admin extends Component {
     this.setState({archives: arrayCopy})
   }
 
-  handleEdit() {
-
-  }
-
   render() {
     //load title list
     const listItems = this.state.archives
     .sort((a, b) => a.current_time < b.current_time)
-    .map((archive) => {
+    .map((archive, i) => {
       return (
-        <tr>
+        <tr key={i}>
           <td width="80%">
               {archive.title}
           </td>
@@ -65,7 +64,7 @@ class Admin extends Component {
           </td>
           <td>
             <Link to={`/admin-edit/${archive.key}`} >
-              <Button bsStyle="primary" onClick={this.handleEdit}><Glyphicon glyph="edit" /> Edit</Button>
+              <Button bsStyle="primary"><Glyphicon glyph="edit" /> Edit</Button>
             </Link>
             
           </td>
