@@ -47,8 +47,10 @@ class OldStuffDetail extends Component {
           title: post_details[0].title,
           body: post_details[0].body
         });
+        document.title = post_details[0].title;
       }
     }
+    
   }
 
   componentDidUpdate() {
