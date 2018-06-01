@@ -29,6 +29,39 @@
   font-size: 15px;
 }
 
+nav.navbar.navbar-inverse .container {
+    margin-bottom: 0;
+}
+
+.container {
+  margin-bottom: 40px;
+}
+
+.search-form {
+  width: 40%;
+  margin-top: 10px;
+}
+
+@media only screen and (max-width: 768px) {
+  .search-form {
+    margin-top: 20px;
+    width: 100%;
+  }
+}
+
+.footer {
+  color: black;
+  text-align: center;
+  font-size: 0.7em;
+  
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 15px;
+  width: 100%;
+  overflow:hidden;
+}
+
 @keyframes App-logo-spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
