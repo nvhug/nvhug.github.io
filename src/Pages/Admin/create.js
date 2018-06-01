@@ -57,7 +57,7 @@ class AdminCreate extends Component {
     var updates = {};
     updates[dbName + '/posts/' + newPostKey] = postData;
     firebase.database().ref().update(updates);
-    alert('finished create');
+    //alert('finished create');
   }
 
   render() {

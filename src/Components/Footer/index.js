@@ -7,7 +7,7 @@ class Footer extends Component {
   	const year = currentYear === 2018 ? "2018" : `2018-${currentYear}`;
 
     return (
-      	<div class="footer">
+      	<div className="footer">
 		  <p>Copyright © {year} <i>Hung Nguyen</i>. Some rights reserved.</p>
 		</div>
     );

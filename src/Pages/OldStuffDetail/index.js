@@ -50,7 +50,7 @@ class OldStuffDetail extends Component {
         document.title = post_details[0].title;
       }
     }
-    
+
   }
 
   componentDidUpdate() {
@@ -60,6 +60,10 @@ class OldStuffDetail extends Component {
             highlightjs.highlightBlock(els[i]);
         }
     }
+  }
+
+  handleChange = () => {
+
   }
   
   render() {

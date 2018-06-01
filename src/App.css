@@ -37,6 +37,18 @@ nav.navbar.navbar-inverse .container {
   margin-bottom: 40px;
 }
 
+.search-form {
+  width: 40%;
+  margin-top: 10px;
+}
+
+@media only screen and (max-width: 768px) {
+  .search-form {
+    margin-top: 20px;
+    width: 100%;
+  }
+}
+
 .footer {
   color: black;
   text-align: center;

@@ -1,14 +1,17 @@
 import React, { Component } from 'react';
 import { withRouter, Link } from "react-router-dom";
-import { Grid, Row, Col, Table, PageHeader } from 'react-bootstrap';
+import { Grid, Row, Col, Table, PageHeader, FormGroup, FormControl } from 'react-bootstrap';
 import firebase from 'firebase';
 import { dbName } from '../../Utils/Variable.js';
 import { archivesList } from '../../Utils/FbData.js';
 class OldStuff extends Component {
 	constructor(props) {
     super(props);
+
+    // this.handleChange = this.handleChange.bind(this);
     this.state = {
-      archives: archivesList
+      archives: archivesList,
+      inputFilter: ''
     };
 
     document.title = "nvhug | Old Stuff";
@@ -37,8 +40,15 @@ class OldStuff extends Component {
     // Path is itemId
     this.props.history.push(`/archives/${key}`);
   };
+
+  handleChange = (e) => {
+    this.setState({inputFilter: e.target.value})
+  }
   render() {
   	const listItems = this.state.archives
+    .filter((archive) => 
+      this.state.inputFilter ? archive.title.toLowerCase().search(this.state.inputFilter.toLowerCase()) >= 0 : true
+    )
     .sort((a, b) => a.current_time < b.current_time)
     .map((archive, i) => {
       var title_link = archive.title.replace(/\s/g, '-');
@@ -60,6 +70,17 @@ class OldStuff extends Component {
     	<Grid>
           <PageHeader>
             Old Stuff
+            <FormGroup
+                  controlId="formBasicText"
+                  className="pull-right search-form"
+                >
+                  <FormControl
+                    type="text"
+                    value={this.state.inputFilter}
+                    placeholder="Search"
+                    onChange={this.handleChange}
+                  />
+                </FormGroup>
           </PageHeader>
 			  <Row className="show-grid">
 			    <Col xs={12} md={8} mdOffset={2}>
