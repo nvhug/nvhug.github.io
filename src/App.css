@@ -29,14 +29,21 @@
   font-size: 15px;
 }
 
+.container {
+  margin-bottom: 40px;
+}
+
 .footer {
-   position: fixed;
-   left: 0;
-   bottom: 0;
-   width: 100%;
-   color: black;
-   text-align: center;
-   font-size: 0.7em;
+  color: black;
+  text-align: center;
+  font-size: 0.7em;
+  
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 15px;
+  width: 100%;
+  overflow:hidden;
 }
 
 @keyframes App-logo-spin {
