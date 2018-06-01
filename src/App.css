@@ -29,6 +29,10 @@
   font-size: 15px;
 }
 
+nav.navbar.navbar-inverse .container {
+    margin-bottom: 0;
+}
+
 .container {
   margin-bottom: 40px;
 }
