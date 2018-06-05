@@ -49,7 +49,7 @@ class OldStuff extends Component {
     .filter((archive) => 
       this.state.inputFilter ? archive.title.toLowerCase().search(this.state.inputFilter.toLowerCase()) >= 0 : true
     )
-    .sort((a, b) => a.current_time < b.current_time)
+    .sort((a, b) => Date.parse(b.current_time) - Date.parse(a.current_time))
     .map((archive, i) => {
       var title_link = archive.title.replace(/\s/g, '-');
       return (
