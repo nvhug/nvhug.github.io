@@ -13,9 +13,12 @@ class OldStuffDetail extends Component {
 	constructor(props) {
     super(props);
 
+    this.updateContentData = this.updateContentData.bind(this);
     this.state = {
       body: ''
     }
+
+    //init highlight js 
     highlightjs.initHighlightingOnLoad();
 
     const key = props.match.params.keyOldStuff;
@@ -27,7 +30,8 @@ class OldStuffDetail extends Component {
         var title = snapshot.val().title;
         that.setState({
           body: body,
-          title: title
+          title: title,
+          key: that.props.match.params.keyOldStuff
         });
         document.title = title;
       });
@@ -35,11 +39,30 @@ class OldStuffDetail extends Component {
   }
 
   componentDidMount() {
-    if(archivesList.length > 0) {
+    // update content data when load a detail 
+    this.updateContentData(this.props.match.params.keyOldStuff);
+  }
 
-      //filter by key and get detail value
+  componentDidUpdate() {
+    //Custom Initialization highlight js 
+    var els = document.querySelectorAll('pre code');
+    for (var i = 0; i < els.length; i++) {
+        if (!els[i].classList.contains('hljs')) {
+            highlightjs.highlightBlock(els[i]);
+        }
+    }
+  }
+
+  componentWillReceiveProps(newProps) {
+    //directing to the same route with just a different param
+    this.updateContentData(newProps.match.params.keyOldStuff);
+  }
+
+  //update content data with difference key
+  updateContentData(key) {
+    if(archivesList.length > 0) {
       const post_details = archivesList.filter((archive) => 
-        archive.key === this.props.match.params.keyOldStuff
+        archive.key === key
       );
 
       if (post_details[0]) {
@@ -50,20 +73,6 @@ class OldStuffDetail extends Component {
         document.title = post_details[0].title;
       }
     }
-
-  }
-
-  componentDidUpdate() {
-    var els = document.querySelectorAll('pre code');
-    for (var i = 0; i < els.length; i++) {
-        if (!els[i].classList.contains('hljs')) {
-            highlightjs.highlightBlock(els[i]);
-        }
-    }
-  }
-
-  handleChange = () => {
-
   }
   
   render() {
