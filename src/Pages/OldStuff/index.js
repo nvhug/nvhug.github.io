@@ -4,6 +4,8 @@ import { Grid, Row, Col, Table, PageHeader, FormGroup, FormControl, Image } from
 import firebase from 'firebase';
 import { dbName } from '../../Utils/Variable.js';
 import { archivesList } from '../../Utils/FbData.js';
+import Loading from '../../Components/Loading';
+
 class OldStuff extends Component {
 	constructor(props) {
     super(props);
@@ -48,11 +50,7 @@ class OldStuff extends Component {
     this.setState({inputFilter: e.target.value})
   }
   render() {
-    const loading = this.state.loading ? (<Row>
-          <Col xs={12} md={4} mdOffset={4}>
-            <Image src={require('../../Images/loading3.gif')} width="100%" />
-          </Col>
-        </Row>) : '';
+    const loading = this.state.loading ? <Loading /> : '';
   	const listItems = this.state.archives
     .filter((archive) => 
       this.state.inputFilter ? archive.title.toLowerCase().search(this.state.inputFilter.toLowerCase()) >= 0 : true

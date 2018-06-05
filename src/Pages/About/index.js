@@ -5,13 +5,15 @@ import ReactMarkdown from 'react-markdown';
 import firebase from 'firebase';
 import { dbName } from '../../Utils/Variable.js';
 import { about } from '../../Utils/FbData.js';
+import Loading from '../../Components/Loading';
 class About extends Component {
 
   constructor(props) {
     super(props);
 
     this.state = {
-      about: about
+      about: about,
+      loading: true
     }
 
     document.title = "nvhug | About";
@@ -22,12 +24,15 @@ class About extends Component {
     if(about === ""){
       firebase.database().ref(dbName + '/about').once('value').then(function(snapshot) {
         var value = snapshot.val() ? snapshot.val() : '';
-        that.setState({about: value});
+        that.setState({about: value, loading: false});
       });
+    }else {
+      this.setState({loading: false})
     }
   }
 
   render() {
+    const loading = this.state.loading ? <Loading /> : '';
     return (
     	<Grid>
         <Row className="show-grid">
@@ -38,6 +43,7 @@ class About extends Component {
             <ReactMarkdown source={this.state.about} />
           </Col>
         </Row>
+        {loading}
       </Grid>
     );
   }
