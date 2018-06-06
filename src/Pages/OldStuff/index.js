@@ -1,6 +1,6 @@
 import React, { Component } from 'react';
 import { withRouter, Link } from "react-router-dom";
-import { Grid, Row, Col, Table, PageHeader, FormGroup, FormControl, Image } from 'react-bootstrap';
+import { Grid, Row, Col, Table, PageHeader, FormGroup, FormControl } from 'react-bootstrap';
 import firebase from 'firebase';
 import { dbName } from '../../Utils/Variable.js';
 import { archivesList } from '../../Utils/FbData.js';

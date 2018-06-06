@@ -28,4 +28,11 @@ firebase.database().ref(dbName + '/about').once('value').then(function(snapshot)
   about = snapshot.val() ? snapshot.val() : '';
 });
 
-export { archivesList, about };
+var authUser = false;
+firebase.auth().onAuthStateChanged(function(user) {
+  if (user) {
+    authUser = true;
+  } 
+});
+
+export { archivesList, about, authUser };
