@@ -3,7 +3,7 @@ import { withRouter, Link } from "react-router-dom";
 import { Grid, Row, Button, PageHeader, Col, Table, Glyphicon } from 'react-bootstrap';
 import firebase from 'firebase';
 import { dbName } from '../../Utils/Variable.js';
-import { archivesList } from '../../Utils/FbData.js';
+import { archivesList, authUser } from '../../Utils/FbData.js';
 
 class Admin extends Component {
 
@@ -18,14 +18,9 @@ class Admin extends Component {
   }
 
   componentDidMount() {
-    console.log('componentDidMount');
-    firebase.auth().onAuthStateChanged(function(user) {
-      if (!user) {
-        window.location.replace("#/login");
-      } else {
-        console.log(user.email);
-      }
-    });
+    if (!authUser) {
+      window.location.replace("#/login");
+    }
 
     if(this.state.archives.length === 0) {
       var that = this;
