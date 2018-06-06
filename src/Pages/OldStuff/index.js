@@ -4,37 +4,42 @@ import { Grid, Row, Col, Table, PageHeader, FormGroup, FormControl } from 'react
 import firebase from 'firebase';
 import { dbName } from '../../Utils/Variable.js';
 import { archivesList } from '../../Utils/FbData.js';
+import Loading from '../../Components/Loading';
+
 class OldStuff extends Component {
 	constructor(props) {
     super(props);
 
-    // this.handleChange = this.handleChange.bind(this);
     this.state = {
       archives: archivesList,
-      inputFilter: ''
+      inputFilter: '',
+      loading: true
     };
 
     document.title = "nvhug | Old Stuff";
   }
 
-  componentDidMount() {
+  componentWillMount() {
     //if data not loading before, get data from firebase
     if(this.state.archives.length === 0) {
       var that = this;
       var archives_list = [];
-      firebase.database().ref(dbName +'/posts').orderByChild('curTime').once('value', function(snapshot) {
+      firebase.database().ref(dbName +'/posts').once('value', function(snapshot) {
         
         snapshot.forEach(function(childSnapshot) {
           var childKey = childSnapshot.key;
           var childData = childSnapshot.val();
-
+   
           archives_list.push({'key': childKey, 'title': childData.title, 'current_time': childData.curTime});
         });
-        that.setState({archives: archives_list});
+        that.setState({ archives: archives_list, loading: false });
+
       });
+
+    }else {
+      this.setState({ loading: false });
     }
   }
-
 
 	handleOnClick = (event, key) => {
     // Path is itemId
@@ -45,6 +50,7 @@ class OldStuff extends Component {
     this.setState({inputFilter: e.target.value})
   }
   render() {
+    const loading = this.state.loading ? <Loading /> : '';
   	const listItems = this.state.archives
     .filter((archive) => 
       this.state.inputFilter ? archive.title.toLowerCase().search(this.state.inputFilter.toLowerCase()) >= 0 : true
@@ -98,6 +104,7 @@ class OldStuff extends Component {
             </Table>
 			    </Col>
 			  </Row>
+        {loading}
   		</Grid>
     );
   }
