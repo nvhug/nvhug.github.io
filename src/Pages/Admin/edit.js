@@ -1,6 +1,6 @@
 import React, { Component } from 'react';
 import { withRouter } from "react-router-dom";
-import { Grid, Row, FormGroup, ControlLabel, FormControl, HelpBlock, Button } from 'react-bootstrap';
+import { Grid, Row, FormGroup, ControlLabel, FormControl, HelpBlock, ButtonToolbar, Button } from 'react-bootstrap';
 import firebase from 'firebase';
 import { dbName } from '../../Utils/Variable.js';
 
@@ -71,6 +71,7 @@ class AdminEdit extends Component {
   }
 
   render() {
+    const link_to_detail = '#/archives/' + this.state.title.replace(/\s/g, '-') + '/' + this.state.key;
     return (
     	<Grid>
         <Row className="show-grid">
@@ -104,7 +105,10 @@ class AdminEdit extends Component {
               />
               <FormControl.Feedback />
             </FormGroup>
-            <Button bsStyle="primary" onClick={this.handleSubmit}>Submit</Button>
+            <ButtonToolbar>
+              <Button href={link_to_detail} bsClass='btn btn-default'>Back to detail</Button>
+              <Button bsStyle="primary" onClick={this.handleSubmit}>Submit</Button>
+            </ButtonToolbar>
         </form>
        </Row>
       </Grid>
