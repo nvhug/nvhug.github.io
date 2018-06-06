@@ -1,12 +1,12 @@
 import React, { Component } from 'react';
 import { withRouter } from "react-router-dom";
-import { Grid, Row, Col, PageHeader } from 'react-bootstrap';
+import { Grid, Row, Col, PageHeader, Button } from 'react-bootstrap';
 import firebase from 'firebase';
 import ReactMarkdown from 'react-markdown';
 import 'highlightjs/styles/atom-one-dark.css';
 import highlightjs from'highlightjs';
 import { dbName } from '../../Utils/Variable.js';
-import { archivesList } from '../../Utils/FbData.js';
+import { archivesList, authUser } from '../../Utils/FbData.js';
 
 class OldStuffDetail extends Component {
 
@@ -15,7 +15,8 @@ class OldStuffDetail extends Component {
 
     this.updateContentData = this.updateContentData.bind(this);
     this.state = {
-      body: ''
+      body: '',
+      key: ''
     }
 
     //init highlight js 
@@ -68,7 +69,8 @@ class OldStuffDetail extends Component {
       if (post_details[0]) {
         this.setState({
           title: post_details[0].title,
-          body: post_details[0].body
+          body: post_details[0].body,
+          key: key
         });
         document.title = post_details[0].title;
       }
@@ -76,12 +78,15 @@ class OldStuffDetail extends Component {
   }
   
   render() {
+    var link_to = "#/admin-edit/" + this.state.key;
+    const btnEdit = authUser ? (<Button href={link_to} bsClass='btn btn-default pull-right'>Edit</Button>) : '';
     return (
       <Grid>
         <Row className="show-grid">
           <Col xs={12} md={12}>
             <PageHeader>
               {this.state.title}
+              {btnEdit}
             </PageHeader>
             <ReactMarkdown source={this.state.body} />
           </Col>
