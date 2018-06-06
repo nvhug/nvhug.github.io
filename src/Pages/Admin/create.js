@@ -1,6 +1,6 @@
 import React, { Component } from 'react';
 import { withRouter } from "react-router-dom";
-import { Grid, Row, FormGroup, ControlLabel, FormControl, HelpBlock, Button } from 'react-bootstrap';
+import { Grid, Row, FormGroup, ControlLabel, FormControl, HelpBlock, ButtonToolbar, Button } from 'react-bootstrap';
 import firebase from 'firebase';
 import { dbName } from '../../Utils/Variable.js';
 
@@ -92,7 +92,11 @@ class AdminCreate extends Component {
               />
               <FormControl.Feedback />
             </FormGroup>
+            <ButtonToolbar>
+            <Button href="#/archives" bsClass='btn btn-default'>Back to list</Button>
+            
             <Button bsStyle="primary" onClick={this.handleSubmit}>Submit</Button>
+            </ButtonToolbar>
         </form>
        </Row>
       </Grid>

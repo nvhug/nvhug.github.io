@@ -42,6 +42,9 @@ nav.navbar.navbar-inverse .container {
   margin-top: 10px;
 }
 
+div p { 
+  margin: 0px;
+}
 @media only screen and (max-width: 768px) {
   .search-form {
     margin-top: 20px;
