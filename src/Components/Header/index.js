@@ -42,6 +42,7 @@ class Header extends Component {
         <NavDropdown eventKey="5" title="Admin" id="nav-dropdown">
           <MenuItem eventKey="5.1" href="#admin">Old stuff</MenuItem>
           <MenuItem eventKey="5.2" href="#admin-about">About</MenuItem>
+          <MenuItem eventKey="5.3" href="#admin-create">Create</MenuItem>
         </NavDropdown>
       ) : '';
     const button = isLoggedIn ? (

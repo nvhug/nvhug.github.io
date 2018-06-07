@@ -47,7 +47,7 @@ class Admin extends Component {
   render() {
     //load title list
     const listItems = this.state.archives
-    .sort((a, b) => a.current_time < b.current_time)
+    .sort((a, b) => Date.parse(b.current_time) - Date.parse(a.current_time))
     .map((archive, i) => {
       return (
         <tr key={i}>
