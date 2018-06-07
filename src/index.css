@@ -13,3 +13,6 @@ pre {
 	background-color: #282c34 !important;
 }
 
+pre code {
+	color: lightsteelblue;
+}
