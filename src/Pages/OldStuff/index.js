@@ -1,7 +1,7 @@
 import React, { Component } from 'react';
 import { withRouter, Link } from "react-router-dom";
 import { Grid, Row, Col, Table, PageHeader, FormGroup, FormControl } from 'react-bootstrap';
-import firebase from 'firebase';
+import firebase from 'firebase/app';
 import { dbName } from '../../Utils/Variable.js';
 import { archivesList } from '../../Utils/FbData.js';
 import Loading from '../../Components/Loading';
@@ -29,7 +29,7 @@ class OldStuff extends Component {
         snapshot.forEach(function(childSnapshot) {
           var childKey = childSnapshot.key;
           var childData = childSnapshot.val();
-   
+          
           archives_list.push({'key': childKey, 'title': childData.title, 'current_time': childData.curTime});
         });
         that.setState({ archives: archives_list, loading: false });

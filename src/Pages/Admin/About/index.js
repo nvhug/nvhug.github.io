@@ -1,7 +1,7 @@
 import React, { Component } from 'react';
 import { withRouter } from "react-router-dom";
 import { Grid, Row, FormGroup, ControlLabel, FormControl, Button } from 'react-bootstrap';
-import firebase from 'firebase';
+import firebase from 'firebase/app';
 import { dbName } from '../../../Utils/Variable.js';
 
 class AdminAbout extends Component {

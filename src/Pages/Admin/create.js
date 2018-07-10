@@ -1,7 +1,7 @@
 import React, { Component } from 'react';
 import { withRouter } from "react-router-dom";
 import { Grid, Row, FormGroup, ControlLabel, FormControl, HelpBlock, ButtonToolbar, Button } from 'react-bootstrap';
-import firebase from 'firebase';
+import firebase from 'firebase/app';
 import { dbName } from '../../Utils/Variable.js';
 
 class AdminCreate extends Component {
@@ -20,12 +20,10 @@ class AdminCreate extends Component {
   }
 
   componentDidMount() {
-    console.log('componentDidMount');
+    
     firebase.auth().onAuthStateChanged(function(user) {
       if (!user) {
         window.location.replace("#/login");
-      } else {
-        console.log(user.email);
       }
     });
   }

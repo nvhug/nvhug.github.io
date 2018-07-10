@@ -1,7 +1,8 @@
 import React, { Component } from 'react';
 import { withRouter } from "react-router-dom";
 import { Grid, Row, Col, PageHeader, Button } from 'react-bootstrap';
-import firebase from 'firebase';
+import firebase from 'firebase/app';
+
 import ReactMarkdown from 'react-markdown';
 import 'highlightjs/styles/atom-one-dark.css';
 import highlightjs from'highlightjs';
