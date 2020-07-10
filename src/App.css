@@ -1,6 +1,6 @@
 body {
   font-family: monospace;
-  font-size: 15px;
+  font-size: 17px;
 }
 .h1, .h2, .h3, .h4, .h5, .h6, h1, h2, h3, h4, h5, h6 {
   font-weight: bold;
@@ -61,9 +61,6 @@ nav.navbar.navbar-inverse .container {
   white-space: break-spaces;
 }
 
-div p { 
-  margin: 0px;
-}
 @media only screen and (max-width: 768px) {
   .search-form {
     margin-top: 20px;

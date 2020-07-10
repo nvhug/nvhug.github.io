@@ -54,8 +54,8 @@ class Admin extends Component {
           <td width="80%">
               {archive.title}
           </td>
-          <td>
-            <Button bsStyle="warning" className="delete-btn" onClick={(e) => this.handleDelete(archive.key, e)}><Glyphicon glyph="remove" /> delete</Button>
+          <td>     
+            <Button bsStyle="warning" className="delete-btn" onClick={(e) => {if(window.confirm('Delete the item?')){this.handleDelete(archive.key, e)};}}><Glyphicon glyph="remove" /> delete</Button>
           </td>
           <td>
             <Link to={`/admin-edit/${archive.key}`} >

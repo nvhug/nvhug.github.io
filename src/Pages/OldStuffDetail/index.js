@@ -94,9 +94,6 @@ class OldStuffDetail extends Component {
 
             <ReactMarkdown className="content-render" plugins={[breaks]} source={this.state.body} />
           </Col>
-          <Col>
-            {this.state.body}
-          </Col>
         </Row>
       </Grid>
     );
