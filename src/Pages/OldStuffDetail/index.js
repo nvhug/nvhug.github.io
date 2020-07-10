@@ -8,6 +8,7 @@ import 'highlightjs/styles/atom-one-dark.css';
 import highlightjs from'highlightjs';
 import { dbName } from '../../Utils/Variable.js';
 import { archivesList, authUser } from '../../Utils/FbData.js';
+import breaks from 'remark-breaks';
 
 class OldStuffDetail extends Component {
 
@@ -29,6 +30,7 @@ class OldStuffDetail extends Component {
     if(archivesList.length === 0) {
       firebase.database().ref(dbName + '/posts/' + key).once('value').then(function(snapshot) {
         var body = snapshot.val().body;
+        console.log(body);
         var title = snapshot.val().title;
         that.setState({
           body: body,
@@ -89,7 +91,11 @@ class OldStuffDetail extends Component {
               {this.state.title}
               {btnEdit}
             </PageHeader>
-            <ReactMarkdown source={this.state.body} />
+
+            <ReactMarkdown className="content-render" plugins={[breaks]} source={this.state.body} />
+          </Col>
+          <Col>
+            {this.state.body}
           </Col>
         </Row>
       </Grid>

@@ -5,6 +5,7 @@ import firebase from 'firebase/app';
 import { dbName } from '../../Utils/Variable.js';
 import { archivesList } from '../../Utils/FbData.js';
 import Loading from '../../Components/Loading';
+import moment from 'moment';
 
 class OldStuff extends Component {
 	constructor(props) {
@@ -29,8 +30,8 @@ class OldStuff extends Component {
         snapshot.forEach(function(childSnapshot) {
           var childKey = childSnapshot.key;
           var childData = childSnapshot.val();
-          
-          archives_list.push({'key': childKey, 'title': childData.title, 'current_time': childData.curTime});
+          var currentTime = moment(childData.curTime).format("YYYY/MM/DD");
+          archives_list.push({'key': childKey, 'title': childData.title, 'current_time': currentTime});
         });
         that.setState({ archives: archives_list, loading: false });
 
@@ -58,15 +59,16 @@ class OldStuff extends Component {
     .sort((a, b) => Date.parse(b.current_time) - Date.parse(a.current_time))
     .map((archive, i) => {
       var title_link = archive.title.replace(/\s/g, '-');
+      var current_time = moment(archive.current_time).format("YYYY/MM/DD");
       return (
         <tr key={i}>
-        	<td width="77%">
+        	<td width="90%">
 						<Link to={{pathname: `/archives/${title_link}/${archive.key}`, state: archive.key}} >
 							{archive.title}
 						</Link>
         	</td>
           <td>
-              {archive.current_time}
+              {current_time}
           </td>
         </tr>
       );
@@ -89,7 +91,7 @@ class OldStuff extends Component {
                 </FormGroup>
           </PageHeader>
 			  <Row className="show-grid">
-			    <Col xs={12} md={8} mdOffset={2}>
+			    <Col xs={12} md={10} mdOffset={1}>
 			      <Table condensed>
             <thead>
               <tr>
