@@ -1,7 +1,7 @@
 import React, { Component } from 'react';
 import { withRouter, Link } from "react-router-dom";
 import { Grid, Row, Button, PageHeader, Col, Table, Glyphicon } from 'react-bootstrap';
-import firebase from 'firebase';
+import firebase from 'firebase/app';
 import { dbName } from '../../Utils/Variable.js';
 import { archivesList, authUser } from '../../Utils/FbData.js';
 
@@ -47,15 +47,15 @@ class Admin extends Component {
   render() {
     //load title list
     const listItems = this.state.archives
-    .sort((a, b) => a.current_time < b.current_time)
+    .sort((a, b) => Date.parse(b.current_time) - Date.parse(a.current_time))
     .map((archive, i) => {
       return (
         <tr key={i}>
           <td width="80%">
               {archive.title}
           </td>
-          <td>
-            <Button bsStyle="warning" className="delete-btn" onClick={(e) => this.handleDelete(archive.key, e)}><Glyphicon glyph="remove" /> delete</Button>
+          <td>     
+            <Button bsStyle="warning" className="delete-btn" onClick={(e) => {if(window.confirm('Delete the item?')){this.handleDelete(archive.key, e)};}}><Glyphicon glyph="remove" /> delete</Button>
           </td>
           <td>
             <Link to={`/admin-edit/${archive.key}`} >
