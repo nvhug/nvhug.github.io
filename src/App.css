@@ -1,3 +1,15 @@
+body {
+  font-family: monospace;
+  font-size: 15px;
+}
+.h1, .h2, .h3, .h4, .h5, .h6, h1, h2, h3, h4, h5, h6 {
+  font-weight: bold;
+  line-height: 1.7;
+}
+
+p {
+  font-family: inherit;
+}
 .App {
   text-align: center;
 }
@@ -40,6 +52,13 @@ nav.navbar.navbar-inverse .container {
 .search-form {
   width: 40%;
   margin-top: 10px;
+}
+.search-form input#formBasicText {
+  border-radius: 20px;
+}
+
+.content-render {
+  white-space: break-spaces;
 }
 
 div p { 
