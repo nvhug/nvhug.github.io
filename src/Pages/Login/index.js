@@ -1,7 +1,7 @@
 import React, { Component } from 'react';
 import { withRouter } from "react-router-dom";
 import { Col, Grid, Row, FormGroup, ControlLabel, FormControl, Button } from 'react-bootstrap';
-import firebase from 'firebase';
+import firebase from 'firebase/app';
 
 class Login extends Component {
 	constructor(props) {

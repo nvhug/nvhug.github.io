@@ -1,7 +1,7 @@
 import React, { Component } from 'react';
 import { withRouter } from "react-router-dom";
-import { Grid, Row, FormGroup, ControlLabel, FormControl, HelpBlock, Button } from 'react-bootstrap';
-import firebase from 'firebase';
+import { Grid, Row, FormGroup, ControlLabel, FormControl, HelpBlock, ButtonToolbar, Button } from 'react-bootstrap';
+import firebase from 'firebase/app';
 import { dbName } from '../../Utils/Variable.js';
 
 class AdminCreate extends Component {
@@ -20,12 +20,10 @@ class AdminCreate extends Component {
   }
 
   componentDidMount() {
-    console.log('componentDidMount');
+    
     firebase.auth().onAuthStateChanged(function(user) {
       if (!user) {
         window.location.replace("#/login");
-      } else {
-        console.log(user.email);
       }
     });
   }
@@ -92,7 +90,11 @@ class AdminCreate extends Component {
               />
               <FormControl.Feedback />
             </FormGroup>
+            <ButtonToolbar>
+            <Button href="#/archives" bsClass='btn btn-default'>Back to list</Button>
+            
             <Button bsStyle="primary" onClick={this.handleSubmit}>Submit</Button>
+            </ButtonToolbar>
         </form>
        </Row>
       </Grid>
