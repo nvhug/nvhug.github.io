@@ -37,7 +37,7 @@ class About extends Component {
     return (
     	<Grid>
         <Row className="show-grid">
-          <Col xs={12} md={12}>
+          <Col xs={12} md={8} mdOffset={2}>
             <PageHeader>
               About
             </PageHeader>

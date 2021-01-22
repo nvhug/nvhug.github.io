@@ -86,7 +86,7 @@ class OldStuffDetail extends Component {
     return (
       <Grid>
         <Row className="show-grid">
-          <Col xs={12} md={12}>
+          <Col xs={12} md={10} mdOffset={1}>
             <PageHeader>
               {this.state.title}
               {btnEdit}
