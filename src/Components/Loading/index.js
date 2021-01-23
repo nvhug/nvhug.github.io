@@ -7,7 +7,8 @@ class Loading extends Component {
     return (
     	<Row>
         <Col xs={12} md={4} mdOffset={4}>
-          <Image src={require('../../Images/loading3.gif')} width="100%" />
+      
+           <Image src="/favicon.ico" width="100%" />
         </Col>
       </Row>
     );

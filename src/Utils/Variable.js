@@ -2,7 +2,7 @@ const dbProduction = "nvhung-db";
 const dbDev = "nvhung-db-dev";
 
 var dbName = "";
-if(document.domain === "localhost") {
+if(document.domain != "nvhug.github.io") {
 	dbName = dbDev;
 }else {
 	dbName = dbProduction;
