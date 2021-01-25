@@ -5,14 +5,15 @@ import { dbName } from './Variable.js';
 
 
 // initialize firebase
-var config = {
-      apiKey: "AIzaSyAucNLoiTXvsfgonkAnCjnuxVRFlsgJNWM",
-      authDomain: "nvhug-1dcfd.firebaseapp.com",
-      databaseURL: "https://nvhug-1dcfd.firebaseio.com",
-      projectId: "nvhug-1dcfd",
-      storageBucket: "",
-      messagingSenderId: "214786625463"
-    };
+const config = {
+  apiKey: "AIzaSyAucNLoiTXvsfgonkAnCjnuxVRFlsgJNWM",
+  authDomain: "nvhug-1dcfd.firebaseapp.com",
+  databaseURL: "https://nvhug-1dcfd.firebaseio.com",
+  projectId: "nvhug-1dcfd",
+  storageBucket: "nvhug-1dcfd.appspot.com",
+  messagingSenderId: "214786625463",
+  appId: "1:214786625463:web:7c55dfb6006762cb7aa232"
+};
 firebase.initializeApp(config);
 
 var archivesList = [];

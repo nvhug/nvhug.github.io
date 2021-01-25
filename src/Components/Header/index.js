@@ -36,12 +36,19 @@ class Header extends Component {
   render() {
     const isLoggedIn = this.state.isLoggedIn;
     const adminButton = isLoggedIn ? (
+
         <NavDropdown eventKey="5" title="Admin" id="nav-dropdown">
           <MenuItem eventKey="5.1" href="#admin">Old stuff</MenuItem>
-          <MenuItem eventKey="5.2" href="#admin-about">About</MenuItem>
-          <MenuItem eventKey="5.3" href="#admin-create">Create</MenuItem>
+          <MenuItem eventKey="5.2" href="#admin-about">Create About</MenuItem>
+          <MenuItem eventKey="5.3" href="#admin-create">Create Post</MenuItem>
         </NavDropdown>
       ) : '';
+    const onlyMe = isLoggedIn ? (
+      <NavItem eventKey={4} href="#private">
+        Private
+      </NavItem>
+    ) : '';
+
     const button = isLoggedIn ? (
       <NavItem eventKey={2} href="#logout" onClick={this.handleLogout}>
         Logout
@@ -51,7 +58,7 @@ class Header extends Component {
         Login
       </NavItem>
     );
-  
+    
     return (
       <Navbar inverse collapseOnSelect>
         <Navbar.Header>
@@ -68,7 +75,7 @@ class Header extends Component {
             <NavItem eventKey={3} href="#archives">
               Old Stuff
             </NavItem>
-       
+            {onlyMe}
             {adminButton}
           </Nav>
           <Nav pullRight>

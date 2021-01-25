@@ -1,9 +1,8 @@
 import React, { Component } from 'react';
 import { withRouter } from "react-router-dom";
-import { Grid, Row, FormGroup, ControlLabel, FormControl, HelpBlock, ButtonToolbar, Button } from 'react-bootstrap';
+import { Grid, Row, FormGroup, ControlLabel, FormControl, HelpBlock, ButtonToolbar, Button,DropdownButton ,MenuItem } from 'react-bootstrap';
 import firebase from 'firebase/app';
 import { dbName } from '../../Utils/Variable.js';
-import Moment from 'react-moment';
 
 class AdminCreate extends Component {
 
@@ -59,7 +58,35 @@ class AdminCreate extends Component {
     alert('create ' +  postData.title);
   }
 
+  
+
+
   render() {
+    const BUTTONS = ['Default', 'Primary', 'Success', 'Info', 'Warning', 'Danger'];
+
+  function renderDropdownButton(title, i) {
+    return (
+      <DropdownButton
+        bsStyle={title.toLowerCase()}
+        title={title}
+        key={i}
+        id={`dropdown-basic-${i}`}
+      >
+        <MenuItem eventKey="1">Action</MenuItem>
+        <MenuItem eventKey="2">Another action</MenuItem>
+        <MenuItem eventKey="3" active>
+          Active Item
+        </MenuItem>
+        <MenuItem divider />
+        <MenuItem eventKey="4">Separated link</MenuItem>
+      </DropdownButton>
+    );
+  }
+
+  const buttonsInstance = (
+    <ButtonToolbar>{BUTTONS.map(renderDropdownButton)}</ButtonToolbar>
+  )
+
     return (
     	<Grid>
         <Row className="show-grid">
@@ -79,6 +106,7 @@ class AdminCreate extends Component {
               <HelpBlock>Validation is based on string length.</HelpBlock>
             </FormGroup>
 
+            {buttonsInstance}
             <FormGroup controlId="formControlsTextarea"
             >
               <ControlLabel>Content</ControlLabel>

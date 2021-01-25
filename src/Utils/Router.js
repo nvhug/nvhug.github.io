@@ -5,6 +5,7 @@ import About from '../Pages/About';
 import OldStuff from '../Pages/OldStuff';
 import OldStuffDetail from '../Pages/OldStuffDetail';
 import Portfolio from '../Pages/Portfolio';
+import Private from '../Pages/Private';
 import Admin from '../Pages/Admin';
 import AdminEdit from '../Pages/Admin/edit.js';
 import AdminCreate from '../Pages/Admin/create.js';
@@ -25,6 +26,7 @@ class Router extends Component {
               <Route path="/archives/:archiveId/:keyOldStuff" component={OldStuffDetail} />
               <Route path="/archives" component={OldStuff} />
               <Route path="/portfolio" component={Portfolio} />
+               <Route path="/private" component={Private} />
               <Route path="/admin" component={Admin} />
               <Route path="/admin-edit/:keyOldStuff" component={AdminEdit} />
               <Route path="/admin-create" component={AdminCreate} />
