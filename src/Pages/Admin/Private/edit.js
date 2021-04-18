@@ -3,6 +3,9 @@ import { withRouter } from "react-router-dom";
 import { Grid, Row, FormGroup, ControlLabel, FormControl, HelpBlock, ButtonToolbar, Button } from 'react-bootstrap';
 import firebase from 'firebase/app';
 import { dbName } from '../../../Utils/Variable.js';
+import { modulesQuill, formatsQuill } from '../../../Utils/Init.js';
+import ReactQuill from 'react-quill';
+import 'react-quill/dist/quill.snow.css';
 
 class AdminEdit extends Component {
 
@@ -11,6 +14,7 @@ class AdminEdit extends Component {
 
     this.handleChange = this.handleChange.bind(this);
     this.handleSubmit = this.handleSubmit.bind(this);
+    this.handleChangeTitle = this.handleChangeTitle.bind(this);
 
     const key = props.match.params.keyOldStuff;
 
@@ -52,8 +56,12 @@ class AdminEdit extends Component {
     return null;
   }
 
-  handleChange(e) {
+  handleChangeTitle(e) {
     this.setState({ [e.target.name]: e.target.value });
+  }
+
+  handleChange(html) {
+    this.setState({ body: html });
   }
 
   handleSubmit(e) {
@@ -86,7 +94,7 @@ class AdminEdit extends Component {
                 value={this.state.title}
                 name="title"
                 placeholder="Enter text"
-                onChange={this.handleChange}
+                onChange={this.handleChangeTitle}
               />
               <FormControl.Feedback />
               <HelpBlock>Validation is based on string length.</HelpBlock>
@@ -95,14 +103,13 @@ class AdminEdit extends Component {
             <FormGroup controlId="formControlsTextarea"
             >
               <ControlLabel>Content</ControlLabel>
-              <FormControl 
-                componentClass="textarea" 
-                value={this.state.body}
-                rows="20"
-                name="body"
-                placeholder="Enter text"
-                onChange={this.handleChange}
-              />
+              <ReactQuill theme="snow"
+                    modules={modulesQuill}
+                    formats={formatsQuill} 
+                    value={this.state.body} 
+                    onChange={this.handleChange}
+              /> 
+
               <FormControl.Feedback />
             </FormGroup>
             <ButtonToolbar>

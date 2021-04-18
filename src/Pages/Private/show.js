@@ -2,16 +2,12 @@ import React, { Component } from 'react';
 import { withRouter } from "react-router-dom";
 import { Grid, Row, Col, PageHeader, Button } from 'react-bootstrap';
 import firebase from 'firebase/app';
-
-import ReactMarkdown from 'react-markdown';
 import 'highlightjs/styles/atom-one-dark.css';
 import highlightjs from'highlightjs';
 import { dbName } from '../../Utils/Variable.js';
 import { privatesList, authUser, isLogin } from '../../Utils/FbData.js';
-import breaks from 'remark-breaks';
 
 class PrivateShow extends Component {
-
 	constructor(props) {
     super(props);
     console.log("show page private detail");
@@ -29,7 +25,6 @@ class PrivateShow extends Component {
     if(privatesList.length === 0) {
       firebase.database().ref(dbName + '/privates/' + key).once('value').then(function(snapshot) {
         var body = snapshot.val().body;
-        console.log(body);
         var title = snapshot.val().title;
         that.setState({
           body: body,
@@ -81,7 +76,7 @@ class PrivateShow extends Component {
   }
   
   render() {
-    var link_to = "#/admin-edit/" + this.state.key;
+    var link_to = "#/private-edit/" + this.state.key;
     const btnEdit = authUser ? (<Button href={link_to} bsClass='btn btn-default pull-right'>Edit</Button>) : '';
     return (
       <Grid>
@@ -91,8 +86,7 @@ class PrivateShow extends Component {
               {this.state.title}
               {btnEdit}
             </PageHeader>
-
-            <ReactMarkdown className="content-render" plugins={[breaks]} source={this.state.body} />
+            <div dangerouslySetInnerHTML={{ __html: this.state.body }} />
           </Col>
         </Row>
       </Grid>

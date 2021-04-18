@@ -1,9 +1,12 @@
 import React, { Component } from 'react';
 import { withRouter } from "react-router-dom";
-import { Grid, Row, FormGroup, ControlLabel, FormControl, HelpBlock, ButtonToolbar, Button,DropdownButton ,MenuItem } from 'react-bootstrap';
+import { Grid, Row, FormGroup, ControlLabel, FormControl, HelpBlock, ButtonToolbar, Button } from 'react-bootstrap';
 import firebase from 'firebase/app';
-import { dbName } from '../../../Utils/Variable.js';
 
+import { dbName } from '../../../Utils/Variable.js';
+import { modulesQuill, formatsQuill } from '../../../Utils/Init.js';
+import ReactQuill from 'react-quill';
+import 'react-quill/dist/quill.snow.css';
 class AdminCreate extends Component {
 
   constructor(props, context) {
@@ -20,7 +23,6 @@ class AdminCreate extends Component {
   }
 
   componentDidMount() {
-    
     firebase.auth().onAuthStateChanged(function(user) {
       if (!user) {
         window.location.replace("#/login");
@@ -30,17 +32,17 @@ class AdminCreate extends Component {
 
   getValidationState() {
     const length = this.state.title.length;
-    if (length > 3) return 'success';
-    else if (length > 1) return 'warning';
-    else if (length > 0) return 'error';
+    if (length > 0) return 'amazing good job!!';
+    else if (length === 0) return 'Tiêu đề không được trống!!';
     return null;
   }
 
   handleChange(e) {
     this.setState({ title: e.target.value });
   }
-  handleContentChange(e) {
-    this.setState({ content: e.target.value });
+
+  handleContentChange(html) {
+    this.setState({ content: html });
   }
   
   handleSubmit(e) {
@@ -55,38 +57,10 @@ class AdminCreate extends Component {
     var updates = {};
     updates[dbName + '/privates/' + newPriveKey] = priveData;
     firebase.database().ref().update(updates);
-    alert('create ' +  priveData.title);
+    alert('created ' +  priveData.title);
   }
-
   
-
-
   render() {
-    const BUTTONS = ['Default', 'Primary', 'Success', 'Info', 'Warning', 'Danger'];
-
-  function renderDropdownButton(title, i) {
-    return (
-      <DropdownButton
-        bsStyle={title.toLowerCase()}
-        title={title}
-        key={i}
-        id={`dropdown-basic-${i}`}
-      >
-        <MenuItem eventKey="1">Action</MenuItem>
-        <MenuItem eventKey="2">Another action</MenuItem>
-        <MenuItem eventKey="3" active>
-          Active Item
-        </MenuItem>
-        <MenuItem divider />
-        <MenuItem eventKey="4">Separated link</MenuItem>
-      </DropdownButton>
-    );
-  }
-
-  const buttonsInstance = (
-    <ButtonToolbar>{BUTTONS.map(renderDropdownButton)}</ButtonToolbar>
-  )
-
     return (
     	<Grid>
         <Row className="show-grid">
@@ -106,18 +80,15 @@ class AdminCreate extends Component {
               <HelpBlock>Validation is based on string length.</HelpBlock>
             </FormGroup>
 
-            {buttonsInstance}
-            <FormGroup controlId="formControlsTextarea"
-            >
+            <FormGroup controlId="formControlsTextarea">
               <ControlLabel>Content</ControlLabel>
-              <FormControl 
-                componentClass="textarea" 
-                value={this.state.content}
-                rows="20"
-                placeholder="Enter text"
-                onChange={this.handleContentChange}
-              />
-              <FormControl.Feedback />
+              <ReactQuill theme="snow"
+                    modules={modulesQuill}
+                    formats={formatsQuill} 
+                    value={this.state.content} 
+                    onChange={this.handleContentChange}
+              /> 
+            <FormControl.Feedback />
             </FormGroup>
             <ButtonToolbar>
             <Button href="#/privates" bsClass='btn btn-default'>Back to list</Button>

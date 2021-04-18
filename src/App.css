@@ -65,6 +65,10 @@ nav.navbar.navbar-inverse .container {
   background-color: yellow;
 }
 
+.ql-container {
+  height: 350px;
+} 
+
 @media only screen and (max-width: 768px) {
   .search-form {
     margin-top: 20px;

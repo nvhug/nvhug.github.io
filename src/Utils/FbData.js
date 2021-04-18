@@ -36,7 +36,7 @@ function isLogin() {
     if (!user) {
       window.location.replace("#/login");
     } else {
-      console.log(user.email);
+      console.log("welcome to vuvi.vn!");
     }
   });
 }
