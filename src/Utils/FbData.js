@@ -16,16 +16,32 @@ const config = {
 };
 firebase.initializeApp(config);
 
-var archivesList = [];
-firebase.database().ref(dbName +'/posts').orderByChild('curTime').once('value', function(snapshot) {
+
+
+function getDataList(keyName) {
+  var lists= [];
+  firebase.database().ref(dbName +'/' + keyName).orderByChild('curTime').once('value', function(snapshot) {
   snapshot.forEach(function(childSnapshot) {
-    var childKey = childSnapshot.key;
-    var childData = childSnapshot.val();
+      var childKey = childSnapshot.key;
+      var childData = childSnapshot.val();
 
-    archivesList.push({'key': childKey, 'title': childData.title, 'body': childData.body, 'current_time': childData.curTime});
+      lists.push({'key': childKey, 'title': childData.title, 'body': childData.body, 'current_time': childData.curTime});
+    });
   });
-});
+  return lists;
+}
 
+function isLogin() {
+  firebase.auth().onAuthStateChanged(function(user) {
+    if (!user) {
+      window.location.replace("#/login");
+    } else {
+      console.log(user.email);
+    }
+  });
+}
+var archivesList = getDataList('posts');
+var privatesList = getDataList('privates');
 var about = "";
 firebase.database().ref(dbName + '/about').once('value').then(function(snapshot) {
   about = snapshot.val() ? snapshot.val() : '';
@@ -38,4 +54,4 @@ firebase.auth().onAuthStateChanged(function(user) {
   } 
 });
 
-export { archivesList, about, authUser };
+export { archivesList, about, authUser, privatesList, isLogin };

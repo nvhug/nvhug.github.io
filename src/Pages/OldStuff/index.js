@@ -43,7 +43,6 @@ class OldStuff extends Component {
   }
 
 	handleOnClick = (event, key) => {
-    // Path is itemId
     this.props.history.push(`/archives/${key}`);
   };
 
@@ -51,6 +50,14 @@ class OldStuff extends Component {
     this.setState({inputFilter: e.target.value})
   }
   render() {
+
+    //function removeVietnameseTones(str) { const newStr = str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D'); return newStr; }
+   
+    function getHighlightedText(text, highlight) {
+        // Split text on highlight term, include term itself into parts, ignore case
+        const parts = text.split(new RegExp(`(${highlight})`, 'gi'));
+        return <span>{parts.map(part => part.toLowerCase() === highlight.toLowerCase() ? <b className="highlight">{part}</b> : part)}</span>;
+    }
     const loading = this.state.loading ? <Loading /> : '';
   	const listItems = this.state.archives
     .filter((archive) => 
@@ -59,12 +66,13 @@ class OldStuff extends Component {
     .sort((a, b) => Date.parse(b.current_time) - Date.parse(a.current_time))
     .map((archive, i) => {
       var title_link = archive.title.replace(/\s/g, '-');
+      var title = getHighlightedText(archive.title, this.state.inputFilter.toLowerCase());
       var current_time = moment(archive.current_time).format("YYYY/MM/DD");
       return (
         <tr key={i}>
         	<td width="90%">
-						<Link to={{pathname: `/archives/${title_link}/${archive.key}`, state: archive.key}} >
-							{archive.title}
+						<Link className="wrap-highlight" to={{pathname: `/archives/${title_link}/${archive.key}`, state: archive.key}} >
+							{title}
 						</Link>
         	</td>
           <td>

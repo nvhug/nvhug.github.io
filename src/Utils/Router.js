@@ -5,10 +5,18 @@ import About from '../Pages/About';
 import OldStuff from '../Pages/OldStuff';
 import OldStuffDetail from '../Pages/OldStuffDetail';
 import Portfolio from '../Pages/Portfolio';
-import Private from '../Pages/Private';
+import Private from '../Pages/Private/index';
+import PrivateShow from '../Pages/Private/show.js';
 import Admin from '../Pages/Admin';
 import AdminEdit from '../Pages/Admin/edit.js';
 import AdminCreate from '../Pages/Admin/create.js';
+
+import PrivateIndex from '../Pages/Admin/Private/index.js';
+import PrivateEdit from '../Pages/Admin/Private/edit.js';
+
+import PrivateCreate from '../Pages/Admin/Private/create.js';
+
+
 import AdminAbout from '../Pages/Admin/About';
 import Login from '../Pages/Login';
 import Header from '../Components/Header';
@@ -26,10 +34,17 @@ class Router extends Component {
               <Route path="/archives/:archiveId/:keyOldStuff" component={OldStuffDetail} />
               <Route path="/archives" component={OldStuff} />
               <Route path="/portfolio" component={Portfolio} />
-               <Route path="/private" component={Private} />
+            
+              <Route path="/privates/:privateId/:keyPrivates" component={PrivateShow} />
+              <Route path="/privates" component={Private} /> 
               <Route path="/admin" component={Admin} />
               <Route path="/admin-edit/:keyOldStuff" component={AdminEdit} />
               <Route path="/admin-create" component={AdminCreate} />
+
+              <Route path="/private-index" component={PrivateIndex} />
+              <Route path="/private-edit/:keyOldStuff" component={PrivateEdit} />
+              <Route path="/private-create" component={PrivateCreate} />
+
               <Route path="/admin-about" component={AdminAbout} />
               <Route path="/login" component={Login} />
             </Switch>

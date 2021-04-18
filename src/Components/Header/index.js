@@ -38,13 +38,19 @@ class Header extends Component {
     const adminButton = isLoggedIn ? (
 
         <NavDropdown eventKey="5" title="Admin" id="nav-dropdown">
-          <MenuItem eventKey="5.1" href="#admin">Old stuff</MenuItem>
+          <MenuItem eventKey="5.1" href="#admin">List Post</MenuItem>
           <MenuItem eventKey="5.2" href="#admin-about">Create About</MenuItem>
           <MenuItem eventKey="5.3" href="#admin-create">Create Post</MenuItem>
+          <NavDropdown eventKey="6" title="Private Ad" id="nav-dropdown">
+            <MenuItem eventKey="6.1" href="#private-index">Private list</MenuItem>
+            <MenuItem eventKey="6.2" href="#private-create">Create Private Post</MenuItem>
+          </NavDropdown>
         </NavDropdown>
       ) : '';
+  
+
     const onlyMe = isLoggedIn ? (
-      <NavItem eventKey={4} href="#private">
+      <NavItem eventKey={4} href="#privates">
         Private
       </NavItem>
     ) : '';

@@ -3,7 +3,7 @@ import { withRouter, Link } from "react-router-dom";
 import { Grid, Row, Col, Table, PageHeader, FormGroup, FormControl } from 'react-bootstrap';
 import firebase from 'firebase/app';
 import { dbName } from '../../Utils/Variable.js';
-import { archivesList } from '../../Utils/FbData.js';
+import { privatesList, isLogin } from '../../Utils/FbData.js';
 import Loading from '../../Components/Loading';
 import moment from 'moment';
 
@@ -12,28 +12,31 @@ class Private extends Component {
     super(props);
 
     this.state = {
-      archives: archivesList,
+      privates: privatesList,
       inputFilter: '',
       loading: true
     };
 
-    document.title = "nvhug | Old Stuff";
+    document.title = "nvhug | For me";
   }
 
+  componentDidMount() {
+    isLogin();
+  }
   componentWillMount() {
     //if data not loading before, get data from firebase
-    if(this.state.archives.length === 0) {
+    if(this.state.privates.length === 0) {
       var that = this;
-      var archives_list = [];
-      firebase.database().ref(dbName +'/only-me').once('value', function(snapshot) {
+      var privates_list = [];
+      firebase.database().ref(dbName +'/privates').once('value', function(snapshot) {
         
         snapshot.forEach(function(childSnapshot) {
           var childKey = childSnapshot.key;
           var childData = childSnapshot.val();
           var currentTime = moment(childData.curTime).format("YYYY/MM/DD");
-          archives_list.push({'key': childKey, 'title': childData.title, 'current_time': currentTime});
+          privates_list.push({'key': childKey, 'title': childData.title, 'current_time': currentTime});
         });
-        that.setState({ archives: archives_list, loading: false });
+        that.setState({ privates: privates_list, loading: false });
 
       });
 
@@ -44,7 +47,7 @@ class Private extends Component {
 
 	handleOnClick = (event, key) => {
     // Path is itemId
-    this.props.history.push(`/archives/${key}`);
+    this.props.history.push(`/privates/${key}`);
   };
 
   handleChange = (e) => {
@@ -52,7 +55,7 @@ class Private extends Component {
   }
   render() {
     const loading = this.state.loading ? <Loading /> : '';
-  	const listItems = this.state.archives
+  	const listItems = this.state.privates
     .filter((archive) => 
       this.state.inputFilter ? archive.title.toLowerCase().search(this.state.inputFilter.toLowerCase()) >= 0 : true
     )
@@ -63,7 +66,7 @@ class Private extends Component {
       return (
         <tr key={i}>
         	<td width="90%">
-						<Link to={{pathname: `/archives/${title_link}/${archive.key}`, state: archive.key}} >
+						<Link to={{pathname: `/privates/${title_link}/${archive.key}`, state: archive.key}} >
 							{archive.title}
 						</Link>
         	</td>

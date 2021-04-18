@@ -7,3 +7,8 @@ yarn start
 ```
 yarn deploy
 ```
+
+```
+npm run build
+firebase emulators:start
+```
