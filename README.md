@@ -11,4 +11,5 @@ yarn deploy
 ```
 npm run build
 firebase emulators:start
+firebase deploy --only hosting
 ```

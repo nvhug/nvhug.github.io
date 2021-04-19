@@ -3,8 +3,7 @@ import { withRouter } from "react-router-dom";
 import { Grid, Row, FormGroup, ControlLabel, FormControl, HelpBlock, ButtonToolbar, Button } from 'react-bootstrap';
 import firebase from 'firebase/app';
 import { dbName } from '../../../Utils/Variable.js';
-import { modulesQuill, formatsQuill } from '../../../Utils/Init.js';
-import ReactQuill from 'react-quill';
+import Editor from '../../../Components/Editor';
 import 'react-quill/dist/quill.snow.css';
 
 class AdminEdit extends Component {
@@ -103,12 +102,7 @@ class AdminEdit extends Component {
             <FormGroup controlId="formControlsTextarea"
             >
               <ControlLabel>Content</ControlLabel>
-              <ReactQuill theme="snow"
-                    modules={modulesQuill}
-                    formats={formatsQuill} 
-                    value={this.state.body} 
-                    onChange={this.handleChange}
-              /> 
+              <Editor onGetContent={this.handleChange} />
 
               <FormControl.Feedback />
             </FormGroup>

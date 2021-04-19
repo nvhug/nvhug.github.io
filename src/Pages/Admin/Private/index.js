@@ -79,7 +79,7 @@ class Admin extends Component {
               <tr>
                 <th>Title</th>
                 <th></th>
-                <th><Button href="#/admin-create" bsClass='btn btn-default pull-right'>Create</Button></th>
+                <th><Button href="#/private-create" bsClass='btn btn-default pull-right'>Create</Button></th>
               </tr>
             </thead>
               <tbody>

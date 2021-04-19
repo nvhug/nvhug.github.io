@@ -1,5 +1,6 @@
 //import firebase from 'firebase';
 import firebase from 'firebase/app';
+import 'firebase/storage';
 import 'firebase/auth';
 import { dbName } from './Variable.js';
 
@@ -10,11 +11,12 @@ const config = {
   authDomain: "nvhug-1dcfd.firebaseapp.com",
   databaseURL: "https://nvhug-1dcfd.firebaseio.com",
   projectId: "nvhug-1dcfd",
-  storageBucket: "nvhug-1dcfd.appspot.com",
+  storageBucket: "gs://nvhug-1dcfd.appspot.com",
   messagingSenderId: "214786625463",
   appId: "1:214786625463:web:7c55dfb6006762cb7aa232"
 };
 firebase.initializeApp(config);
+var storage = firebase.storage();
 
 
 
@@ -54,4 +56,4 @@ firebase.auth().onAuthStateChanged(function(user) {
   } 
 });
 
-export { archivesList, about, authUser, privatesList, isLogin };
+export { archivesList, about, authUser, privatesList, isLogin, storage };

@@ -2,20 +2,16 @@ import React, { Component } from 'react';
 import { withRouter } from "react-router-dom";
 import { Grid, Row, FormGroup, ControlLabel, FormControl, HelpBlock, ButtonToolbar, Button } from 'react-bootstrap';
 import firebase from 'firebase/app';
-
 import { dbName } from '../../../Utils/Variable.js';
-import { modulesQuill, formatsQuill } from '../../../Utils/Init.js';
-import ReactQuill from 'react-quill';
-import 'react-quill/dist/quill.snow.css';
+import Editor from '../../../Components/Editor';
 class AdminCreate extends Component {
 
-  constructor(props, context) {
-    super(props, context);
+  constructor(props) {
+    super(props);
 
     this.handleChange = this.handleChange.bind(this);
     this.handleSubmit = this.handleSubmit.bind(this);
     this.handleContentChange = this.handleContentChange.bind(this);
-
     this.state = {
       title: '',
       content: ''
@@ -41,12 +37,13 @@ class AdminCreate extends Component {
     this.setState({ title: e.target.value });
   }
 
-  handleContentChange(html) {
-    this.setState({ content: html });
+  handleContentChange(contentValue) {
+    this.setState({ content: contentValue });
   }
-  
+
   handleSubmit(e) {
     //get uid 
+    console.log(this.state.content);
     var priveData = {
           body: this.state.content,
           title: this.state.title,
@@ -82,12 +79,8 @@ class AdminCreate extends Component {
 
             <FormGroup controlId="formControlsTextarea">
               <ControlLabel>Content</ControlLabel>
-              <ReactQuill theme="snow"
-                    modules={modulesQuill}
-                    formats={formatsQuill} 
-                    value={this.state.content} 
-                    onChange={this.handleContentChange}
-              /> 
+              <Editor onGetContent={this.handleContentChange} />
+              
             <FormControl.Feedback />
             </FormGroup>
             <ButtonToolbar>
