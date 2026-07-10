@@ -281,8 +281,17 @@ export default function AdminPostsPage() {
                 {filteredPosts.map((post) => (
                   <tr key={post.id} className="border-b border-emerald-50 last:border-0 hover:bg-emerald-50/70">
                     <td className="max-w-xs px-5 py-3.5">
-                      <div className="font-semibold text-zinc-900">{post.title}</div>
-                      <div className="line-clamp-1 text-xs text-zinc-500">{post.excerpt}</div>
+                      {post.published ? (
+                        <Link href={`/blog/${post.slug}`}>
+                          <div className="font-semibold text-emerald-600 hover:text-emerald-700 hover:underline">{post.title}</div>
+                          <div className="line-clamp-1 text-xs text-zinc-500">{post.excerpt}</div>
+                        </Link>
+                      ) : (
+                        <div>
+                          <div className="font-semibold text-zinc-900">{post.title}</div>
+                          <div className="line-clamp-1 text-xs text-zinc-500">{post.excerpt}</div>
+                        </div>
+                      )}
                     </td>
                     <td className="px-5 py-3.5">
                       <div className="flex flex-wrap gap-1">
@@ -310,11 +319,11 @@ export default function AdminPostsPage() {
                     <td className="px-5 py-3.5">
                       <div className="flex items-center justify-center gap-1">
                         {post.published ? (
-                          <a href={`/blog/${post.slug}`} target="_blank" rel="noreferrer" title="View">
+                          <Link href={`/blog/${post.slug}`} title="View published post">
                             <Button variant="ghost" size="icon-sm" className="text-zinc-600 hover:bg-emerald-100 hover:text-emerald-700">
                               <Eye />
                             </Button>
-                          </a>
+                          </Link>
                         ) : (
                           <Button variant="ghost" size="icon-sm" disabled title="View" className="text-zinc-400">
                             <Eye />

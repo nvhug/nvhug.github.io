@@ -1,15 +1,22 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import TableOfContentsCard from '@/components/TableOfContentsCard'
 import { supabase } from '@/lib/supabase'
-import { Post } from '@/types'
+import { Post, Tag } from '@/types'
+import { getTagColor } from '@/lib/utils'
+
+type PostRow = Post & { post_tags: { tags: Tag | null }[] }
+
+const ITEMS_PER_PAGE = 5
 
 export default function Home() {
   const [posts, setPosts] = useState<Post[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
+  const [selectedTag, setSelectedTag] = useState('all')
+  const [currentPage, setCurrentPage] = useState(1)
 
   const fetchPosts = useCallback(async (withLoading = true) => {
     if (withLoading) {
@@ -18,12 +25,18 @@ export default function Home() {
     try {
       const { data, error } = await supabase
         .from('posts')
-        .select('*')
+        .select('*, post_tags(tags(id, name))')
         .eq('published', true)
         .order('created_at', { ascending: false })
 
       if (error) throw error
-      setPosts(data || [])
+
+      const rows = (data || []) as PostRow[]
+      const mapped: Post[] = rows.map(({ post_tags, ...post }) => ({
+        ...post,
+        tags: post_tags.map((pt) => pt.tags).filter((tag): tag is Tag => tag !== null),
+      }))
+      setPosts(mapped)
     } catch (error) {
       console.error('Error fetching posts:', error)
     } finally {
@@ -39,10 +52,33 @@ export default function Home() {
     return () => window.clearTimeout(timer)
   }, [fetchPosts])
 
-  const filteredPosts = posts.filter(
-    (post) =>
-      post.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      post.excerpt.toLowerCase().includes(searchTerm.toLowerCase())
+  const allTags = useMemo(() => {
+    const map = new Map<string, string>()
+    posts.forEach((post) => post.tags?.forEach((tag) => map.set(tag.id, tag.name)))
+    return Array.from(map, ([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name))
+  }, [posts])
+
+  const filteredPosts = useMemo(
+    () =>
+      posts.filter((post) => {
+        const matchesSearch =
+          post.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          post.excerpt.toLowerCase().includes(searchTerm.toLowerCase())
+
+        const matchesTag = selectedTag === 'all' || post.tags?.some((tag) => tag.id === selectedTag)
+
+        return matchesSearch && matchesTag
+      }),
+    [posts, searchTerm, selectedTag]
+  )
+
+  const totalPages = Math.ceil(filteredPosts.length / ITEMS_PER_PAGE)
+  const paginatedPosts = useMemo(
+    () => {
+      const start = (currentPage - 1) * ITEMS_PER_PAGE
+      return filteredPosts.slice(start, start + ITEMS_PER_PAGE)
+    },
+    [filteredPosts, currentPage]
   )
 
   return (
@@ -68,10 +104,45 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="mt-6 flex flex-wrap items-center gap-2">
-            <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
-              {filteredPosts.length} bài viết
-            </span>
+          <div className="mt-6 space-y-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
+                {filteredPosts.length} bài viết
+              </span>
+              {totalPages > 1 && (
+                <span className="rounded-full border border-zinc-200 bg-white px-3 py-1 text-xs font-medium text-zinc-600">
+                  Trang {currentPage} / {totalPages}
+                </span>
+              )}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={() => setSelectedTag('all')}
+                className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors ${
+                  selectedTag === 'all'
+                    ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
+                    : 'border-emerald-100 text-zinc-600 hover:bg-emerald-50 hover:text-zinc-900'
+                }`}
+              >
+                All Tags
+              </button>
+              {allTags.map((tag) => {
+                const colors = getTagColor(tag.name)
+                const isSelected = selectedTag === tag.id
+                return (
+                  <button
+                    key={tag.id}
+                    onClick={() => setSelectedTag(tag.id)}
+                    className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition-all ${colors.border} ${colors.bg} ${colors.text} ${
+                      isSelected ? 'ring-2 ring-offset-1' : 'hover:shadow-sm'
+                    }`}
+                  >
+                    {tag.name}
+                  </button>
+                )
+              })}
+            </div>
           </div>
         </div>
       </section>
@@ -91,11 +162,58 @@ export default function Home() {
             )}
           </div>
         ) : (
-          <div className="rounded-2xl border border-emerald-100 bg-white/90 px-5 py-6 shadow-[0_18px_36px_-30px_rgba(16,185,129,0.24)] sm:px-7 sm:py-7">
-            {filteredPosts.map((post, index) => (
-              <TableOfContentsCard key={post.id} post={post} index={index} />
-            ))}
-          </div>
+          <>
+            <div className="rounded-2xl border border-emerald-100 bg-white/90 px-5 py-6 shadow-[0_18px_36px_-30px_rgba(16,185,129,0.24)] sm:px-7 sm:py-7">
+              {paginatedPosts.map((post, index) => (
+                <TableOfContentsCard key={post.id} post={post} index={(currentPage - 1) * ITEMS_PER_PAGE + index} />
+              ))}
+            </div>
+
+            {totalPages > 1 && (
+              <div className="mt-6 flex items-center justify-center gap-2">
+                <button
+                  onClick={() => {
+                    setCurrentPage(Math.max(1, currentPage - 1))
+                    window.scrollTo({ top: 0, behavior: 'smooth' })
+                  }}
+                  disabled={currentPage === 1}
+                  className="rounded-lg border border-emerald-200 px-4 py-2 text-sm font-medium text-emerald-700 transition-colors disabled:border-zinc-100 disabled:text-zinc-400 hover:bg-emerald-50 disabled:hover:bg-transparent"
+                >
+                  ← Previous
+                </button>
+
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                    <button
+                      key={page}
+                      onClick={() => {
+                        setCurrentPage(page)
+                        window.scrollTo({ top: 0, behavior: 'smooth' })
+                      }}
+                      className={`h-9 w-9 rounded-lg border font-medium transition-colors ${
+                        currentPage === page
+                          ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
+                          : 'border-emerald-100 text-zinc-600 hover:bg-emerald-50 hover:text-zinc-900'
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  ))}
+                </div>
+
+                <button
+                  onClick={() => {
+                    setCurrentPage(Math.min(totalPages, currentPage + 1))
+                    window.scrollTo({ top: 0, behavior: 'smooth' })
+                  }}
+                  disabled={currentPage === totalPages}
+                  className="rounded-lg border border-emerald-200 px-4 py-2 text-sm font-medium text-emerald-700 transition-colors disabled:border-zinc-100 disabled:text-zinc-400 hover:bg-emerald-50 disabled:hover:bg-transparent"
+                >
+                  Next →
+                </button>
+              </div>
+            )}
+          </>
         )}
       </section>
     </main>

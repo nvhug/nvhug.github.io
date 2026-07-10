@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, CircleDot, Loader2, Plus, Tags, Trash2 } from 'lucide-react'
+import { marked } from 'marked'
 
 import { supabase } from '@/lib/supabase'
 import { Post, Tag } from '@/types'
@@ -10,6 +11,40 @@ import { generateSlug, truncateHtml } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import RichEditor from '@/components/RichEditor'
+
+// Block-level tags Quill uses to represent each line/paragraph.
+const BLOCK_CLOSE_TAGS = /<\/(p|div|h[1-6]|li|blockquote|pre)>/gi
+
+/**
+ * Reduce Quill's editor HTML back to plain text, turning block boundaries
+ * (and <br>) into real newlines so markdown syntax can be reliably detected
+ * and re-parsed. This is necessary because pasted markdown lands in Quill
+ * as one <p> per line (e.g. `<p># Heading</p><p>Some text</p>`), which is
+ * not valid HTML for `marked` to interpret — each <p> hides the markdown
+ * characters from block-level parsing.
+ */
+function htmlToPlainText(html: string): string {
+  return html
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(BLOCK_CLOSE_TAGS, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#0?39;/g, "'")
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
+
+// Matches common block-level markdown syntax at the start of a line:
+// headings, blockquotes, bullet/numbered lists, fenced code blocks.
+const MARKDOWN_PATTERN = /^ {0,3}(#{1,6}\s|>\s?|[-*+]\s|\d+[.)]\s|```)/m
+
+function isLikelyMarkdown(plainText: string): boolean {
+  return MARKDOWN_PATTERN.test(plainText)
+}
 
 export interface PostFormValues {
   title: string
@@ -90,11 +125,29 @@ export default function PostForm({ mode, initialPost, submitting, onSubmit, onDe
     e.preventDefault()
     if (!title.trim() || !slug.trim() || !content.trim()) return
 
+    // The editor's `content` is Quill's HTML. If the user pasted raw
+    // markdown, Quill stores it as plain text (one <p> per line), so the
+    // markdown syntax (#, >, -, etc.) is still literally sitting in the
+    // text. Detect that case on the extracted plain text and convert the
+    // whole thing to real HTML via `marked` here, at save time. Content
+    // produced purely via the toolbar (bold, headings, images, ...) has no
+    // markdown syntax and is left untouched.
+    let finalContent = content
+    const plainText = htmlToPlainText(content)
+
+    if (isLikelyMarkdown(plainText)) {
+      try {
+        finalContent = (await marked.parse(plainText, { breaks: true, gfm: true })) as string
+      } catch (error) {
+        console.error('Markdown conversion failed:', error)
+      }
+    }
+
     await onSubmit({
       title: title.trim(),
       slug: slug.trim(),
-      excerpt: excerpt.trim() || truncateHtml(content),
-      content,
+      excerpt: excerpt.trim() || truncateHtml(finalContent),
+      content: finalContent,
       published,
       tagIds,
     })

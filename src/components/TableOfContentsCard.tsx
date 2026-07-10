@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { Post } from '@/types'
-import { formatDate } from '@/lib/utils'
+import { formatDate, getTagColor } from '@/lib/utils'
 
 interface TableOfContentsCardProps {
   post: Post
@@ -36,6 +36,23 @@ export default function TableOfContentsCard({ post, index }: TableOfContentsCard
               {formatDate(post.created_at)}
             </time>
           </div>
+
+          {/* Tags */}
+          {post.tags && post.tags.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {post.tags.map((tag) => {
+                const colors = getTagColor(tag.name)
+                return (
+                  <span
+                    key={tag.id}
+                    className={`inline-block rounded-full border ${colors.border} ${colors.bg} px-2.5 py-0.5 text-xs font-medium ${colors.text}`}
+                  >
+                    {tag.name}
+                  </span>
+                )
+              })}
+            </div>
+          )}
         </div>
 
         {/* Divider line */}
