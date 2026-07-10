@@ -72,14 +72,22 @@ export default function RichEditor({
               image: () => imageHandler(quill),
             },
           },
+          clipboard: {
+            matchVisual: false,
+          },
         },
       })
 
       quill.root.innerHTML = value
+
       quill.on('text-change', () => {
         onChangeRef.current(quill.root.innerHTML)
       })
 
+      // Intentionally no custom paste handling here: pasted markdown is
+      // inserted as plain text via Quill's default clipboard behavior
+      // (each line becomes its own paragraph). Markdown -> HTML conversion
+      // happens once, at save time, in PostForm's submit handler — not here.
       quillRef.current = quill
     })
 

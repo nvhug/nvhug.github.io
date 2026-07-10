@@ -105,7 +105,7 @@ export default function BlogPost({ params }: { params: Promise<{ slug: string }>
 
   return (
     <article className="relative min-h-svh overflow-x-clip bg-[radial-gradient(circle_at_top,#d1fae5,#f7fef9_38%,#eef2ff_100%)] pb-16 pt-24">
-      {/* Post Header */}
+      {/* Post Header & Content */}
       <section className="mx-auto w-full max-w-6xl px-4 sm:px-6">
         <div className="relative overflow-hidden rounded-3xl border border-emerald-200/70 bg-white/85 p-6 shadow-[0_24px_50px_-30px_rgba(15,23,42,0.35)] backdrop-blur sm:p-8">
           <div className="pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full bg-emerald-200/40 blur-3xl" />
@@ -128,13 +128,8 @@ export default function BlogPost({ params }: { params: Promise<{ slug: string }>
               {comments.length} comments
             </span>
           </div>
-        </div>
-      </section>
 
-      {/* Post Content */}
-      <section className="mx-auto mt-6 w-full max-w-6xl px-4 sm:px-6">
-        <div className="rounded-3xl border border-white/70 bg-white/90 p-6 shadow-[0_28px_50px_-34px_rgba(15,23,42,0.35)] backdrop-blur sm:p-8">
-          <div className="prose prose-zinc max-w-none text-zinc-700 prose-headings:font-poppins prose-headings:text-zinc-900 prose-a:text-emerald-700 hover:prose-a:text-emerald-600">
+          <div className="prose mt-8 max-w-none text-zinc-700 [&_:is(h1,h2,h3,h4)]:font-poppins [&_:is(h1,h2,h3,h4)]:text-zinc-900 [&_a]:text-emerald-700 [&_a:hover]:text-emerald-600 [&_p]:my-3">
             <div dangerouslySetInnerHTML={{ __html: post.content }} />
           </div>
         </div>

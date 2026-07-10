@@ -12,8 +12,11 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "Creative Journey - Design & Development Blog",
-  description: "A blog about design, technology, and the creative process. Featuring tutorials, inspirations, and thoughts on web design and development.",
+  title: {
+    default: "nvhug - Personal Blog",
+    template: "%s | nvhug",
+  },
+  description: "Personal blog about code, learning notes, and daily progress.",
   keywords: "design, development, nextjs, react, typescript, ui/ux",
   authors: [{ name: "Your Name" }],
 };
@@ -24,7 +27,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={cn("font-sans", geist.variable)}>
+    <html lang="en" className={cn("font-sans", geist.variable)} data-scroll-behavior="smooth">
       <body>
         <RootLayoutClient>{children}</RootLayoutClient>
       </body>
