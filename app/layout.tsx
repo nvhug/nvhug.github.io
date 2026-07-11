@@ -3,6 +3,8 @@ import "./globals.css";
 import { Geist, Playfair_Display, Poppins } from "next/font/google";
 import { cn } from "@/lib/utils";
 import { RootLayoutClient } from "@/components/RootLayoutClient";
+import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 
 const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 const playfair = Playfair_Display({subsets:['latin'],variable:'--font-playfair',style:['normal','italic']});
@@ -32,6 +34,8 @@ export default function RootLayout({
     <html lang="en" className={cn("font-sans", geist.variable, playfair.variable, poppins.variable)} data-scroll-behavior="smooth">
       <body>
         <RootLayoutClient>{children}</RootLayoutClient>
+        <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );
