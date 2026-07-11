@@ -11,9 +11,9 @@ export function RootLayoutClient({ children }: { children: React.ReactNode }) {
 
   const navItems = [
     { href: '/', label: 'Home' },
-    { href: '/about', label: 'About' },
     { href: '/notes', label: 'Notes' },
     { href: '/quotes', label: 'Quotes' },
+    { href: '/about', label: 'About' },
     { href: '/admin', label: 'Admin' },
   ]
 
@@ -27,7 +27,7 @@ export function RootLayoutClient({ children }: { children: React.ReactNode }) {
       {!hideSiteChrome && (
         <header className="fixed inset-x-0 top-0 z-50 border-b border-emerald-100/80 bg-white/88 backdrop-blur-md">
           <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-3 sm:px-6">
-            <Link href="/" className="font-poppins text-xl font-semibold tracking-tight text-zinc-900">
+            <Link href="/" className="hidden font-poppins text-xl font-semibold tracking-tight text-zinc-900 sm:block">
               nvhug
             </Link>
 
