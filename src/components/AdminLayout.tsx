@@ -4,9 +4,7 @@ import * as React from 'react'
 import {
   ArrowUpRight,
   FileText,
-  Home,
   LogOut,
-  Settings,
   Tag,
   User,
 } from 'lucide-react'
@@ -16,9 +14,7 @@ import { usePathname } from 'next/navigation'
 import {
   Sidebar,
   SidebarContent,
-  SidebarFooter,
   SidebarHeader,
-  SidebarMenuBadge,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
@@ -57,13 +53,10 @@ export function AdminSidebar() {
 
   return (
     <Sidebar collapsible="none" className="border-r border-emerald-100 bg-white/90 backdrop-blur">
-      <SidebarHeader className="border-b border-emerald-100 px-5 py-5">
-        <Link href="/" className="group flex items-center justify-between rounded-xl border border-emerald-200 bg-[linear-gradient(135deg,#ffffff_0%,#f0fdf4_100%)] px-3 py-2.5 shadow-[0_10px_25px_-18px_rgba(16,185,129,0.6)] transition-colors hover:bg-emerald-50">
-          <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-emerald-600">Control Panel</p>
-            <p className="font-poppins text-lg font-semibold leading-tight text-zinc-900">nvhug Admin</p>
-          </div>
-          <ArrowUpRight className="h-4 w-4 text-emerald-600 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+      <SidebarHeader className="border-b border-emerald-100 px-4 py-3">
+        <Link href="/" className="group inline-flex items-center gap-1.5 text-sm font-medium text-zinc-500 transition-colors hover:text-emerald-600">
+          <ArrowUpRight className="h-3.5 w-3.5 rotate-225" />
+          Home
         </Link>
       </SidebarHeader>
       <SidebarContent className="px-3 py-4">
@@ -75,26 +68,20 @@ export function AdminSidebar() {
                 <Link href={item.href}>
                   <SidebarMenuButton
                     isActive={isActive}
-                    className={`h-auto min-h-12 rounded-xl px-3 py-2.5 transition-all ${
+                    className={`h-auto min-h-12 rounded-xl px-3 py-2.5 transition-colors ${
                       isActive
-                        ? 'bg-linear-to-r from-emerald-500 to-emerald-600 text-white shadow-[0_12px_24px_-16px_rgba(16,185,129,0.9)] hover:from-emerald-500 hover:to-emerald-600'
-                        : 'text-zinc-700 hover:bg-emerald-50 hover:text-zinc-900'
+                        ? 'bg-emerald-50 text-emerald-700'
+                        : 'text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900'
                     }`}
                   >
-                    <item.icon className="h-4 w-4" />
-                    <span className="flex min-w-0 flex-1 items-center justify-between gap-2">
-                      <span className="min-w-0">
-                        <span className="block truncate text-sm font-semibold leading-tight">{item.title}</span>
-                        <span className={`block truncate text-xs ${isActive ? 'text-emerald-100' : 'text-zinc-500'}`}>
-                          {item.description}
-                        </span>
+                    <item.icon className={`h-4 w-4 ${isActive ? 'text-emerald-600' : ''}`} />
+                    <span className="min-w-0">
+                      <span className={`block truncate text-sm font-semibold leading-tight ${isActive ? 'text-emerald-800' : ''}`}>{item.title}</span>
+                      <span className={`block truncate text-xs ${isActive ? 'text-emerald-500' : 'text-zinc-400'}`}>
+                        {item.description}
                       </span>
                     </span>
-                    <SidebarMenuBadge
-                      className={isActive ? 'text-emerald-100' : 'text-zinc-500'}
-                    >
-                      {isActive ? 'Now' : ''}
-                    </SidebarMenuBadge>
+                    {isActive && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-emerald-500" />}
                   </SidebarMenuButton>
                 </Link>
               </SidebarMenuItem>
@@ -102,33 +89,8 @@ export function AdminSidebar() {
           })}
         </SidebarMenu>
 
-        <div className="mt-6 rounded-xl border border-emerald-100 bg-emerald-50/70 p-3 shadow-[0_10px_25px_-18px_rgba(16,185,129,0.55)]">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-500">Quick Links</p>
-          <div className="mt-2.5 grid gap-1.5">
-            <Link
-              href="/"
-              className="inline-flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-emerald-100 hover:text-zinc-900"
-            >
-              <Home className="h-4 w-4" />
-              Public site
-            </Link>
-            <Link
-              href="/admin/settings"
-              className="inline-flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-emerald-100 hover:text-zinc-900"
-            >
-              <Settings className="h-4 w-4" />
-              Settings
-            </Link>
-          </div>
-        </div>
       </SidebarContent>
 
-      <SidebarFooter className="border-t border-emerald-100 px-5 py-4">
-        <div className="rounded-xl border border-emerald-100 bg-white p-3 shadow-[0_10px_25px_-18px_rgba(16,185,129,0.45)]">
-          <p className="text-xs font-medium text-zinc-500">Workspace</p>
-          <p className="mt-0.5 text-sm font-semibold text-zinc-900">Editorial Console</p>
-        </div>
-      </SidebarFooter>
     </Sidebar>
   )
 }

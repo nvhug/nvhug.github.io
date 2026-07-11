@@ -29,6 +29,7 @@ const config = {
       fontFamily: {
         poppins: ['var(--font-poppins)', 'system-ui', 'sans-serif'],
         inter: ['var(--font-inter)', 'system-ui', 'sans-serif'],
+        playfair: ['var(--font-playfair)', 'Georgia', 'serif'],
       },
       fontSize: {
         '4.5xl': '48px',

@@ -13,6 +13,7 @@ export function RootLayoutClient({ children }: { children: React.ReactNode }) {
     { href: '/', label: 'Home' },
     { href: '/about', label: 'About' },
     { href: '/notes', label: 'Notes' },
+    { href: '/quotes', label: 'Quotes' },
     { href: '/admin', label: 'Admin' },
   ]
 
