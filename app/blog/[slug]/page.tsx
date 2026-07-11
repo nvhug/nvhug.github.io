@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase'
 import { Post, Comment } from '@/types'
 import { formatDate } from '@/lib/utils'
 
+
 export default function BlogPost({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = use(params)
   const [post, setPost] = useState<Post | null>(null)
@@ -114,32 +115,31 @@ export default function BlogPost({ params }: { params: Promise<{ slug: string }>
             ← Back to articles
           </Link>
 
-          <h1 className="mt-4 font-poppins text-3xl font-semibold leading-tight text-zinc-900 sm:text-4xl">{post.title}</h1>
+          <h1 className="mt-6 font-poppins text-4xl font-bold leading-snug text-zinc-900 sm:text-5xl">{post.title}</h1>
 
-          <div className="mt-6 flex flex-wrap items-center gap-3">
-            <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
-              Published
-            </span>
-            <time className="text-sm text-zinc-500">{formatDate(post.created_at)}</time>
-            <span className="rounded-full border border-zinc-200 bg-white px-3 py-1 text-xs font-medium text-zinc-600">
+          <div className="mt-8 flex flex-wrap items-center gap-4">
+            <time className="text-sm font-medium text-zinc-600">{formatDate(post.created_at)}</time>
+            <span className="text-sm font-medium text-zinc-500">•</span>
+            <span className="text-sm font-medium text-zinc-600">
               {readingMinutes} min read
             </span>
-            <span className="rounded-full border border-zinc-200 bg-white px-3 py-1 text-xs font-medium text-zinc-600">
-              {comments.length} comments
+            <span className="text-sm font-medium text-zinc-500">•</span>
+            <span className="text-sm font-medium text-zinc-600">
+              {comments.length} {comments.length === 1 ? 'comment' : 'comments'}
             </span>
           </div>
 
-          <div className="prose mt-8 max-w-none text-zinc-700 [&_:is(h1,h2,h3,h4)]:font-poppins [&_:is(h1,h2,h3,h4)]:text-zinc-900 [&_a]:text-emerald-700 [&_a:hover]:text-emerald-600 [&_p]:my-3">
+          <div className="prose prose-lg mt-10 max-w-none text-zinc-700 [&_h2]:mt-10 [&_h2]:mb-5 [&_h2]:font-poppins [&_h2]:text-3xl [&_h2]:font-bold [&_h2]:text-zinc-900 [&_h2]:border-l-4 [&_h2]:border-emerald-500 [&_h2]:pl-4 [&_h3]:mt-8 [&_h3]:mb-4 [&_h3]:font-poppins [&_h3]:text-xl [&_h3]:font-semibold [&_h3]:text-zinc-800 [&_p]:my-5 [&_p]:leading-relaxed [&_a]:font-medium [&_a]:text-emerald-600 [&_a:hover]:text-emerald-700 [&_a:hover]:underline [&_ul]:my-5 [&_ul]:ml-6 [&_ul]:space-y-2 [&_li]:leading-relaxed [&_blockquote]:my-6 [&_blockquote]:border-l-4 [&_blockquote]:border-emerald-500 [&_blockquote]:bg-emerald-50/40 [&_blockquote]:py-3 [&_blockquote]:px-4 [&_blockquote]:rounded-r-lg [&_blockquote]:italic [&_blockquote]:text-zinc-700 [&_code]:font-mono [&_code]:text-sm [&_pre]:my-6 [&_pre]:overflow-x-auto [&_pre]:rounded-xl">
             <div dangerouslySetInnerHTML={{ __html: post.content }} />
           </div>
         </div>
       </section>
 
       {/* Comments Section */}
-      <section className="mx-auto mt-6 w-full max-w-6xl px-4 sm:px-6">
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-          {/* Comments List - Left Side */}
-          <div className="md:col-span-2">
+      <section className="mx-auto mt-8 w-full max-w-6xl px-4 sm:px-6">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+          {/* Comments List */}
+          <div className="lg:col-span-2">
             <div className="mb-6 rounded-2xl border border-emerald-200/60 bg-white/90 p-6 shadow-[0_18px_40px_-32px_rgba(15,23,42,0.45)]">
               <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.15em] text-emerald-700">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
@@ -190,7 +190,7 @@ export default function BlogPost({ params }: { params: Promise<{ slug: string }>
           </div>
 
           {/* Comment Form - Right Side */}
-          <div className="md:col-span-1">
+          <div className="lg:col-span-1">
             <div className="sticky top-32">
               <div className="rounded-2xl border border-emerald-200/80 bg-linear-to-b from-white to-emerald-50/80 p-6 shadow-[0_18px_36px_-30px_rgba(5,150,105,0.5)]">
                 <h3 className="mb-1 font-poppins text-xl font-semibold text-zinc-900">Share Your Thoughts</h3>
