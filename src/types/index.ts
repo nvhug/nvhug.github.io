@@ -44,6 +44,7 @@ export interface Note {
   priority?: number
   completion_percentage?: number
   tags?: string[]
+  hide_meta?: boolean
   created_at: string
 }
 

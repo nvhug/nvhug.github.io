@@ -83,8 +83,8 @@ export default function BlogPost({ params }: { params: Promise<{ slug: string }>
 
   if (loading) {
     return (
-      <main className="min-h-svh bg-[#f7fef9] px-4 pb-16 pt-24 sm:px-6">
-        <div className="mx-auto w-full max-w-6xl rounded-2xl border border-emerald-100 bg-white p-16 text-center text-sm text-zinc-500">
+      <main className="min-h-svh bg-[#f7f4ed] px-4 pb-16 pt-24 sm:px-6">
+        <div className="mx-auto w-full max-w-3xl rounded-2xl border border-[#e5e0d5] bg-white/75 p-16 text-center text-sm text-zinc-500 shadow-[0_18px_45px_-34px_rgba(23,23,23,0.35)]">
           Loading...
         </div>
       </main>
@@ -93,10 +93,10 @@ export default function BlogPost({ params }: { params: Promise<{ slug: string }>
 
   if (!post) {
     return (
-      <main className="min-h-svh bg-[#f7fef9] px-4 pb-16 pt-24 sm:px-6">
-        <div className="mx-auto w-full max-w-6xl rounded-2xl border border-emerald-100 bg-white p-16 text-center">
+      <main className="min-h-svh bg-[#f7f4ed] px-4 pb-16 pt-24 sm:px-6">
+        <div className="mx-auto w-full max-w-3xl rounded-2xl border border-[#e5e0d5] bg-white/75 p-16 text-center shadow-[0_18px_45px_-34px_rgba(23,23,23,0.35)]">
           <h1 className="mb-4 font-poppins text-3xl font-semibold text-zinc-900">Post not found</h1>
-          <Link href="/" className="text-sm font-semibold text-emerald-700 hover:underline">
+          <Link href="/" className="text-sm font-semibold text-[#8a4a2a] hover:underline">
             ← Back to blog
           </Link>
         </div>
@@ -105,47 +105,45 @@ export default function BlogPost({ params }: { params: Promise<{ slug: string }>
   }
 
   return (
-    <article className="relative min-h-svh overflow-x-clip bg-[radial-gradient(circle_at_top,#d1fae5,#f7fef9_38%,#eef2ff_100%)] pb-16 pt-24">
+    <article className="relative min-h-svh overflow-x-clip bg-[#f7f4ed] pb-16 pt-24 text-[#171717]">
       {/* Post Header & Content */}
-      <section className="mx-auto w-full max-w-6xl px-4 sm:px-6">
-        <div className="relative overflow-hidden rounded-3xl border border-emerald-200/70 bg-white/85 p-6 shadow-[0_24px_50px_-30px_rgba(15,23,42,0.35)] backdrop-blur sm:p-8">
-          <div className="pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full bg-emerald-200/40 blur-3xl" />
-
-          <Link href="/" className="text-sm font-medium text-zinc-500 transition-colors hover:text-emerald-700">
+      <section className="mx-auto w-full max-w-3xl px-4 sm:px-6">
+        <div className="rounded-[28px] border border-[#e5e0d5] bg-[#fffdf8]/82 px-5 py-6 shadow-[0_24px_70px_-48px_rgba(23,23,23,0.55)] backdrop-blur sm:px-8 sm:py-8">
+          <Link href="/" className="inline-flex rounded-full border border-[#e5e0d5] bg-white/70 px-3 py-1.5 text-sm font-medium text-zinc-500 transition-colors hover:border-[#c9bba8] hover:text-[#8a4a2a]">
             ← Back to articles
           </Link>
 
-          <h1 className="mt-6 font-poppins text-4xl font-bold leading-snug text-zinc-900 sm:text-5xl">{post.title}</h1>
+          <h1 className="mt-8 max-w-2xl font-poppins text-4xl font-semibold leading-[1.08] tracking-tight text-zinc-950 sm:text-5xl">{post.title}</h1>
 
-          <div className="mt-8 flex flex-wrap items-center gap-4">
-            <time className="text-sm font-medium text-zinc-600">{formatDate(post.created_at)}</time>
-            <span className="text-sm font-medium text-zinc-500">•</span>
-            <span className="text-sm font-medium text-zinc-600">
+          <div className="mt-6 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-zinc-500">
+            <time>{formatDate(post.created_at)}</time>
+            <span aria-hidden="true">/</span>
+            <span>
               {readingMinutes} min read
             </span>
-            <span className="text-sm font-medium text-zinc-500">•</span>
-            <span className="text-sm font-medium text-zinc-600">
+            <span aria-hidden="true">/</span>
+            <span>
               {comments.length} {comments.length === 1 ? 'comment' : 'comments'}
             </span>
           </div>
 
-          <div className="prose prose-lg mt-10 max-w-none text-zinc-700 [&_h2]:mt-10 [&_h2]:mb-5 [&_h2]:font-poppins [&_h2]:text-3xl [&_h2]:font-bold [&_h2]:text-zinc-900 [&_h2]:border-l-4 [&_h2]:border-emerald-500 [&_h2]:pl-4 [&_h3]:mt-8 [&_h3]:mb-4 [&_h3]:font-poppins [&_h3]:text-xl [&_h3]:font-semibold [&_h3]:text-zinc-800 [&_p]:my-5 [&_p]:leading-relaxed [&_a]:font-medium [&_a]:text-emerald-600 [&_a:hover]:text-emerald-700 [&_a:hover]:underline [&_ul]:my-5 [&_ul]:ml-6 [&_ul]:space-y-2 [&_li]:leading-relaxed [&_blockquote]:my-6 [&_blockquote]:border-l-4 [&_blockquote]:border-emerald-500 [&_blockquote]:bg-emerald-50/40 [&_blockquote]:py-3 [&_blockquote]:px-4 [&_blockquote]:rounded-r-lg [&_blockquote]:italic [&_blockquote]:text-zinc-700 [&_code]:font-mono [&_code]:text-sm [&_pre]:my-6 [&_pre]:overflow-x-auto [&_pre]:rounded-xl">
+          <div className="prose mt-9 max-w-none text-[16.5px] text-zinc-800 [&_a]:font-medium [&_a]:text-[#8a4a2a] [&_a:hover]:underline [&_blockquote]:my-5 [&_blockquote]:rounded-2xl [&_blockquote]:border [&_blockquote]:border-[#e5e0d5] [&_blockquote]:bg-[#f7f4ed]/65 [&_blockquote]:px-5 [&_blockquote]:py-3.5 [&_blockquote]:text-zinc-700 [&_blockquote]:shadow-inner [&_code]:rounded-md [&_code]:bg-[#f7f4ed] [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:font-mono [&_code]:text-sm [&_h1]:font-poppins [&_h1]:text-3xl [&_h1]:font-semibold [&_h1]:tracking-tight [&_h1]:text-zinc-950 [&_h2]:mb-2.5 [&_h2]:mt-8 [&_h2]:font-poppins [&_h2]:text-2xl [&_h2]:font-semibold [&_h2]:tracking-tight [&_h2]:text-zinc-950 [&_h3]:mb-2 [&_h3]:mt-6 [&_h3]:font-poppins [&_h3]:text-xl [&_h3]:font-semibold [&_h3]:text-zinc-900 [&_li]:pl-1 [&_li]:leading-7 [&_ol]:my-3.5 [&_ol]:list-decimal [&_ol]:space-y-1 [&_ol]:pl-7 [&_p]:my-3 [&_p]:leading-[1.65] [&_pre]:my-5 [&_pre]:overflow-x-auto [&_pre]:rounded-2xl [&_pre]:border [&_pre]:border-[#e5e0d5] [&_pre]:bg-zinc-950 [&_pre]:p-5 [&_table]:my-5 [&_table]:w-full [&_table]:overflow-hidden [&_table]:rounded-2xl [&_table]:border [&_table]:border-[#e5e0d5] [&_table]:bg-white/70 [&_td]:border-t [&_td]:border-[#e5e0d5] [&_td]:px-4 [&_td]:py-3 [&_th]:bg-[#f7f4ed] [&_th]:px-4 [&_th]:py-3 [&_th]:text-left [&_ul]:my-3.5 [&_ul]:list-disc [&_ul]:space-y-1 [&_ul]:pl-7">
             <div dangerouslySetInnerHTML={{ __html: post.content }} />
           </div>
         </div>
       </section>
 
       {/* Comments Section */}
-      <section className="mx-auto mt-8 w-full max-w-6xl px-4 sm:px-6">
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+      <section className="mx-auto mt-8 w-full max-w-3xl px-4 sm:px-6">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_280px]">
           {/* Comments List */}
-          <div className="lg:col-span-2">
-            <div className="mb-6 rounded-2xl border border-emerald-200/60 bg-white/90 p-6 shadow-[0_18px_40px_-32px_rgba(15,23,42,0.45)]">
-              <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.15em] text-emerald-700">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+          <div>
+            <div className="mb-4 rounded-2xl border border-[#e5e0d5] bg-white/65 p-5">
+              <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-[#e5e0d5] bg-[#f7f4ed] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.15em] text-[#8a4a2a]">
+                <span className="h-1.5 w-1.5 rounded-full bg-[#a05b35]" />
                 Reader Feedback
               </div>
-              <h2 className="mb-2 font-poppins text-2xl font-semibold text-zinc-900">Discussions</h2>
+              <h2 className="mb-1 font-poppins text-2xl font-semibold text-zinc-900">Discussions</h2>
               <p className="text-sm text-zinc-600">Be the first to share your thoughts.</p>
             </div>
 
@@ -153,11 +151,11 @@ export default function BlogPost({ params }: { params: Promise<{ slug: string }>
             {comments.length > 0 && (
               <div className="space-y-4">
                 {comments.map((comment) => (
-                  <div key={comment.id} className="rounded-2xl border border-emerald-100/80 bg-white/95 p-5 shadow-[0_16px_34px_-30px_rgba(15,23,42,0.55)] transition-transform hover:-translate-y-0.5">
+                  <div key={comment.id} className="rounded-2xl border border-[#e5e0d5] bg-white/75 p-5 shadow-[0_14px_34px_-30px_rgba(23,23,23,0.5)]">
                     <div className="flex gap-4 items-start">
                       {/* Avatar placeholder */}
-                      <div className="h-10 w-10 shrink-0 rounded-full border border-emerald-200 bg-emerald-100/80 flex items-center justify-center">
-                        <span className="text-xs font-bold text-emerald-700/80">
+                      <div className="h-10 w-10 shrink-0 rounded-full border border-[#e5e0d5] bg-[#f7f4ed] flex items-center justify-center">
+                        <span className="text-xs font-bold text-[#8a4a2a]">
                           {comment.author.charAt(0).toUpperCase()}
                         </span>
                       </div>
@@ -181,8 +179,8 @@ export default function BlogPost({ params }: { params: Promise<{ slug: string }>
             )}
 
             {comments.length === 0 && (
-              <div className="rounded-2xl border border-dashed border-emerald-200 bg-white/80 p-8 text-center">
-                <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">✦</div>
+              <div className="rounded-2xl border border-dashed border-[#d8cdbf] bg-white/60 p-8 text-center">
+                <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-[#f7f4ed] text-[#8a4a2a]">✦</div>
                 <p className="font-medium text-zinc-700">No comments yet</p>
                 <p className="mt-1 text-sm text-zinc-500">Start the conversation using the form on the right.</p>
               </div>
@@ -190,9 +188,9 @@ export default function BlogPost({ params }: { params: Promise<{ slug: string }>
           </div>
 
           {/* Comment Form - Right Side */}
-          <div className="lg:col-span-1">
+          <div>
             <div className="sticky top-32">
-              <div className="rounded-2xl border border-emerald-200/80 bg-linear-to-b from-white to-emerald-50/80 p-6 shadow-[0_18px_36px_-30px_rgba(5,150,105,0.5)]">
+              <div className="rounded-2xl border border-[#e5e0d5] bg-white/75 p-5 shadow-[0_18px_36px_-32px_rgba(23,23,23,0.45)]">
                 <h3 className="mb-1 font-poppins text-xl font-semibold text-zinc-900">Share Your Thoughts</h3>
                 <p className="mb-6 text-xs text-zinc-600">Your feedback helps me improve.</p>
                 
@@ -206,7 +204,7 @@ export default function BlogPost({ params }: { params: Promise<{ slug: string }>
                       onChange={(e) =>
                         setNewComment({ ...newComment, author: e.target.value })
                       }
-                      className="w-full rounded-xl border border-emerald-200 bg-white/95 px-3 py-2 text-sm text-zinc-900 outline-none transition-all focus-visible:border-emerald-500 focus-visible:ring-2 focus-visible:ring-emerald-500/20"
+                      className="w-full rounded-xl border border-[#e5e0d5] bg-[#fffdf8] px-3 py-2 text-sm text-zinc-900 outline-none transition-all focus-visible:border-[#a05b35] focus-visible:ring-2 focus-visible:ring-[#a05b35]/15"
                       required
                     />
                   </div>
@@ -219,7 +217,7 @@ export default function BlogPost({ params }: { params: Promise<{ slug: string }>
                       onChange={(e) =>
                         setNewComment({ ...newComment, content: e.target.value })
                       }
-                      className="w-full resize-none rounded-xl border border-emerald-200 bg-white/95 px-3 py-2 text-sm text-zinc-900 outline-none transition-all focus-visible:border-emerald-500 focus-visible:ring-2 focus-visible:ring-emerald-500/20"
+                      className="w-full resize-none rounded-xl border border-[#e5e0d5] bg-[#fffdf8] px-3 py-2 text-sm text-zinc-900 outline-none transition-all focus-visible:border-[#a05b35] focus-visible:ring-2 focus-visible:ring-[#a05b35]/15"
                       rows={5}
                       required
                     />
@@ -227,7 +225,7 @@ export default function BlogPost({ params }: { params: Promise<{ slug: string }>
 
                   <button
                     type="submit"
-                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-500"
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#171717] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#8a4a2a]"
                   >
                     Post Comment
                     <span aria-hidden="true">→</span>

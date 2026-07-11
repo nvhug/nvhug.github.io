@@ -13,11 +13,14 @@ import {
   X,
 } from 'lucide-react'
 
+import { toast } from 'sonner'
+
 import { supabase } from '@/lib/supabase'
 import { Note } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Badge } from '@/components/ui/badge'
+import { ConfirmModal } from '@/components/ui/confirm-modal'
+import { TagInput } from '@/components/ui/tag-input'
 
 type TypeFilter = 'all' | 'good' | 'bad'
 
@@ -41,10 +44,11 @@ type Draft = {
   type: 'good' | 'bad'
   priority: number
   completion_percentage: number
-  tags: string
+  tags: string[]
+  hide_meta: boolean
 }
 
-type EditDraft = Omit<Draft, 'note_date'>
+type EditDraft = Omit<Draft, 'note_date'> & { hide_meta: boolean }
 
 const textareaClass =
   'w-full resize-y rounded-lg border border-emerald-200 bg-white px-2.5 py-2 text-sm text-zinc-900 outline-none placeholder:text-zinc-500 focus-visible:border-emerald-400'
@@ -63,6 +67,10 @@ export default function NotesPage() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingDraft, setEditingDraft] = useState<EditDraft | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<Note | null>(null)
+  const [deleting, setDeleting] = useState(false)
+  const [percentEditId, setPercentEditId] = useState<string | null>(null)
+  const [percentEditValue, setPercentEditValue] = useState('')
   const editTextareaRef = useRef<HTMLTextAreaElement | null>(null)
 
   useLayoutEffect(() => {
@@ -107,7 +115,8 @@ export default function NotesPage() {
       type: 'good',
       priority: 3,
       completion_percentage: 0,
-      tags: '',
+      tags: [],
+      hide_meta: true,
     })
   }
 
@@ -134,7 +143,8 @@ export default function NotesPage() {
           status: 'in_progress',
           priority: draft.priority,
           completion_percentage: draft.completion_percentage,
-          tags: draft.tags ? draft.tags.split(',').map((t) => t.trim()) : [],
+          tags: draft.tags,
+          hide_meta: draft.hide_meta,
         },
       ])
       if (error) throw error
@@ -142,7 +152,7 @@ export default function NotesPage() {
       await fetchNotes()
     } catch (error) {
       console.error('Error creating note:', error)
-      alert('Không thể thêm note.')
+      toast.error('Không thể thêm note.')
     } finally {
       setSavingDraft(false)
     }
@@ -155,7 +165,8 @@ export default function NotesPage() {
       type: note.type,
       priority: note.priority ?? 3,
       completion_percentage: note.completion_percentage ?? 0,
-      tags: note.tags && note.tags.length > 0 ? note.tags.join(', ') : '',
+      tags: note.tags ?? [],
+      hide_meta: note.hide_meta ?? false,
     })
   }
 
@@ -178,7 +189,8 @@ export default function NotesPage() {
       type: editingDraft.type,
       priority: editingDraft.priority,
       completion_percentage: editingDraft.completion_percentage,
-      tags: editingDraft.tags ? editingDraft.tags.split(',').map((t) => t.trim()).filter(Boolean) : [],
+      tags: editingDraft.tags,
+      hide_meta: editingDraft.hide_meta,
     }
 
     setBusyId(note.id)
@@ -189,24 +201,50 @@ export default function NotesPage() {
       cancelEdit()
     } catch (error) {
       console.error('Error updating note:', error)
-      alert('Không thể cập nhật note.')
+      toast.error('Không thể cập nhật note.')
     } finally {
       setBusyId(null)
     }
   }
 
-  async function handleDelete(note: Note) {
-    if (!confirm('Xoá note này?')) return
-
-    setBusyId(note.id)
+  async function confirmDelete() {
+    if (!deleteTarget) return
+    setDeleting(true)
     try {
-      const { error } = await supabase.from('notes').delete().eq('id', note.id)
+      const { error } = await supabase.from('notes').delete().eq('id', deleteTarget.id)
       if (error) throw error
-      setNotes((prev) => prev.filter((n) => n.id !== note.id))
+      setNotes((prev) => prev.filter((n) => n.id !== deleteTarget.id))
+      setDeleteTarget(null)
+      toast.success('Đã xoá note.')
     } catch (error) {
       console.error('Error deleting note:', error)
+      toast.error('Không thể xoá note.')
     } finally {
-      setBusyId(null)
+      setDeleting(false)
+    }
+  }
+
+  async function updatePriority(note: Note, priority: number) {
+    setNotes((prev) => prev.map((n) => (n.id === note.id ? { ...n, priority } : n)))
+    try {
+      const { error } = await supabase.from('notes').update({ priority }).eq('id', note.id)
+      if (error) throw error
+    } catch {
+      setNotes((prev) => prev.map((n) => (n.id === note.id ? { ...n, priority: note.priority } : n)))
+      toast.error('Không thể cập nhật.')
+    }
+  }
+
+  async function savePercentage(note: Note) {
+    const pct = Math.min(100, Math.max(0, Number(percentEditValue) || 0))
+    setPercentEditId(null)
+    setNotes((prev) => prev.map((n) => (n.id === note.id ? { ...n, completion_percentage: pct } : n)))
+    try {
+      const { error } = await supabase.from('notes').update({ completion_percentage: pct }).eq('id', note.id)
+      if (error) throw error
+    } catch {
+      setNotes((prev) => prev.map((n) => (n.id === note.id ? { ...n, completion_percentage: note.completion_percentage } : n)))
+      toast.error('Không thể cập nhật.')
     }
   }
 
@@ -236,6 +274,11 @@ export default function NotesPage() {
       items: [...items].sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0)),
     }))
   }, [filteredNotes])
+
+  const allTags = useMemo(
+    () => [...new Set(notes.flatMap((n) => n.tags ?? []))].sort(),
+    [notes]
+  )
 
   const typeTabs: { key: TypeFilter; label: string; count: number }[] = [
     { key: 'all', label: 'Tất cả', count: counts.all },
@@ -329,6 +372,15 @@ export default function NotesPage() {
                       className="w-48"
                     />
                     <span className="w-9 text-right text-xs font-medium text-zinc-600">{draft.completion_percentage}%</span>
+                    <label className="inline-flex cursor-pointer items-center gap-1.5 text-xs text-zinc-500 select-none">
+                      <input
+                        type="checkbox"
+                        checked={draft.hide_meta}
+                        onChange={(e) => updateDraft({ hide_meta: e.target.checked })}
+                        className="h-3.5 w-3.5 accent-emerald-500"
+                      />
+                      Ẩn tiến độ
+                    </label>
                   </div>
                 </div>
                 <textarea
@@ -346,12 +398,10 @@ export default function NotesPage() {
                   placeholder="Hôm nay bạn đã làm gì..."
                   className={textareaClass}
                 />
-                <Input
-                  type="text"
+                <TagInput
                   value={draft.tags}
-                  onChange={(e) => updateDraft({ tags: e.target.value })}
-                  placeholder="Tags, cách nhau bằng dấu phẩy"
-                  className="border-emerald-200 bg-white text-zinc-900"
+                  onChange={(tags) => updateDraft({ tags })}
+                  suggestions={allTags}
                 />
                 <div className="flex items-center justify-end gap-2">
                   <Button variant="ghost" size="sm" onClick={cancelDraft} className="text-zinc-600 hover:bg-emerald-100 hover:text-emerald-700">
@@ -422,7 +472,7 @@ export default function NotesPage() {
                           note.type === 'good' ? 'border-emerald-400' : 'border-amber-400'
                         }`}
                       >
-                        <div className="min-w-0 flex-1">
+                        <div className="min-w-0 flex-1" onDoubleClick={() => editingId !== note.id && startEdit(note)}>
                           {editingId === note.id && editingDraft ? (
                             <div className="flex flex-col gap-2">
                               <div className="flex flex-wrap items-center gap-2">
@@ -472,6 +522,15 @@ export default function NotesPage() {
                                   <span className="w-9 text-right text-xs font-medium text-zinc-600">
                                     {editingDraft.completion_percentage}%
                                   </span>
+                                  <label className="inline-flex cursor-pointer items-center gap-1.5 text-xs text-zinc-500 select-none">
+                                    <input
+                                      type="checkbox"
+                                      checked={editingDraft.hide_meta}
+                                      onChange={(e) => updateEditingDraft({ hide_meta: e.target.checked })}
+                                      className="h-3.5 w-3.5 accent-emerald-500"
+                                    />
+                                    Ẩn tiến độ
+                                  </label>
                                 </div>
                               </div>
                               <textarea
@@ -488,36 +547,64 @@ export default function NotesPage() {
                                 }}
                                 className={autoTextareaClass}
                               />
-                              <Input
-                                type="text"
+                              <TagInput
                                 value={editingDraft.tags}
-                                onChange={(e) => updateEditingDraft({ tags: e.target.value })}
-                                placeholder="Tags, cách nhau bằng dấu phẩy"
-                                className="border-emerald-200 bg-white text-zinc-900"
+                                onChange={(tags) => updateEditingDraft({ tags })}
+                                suggestions={allTags}
                               />
                             </div>
                           ) : (
                             <>
                               <p className="whitespace-pre-wrap text-sm text-zinc-800">{note.content}</p>
-                              <div className="mt-2 flex flex-wrap items-center gap-2">
-                                {note.priority && (
-                                  <span className="inline-flex items-center gap-0.5">
-                                    {([1, 2, 3, 4, 5] as const).map((star) => (
+                              {!note.hide_meta && <div className="mt-2 flex flex-wrap items-center gap-2">
+                                <span className="inline-flex items-center gap-0.5">
+                                  {([1, 2, 3, 4, 5] as const).map((star) => (
+                                    <button
+                                      key={star}
+                                      type="button"
+                                      onClick={() => updatePriority(note, star)}
+                                      className="rounded hover:scale-110 transition-transform"
+                                    >
                                       <Star
-                                        key={star}
-                                        className={`h-3 w-3 ${
-                                          star <= note.priority! ? 'fill-amber-400 text-amber-400' : 'text-zinc-300'
+                                        className={`h-3.5 w-3.5 transition-colors ${
+                                          star <= (note.priority ?? 0) ? 'fill-amber-400 text-amber-400' : 'text-zinc-300 hover:text-amber-300'
                                         }`}
                                       />
-                                    ))}
-                                  </span>
+                                    </button>
+                                  ))}
+                                </span>
+                                {percentEditId === note.id ? (
+                                  <div className="flex items-center gap-1">
+                                    <input
+                                      autoFocus
+                                      type="number"
+                                      min="0"
+                                      max="100"
+                                      value={percentEditValue}
+                                      onChange={(e) => setPercentEditValue(e.target.value)}
+                                      onBlur={() => savePercentage(note)}
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter') savePercentage(note)
+                                        if (e.key === 'Escape') setPercentEditId(null)
+                                      }}
+                                      className="w-14 rounded-md border border-emerald-300 bg-white px-1.5 py-0.5 text-xs text-zinc-900 outline-none focus:border-emerald-500"
+                                    />
+                                    <span className="text-xs text-zinc-500">%</span>
+                                  </div>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => { setPercentEditId(note.id); setPercentEditValue(String(note.completion_percentage ?? 0)) }}
+                                    className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs transition-colors hover:border-emerald-300 hover:bg-emerald-50 ${
+                                      note.completion_percentage
+                                        ? 'border-zinc-200 bg-zinc-50 text-zinc-700'
+                                        : 'border-dashed border-zinc-200 text-zinc-400'
+                                    }`}
+                                  >
+                                    {note.completion_percentage ? `${note.completion_percentage}%` : '—'}
+                                  </button>
                                 )}
-                                {note.completion_percentage !== undefined && (
-                                  <Badge className="border border-zinc-200 bg-zinc-50 text-zinc-700">
-                                    {note.completion_percentage}% ✓
-                                  </Badge>
-                                )}
-                              </div>
+                              </div>}
                               {note.tags && note.tags.length > 0 && (
                                 <div className="mt-2 flex flex-wrap gap-1">
                                   {(Array.isArray(note.tags) ? note.tags : []).map((tag: string, idx: number) => (
@@ -562,7 +649,7 @@ export default function NotesPage() {
                                 variant="ghost"
                                 size="icon-sm"
                                 disabled={busyId === note.id}
-                                onClick={() => handleDelete(note)}
+                                onClick={() => setDeleteTarget(note)}
                                 className="text-rose-300 hover:bg-rose-500/15"
                               >
                                 <Trash2 />
@@ -579,6 +666,13 @@ export default function NotesPage() {
           )}
         </section>
       </div>
+      <ConfirmModal
+        open={!!deleteTarget}
+        itemContent={deleteTarget?.content}
+        loading={deleting}
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </main>
   )
 }
