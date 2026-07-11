@@ -1,11 +1,13 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Check, Quote, Sparkles, X } from 'lucide-react'
+import { Check, Pencil, Quote, Sparkles, Trash2, X } from 'lucide-react'
+import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import { Quote as QuoteType } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { ConfirmModal } from '@/components/ui/confirm-modal'
 
 export default function QuotesPage() {
   const [quotes, setQuotes] = useState<QuoteType[]>([])
@@ -19,6 +21,8 @@ export default function QuotesPage() {
   const [editingContent, setEditingContent] = useState('')
   const [editingAuthor, setEditingAuthor] = useState('')
   const [busyId, setBusyId] = useState<string | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<QuoteType | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
   async function fetchQuotes() {
     setLoading(true)
@@ -69,21 +73,27 @@ export default function QuotesPage() {
       await fetchQuotes()
     } catch (error) {
       console.error('Error adding quote:', error)
-      alert('Không thể thêm quote.')
+      toast.error('Không thể thêm quote.')
     } finally {
       setSaving(false)
     }
   }
 
-  async function deleteQuote(quote: QuoteType) {
-    if (!confirm('Xoá quote này?')) return
-
+  async function confirmDelete() {
+    if (!deleteTarget) return
+    setDeleting(true)
     try {
-      const { error } = await supabase.from('quotes').delete().eq('id', quote.id)
+      const { error } = await supabase.from('quotes').delete().eq('id', deleteTarget.id)
       if (error) throw error
-      await fetchQuotes()
+      setQuotes((prev) => prev.filter((q) => q.id !== deleteTarget.id))
+      if (currentQuote?.id === deleteTarget.id) setCurrentQuote(null)
+      setDeleteTarget(null)
+      toast.success('Đã xoá quote.')
     } catch (error) {
       console.error('Error deleting quote:', error)
+      toast.error('Không thể xoá quote.')
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -114,7 +124,7 @@ export default function QuotesPage() {
       cancelEdit()
     } catch (error) {
       console.error('Error updating quote:', error)
-      alert('Không thể cập nhật quote.')
+      toast.error('Không thể cập nhật quote.')
     } finally {
       setBusyId(null)
     }
@@ -251,19 +261,18 @@ export default function QuotesPage() {
                         placeholder="Tác giả hoặc nguồn gốc"
                         className="border-emerald-200 bg-white text-zinc-900"
                       />
-                      <div className="flex justify-end gap-2">
-                        <Button variant="ghost" size="sm" onClick={cancelEdit} className="text-zinc-600 hover:bg-emerald-100 hover:text-emerald-700">
-                          <X />
-                          Huỷ
-                        </Button>
+                      <div className="flex justify-end gap-1">
                         <Button
-                          size="sm"
+                          variant="ghost"
+                          size="icon-sm"
                           disabled={busyId === quote.id || !editingContent.trim()}
                           onClick={() => saveEdit(quote)}
-                          className="bg-linear-to-r from-emerald-500 to-emerald-600 text-white hover:from-emerald-400 hover:to-emerald-500"
+                          className="text-zinc-600 hover:bg-emerald-100 hover:text-emerald-700"
                         >
                           <Check />
-                          Lưu
+                        </Button>
+                        <Button variant="ghost" size="icon-sm" onClick={cancelEdit} className="text-zinc-600 hover:bg-emerald-100 hover:text-emerald-700">
+                          <X />
                         </Button>
                       </div>
                     </div>
@@ -276,18 +285,24 @@ export default function QuotesPage() {
                         )}
                       </div>
                       <div className="flex shrink-0 items-center gap-1">
-                        <button
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          disabled={busyId === quote.id}
                           onClick={() => startEdit(quote)}
-                          className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-zinc-600 hover:bg-emerald-100 hover:text-emerald-700 transition-colors"
+                          className="text-zinc-600 hover:bg-emerald-100 hover:text-emerald-700"
                         >
-                          Sửa
-                        </button>
-                        <button
-                          onClick={() => deleteQuote(quote)}
-                          className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-rose-600 hover:bg-rose-50 transition-colors"
+                          <Pencil />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          disabled={busyId === quote.id}
+                          onClick={() => setDeleteTarget(quote)}
+                          className="text-rose-300 hover:bg-rose-500/15"
                         >
-                          Xoá
-                        </button>
+                          <Trash2 />
+                        </Button>
                       </div>
                     </>
                   )}
@@ -297,6 +312,14 @@ export default function QuotesPage() {
           </section>
         )}
       </div>
+      <ConfirmModal
+        open={!!deleteTarget}
+        itemContent={deleteTarget?.content}
+        itemMeta={deleteTarget?.author ? `— ${deleteTarget.author}` : undefined}
+        loading={deleting}
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </main>
   )
 }

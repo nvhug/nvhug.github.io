@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { Toaster } from 'sonner'
 
 export function RootLayoutClient({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
@@ -28,7 +29,7 @@ export function RootLayoutClient({ children }: { children: React.ReactNode }) {
         <header className="fixed inset-x-0 top-0 z-50 border-b border-emerald-100/80 bg-white/88 backdrop-blur-md">
           <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-3 sm:px-6">
             <Link href="/" className="hidden font-poppins text-xl font-semibold tracking-tight text-zinc-900 sm:block">
-              nvhug
+            nvhug
             </Link>
 
             <div className="flex items-center gap-1">
@@ -60,6 +61,7 @@ export function RootLayoutClient({ children }: { children: React.ReactNode }) {
         </header>
       )}
       {children}
+      <Toaster position="top-right" richColors />
       {!hideSiteChrome && (
         <div className="border-t border-emerald-100 bg-white">
           <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-10 sm:px-6">
