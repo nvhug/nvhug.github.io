@@ -1,14 +1,13 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import {
   Check,
-  CircleCheck,
-  Clock,
   NotebookPen,
   Pencil,
   Plus,
   Sparkles,
+  Star,
   ThumbsDown,
   Trash2,
   X,
@@ -40,24 +39,38 @@ type Draft = {
   note_date: string
   content: string
   type: 'good' | 'bad'
-  status: 'done' | 'in_progress'
+  priority: number
+  completion_percentage: number
+  tags: string
 }
+
+type EditDraft = Omit<Draft, 'note_date'>
 
 const textareaClass =
   'w-full resize-y rounded-lg border border-emerald-200 bg-white px-2.5 py-2 text-sm text-zinc-900 outline-none placeholder:text-zinc-500 focus-visible:border-emerald-400'
+
+const autoTextareaClass =
+  'w-full min-h-24 resize-none overflow-y-hidden rounded-lg border border-emerald-200 bg-white px-2.5 py-2 text-sm text-zinc-900 outline-none placeholder:text-zinc-500 focus-visible:border-emerald-400'
 
 export default function NotesPage() {
   const [notes, setNotes] = useState<Note[]>([])
   const [loading, setLoading] = useState(true)
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
-  const [onlyInProgress, setOnlyInProgress] = useState(false)
 
   const [draft, setDraft] = useState<Draft | null>(null)
   const [savingDraft, setSavingDraft] = useState(false)
 
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [editingContent, setEditingContent] = useState('')
+  const [editingDraft, setEditingDraft] = useState<EditDraft | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
+  const editTextareaRef = useRef<HTMLTextAreaElement | null>(null)
+
+  useLayoutEffect(() => {
+    const el = editTextareaRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = `${el.scrollHeight}px`
+  }, [editingId, editingDraft?.content])
 
   async function fetchNotes(withLoading = true) {
     if (withLoading) {
@@ -88,7 +101,14 @@ export default function NotesPage() {
   }, [])
 
   function openDraft() {
-    setDraft({ note_date: todayDate(), content: '', type: 'good', status: 'in_progress' })
+    setDraft({
+      note_date: todayDate(),
+      content: '',
+      type: 'good',
+      priority: 3,
+      completion_percentage: 0,
+      tags: '',
+    })
   }
 
   function cancelDraft() {
@@ -106,7 +126,17 @@ export default function NotesPage() {
 
     setSavingDraft(true)
     try {
-      const { error } = await supabase.from('notes').insert([{ ...draft, content }])
+      const { error } = await supabase.from('notes').insert([
+        {
+          note_date: draft.note_date,
+          content,
+          type: draft.type,
+          status: 'in_progress',
+          priority: draft.priority,
+          completion_percentage: draft.completion_percentage,
+          tags: draft.tags ? draft.tags.split(',').map((t) => t.trim()) : [],
+        },
+      ])
       if (error) throw error
       setDraft(null)
       await fetchNotes()
@@ -120,44 +150,46 @@ export default function NotesPage() {
 
   function startEdit(note: Note) {
     setEditingId(note.id)
-    setEditingContent(note.content)
+    setEditingDraft({
+      content: note.content,
+      type: note.type,
+      priority: note.priority ?? 3,
+      completion_percentage: note.completion_percentage ?? 0,
+      tags: note.tags && note.tags.length > 0 ? note.tags.join(', ') : '',
+    })
   }
 
   function cancelEdit() {
     setEditingId(null)
-    setEditingContent('')
+    setEditingDraft(null)
+  }
+
+  function updateEditingDraft(patch: Partial<EditDraft>) {
+    setEditingDraft((prev) => (prev ? { ...prev, ...patch } : prev))
   }
 
   async function saveEdit(note: Note) {
-    const content = editingContent.trim()
-    if (!content || content === note.content) {
-      cancelEdit()
-      return
+    if (!editingDraft) return
+    const content = editingDraft.content.trim()
+    if (!content) return
+
+    const update = {
+      content,
+      type: editingDraft.type,
+      priority: editingDraft.priority,
+      completion_percentage: editingDraft.completion_percentage,
+      tags: editingDraft.tags ? editingDraft.tags.split(',').map((t) => t.trim()).filter(Boolean) : [],
     }
 
     setBusyId(note.id)
     try {
-      const { error } = await supabase.from('notes').update({ content }).eq('id', note.id)
+      const { error } = await supabase.from('notes').update(update).eq('id', note.id)
       if (error) throw error
-      setNotes((prev) => prev.map((n) => (n.id === note.id ? { ...n, content } : n)))
+      setNotes((prev) => prev.map((n) => (n.id === note.id ? { ...n, ...update } : n)))
       cancelEdit()
     } catch (error) {
       console.error('Error updating note:', error)
       alert('Không thể cập nhật note.')
-    } finally {
-      setBusyId(null)
-    }
-  }
-
-  async function toggleStatus(note: Note) {
-    const status = note.status === 'done' ? 'in_progress' : 'done'
-    setBusyId(note.id)
-    try {
-      const { error } = await supabase.from('notes').update({ status }).eq('id', note.id)
-      if (error) throw error
-      setNotes((prev) => prev.map((n) => (n.id === note.id ? { ...n, status } : n)))
-    } catch (error) {
-      console.error('Error updating note status:', error)
     } finally {
       setBusyId(null)
     }
@@ -183,14 +215,12 @@ export default function NotesPage() {
       all: notes.length,
       good: notes.filter((n) => n.type === 'good').length,
       bad: notes.filter((n) => n.type === 'bad').length,
-      inProgress: notes.filter((n) => n.status === 'in_progress').length,
     }),
     [notes]
   )
 
   const filteredNotes = notes.filter((note) => {
     if (typeFilter !== 'all' && note.type !== typeFilter) return false
-    if (onlyInProgress && note.status !== 'in_progress') return false
     return true
   })
 
@@ -201,7 +231,10 @@ export default function NotesPage() {
       list.push(note)
       map.set(note.note_date, list)
     })
-    return Array.from(map, ([date, items]) => ({ date, items }))
+    return Array.from(map, ([date, items]) => ({
+      date,
+      items: [...items].sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0)),
+    }))
   }, [filteredNotes])
 
   const typeTabs: { key: TypeFilter; label: string; count: number }[] = [
@@ -225,7 +258,7 @@ export default function NotesPage() {
             </div>
           </div>
 
-          <div className="mt-5 grid gap-3 sm:grid-cols-4">
+          <div className="mt-5 grid gap-3 sm:grid-cols-3">
             <article className="rounded-xl border border-emerald-100 bg-white p-3 shadow-[0_1px_0_0_rgba(16,185,129,0.15)]">
               <p className="text-xs font-medium text-zinc-600">Tổng số</p>
               <p className="mt-2 text-2xl font-semibold leading-none text-zinc-900">{counts.all}</p>
@@ -237,10 +270,6 @@ export default function NotesPage() {
             <article className="rounded-xl border border-amber-100 bg-white p-3 shadow-[0_1px_0_0_rgba(217,119,6,0.15)]">
               <p className="text-xs font-medium text-zinc-600">Chưa tốt</p>
               <p className="mt-2 text-2xl font-semibold leading-none text-amber-600">{counts.bad}</p>
-            </article>
-            <article className="rounded-xl border border-emerald-100 bg-white p-3 shadow-[0_1px_0_0_rgba(16,185,129,0.15)]">
-              <p className="text-xs font-medium text-zinc-600">Đang cải thiện</p>
-              <p className="mt-2 text-2xl font-semibold leading-none text-zinc-900">{counts.inProgress}</p>
             </article>
           </div>
         </section>
@@ -278,27 +307,28 @@ export default function NotesPage() {
                       Chưa tốt
                     </button>
                   </div>
-                  <div className="inline-flex overflow-hidden rounded-lg border border-emerald-200">
-                    <button
-                      type="button"
-                      onClick={() => updateDraft({ status: 'done' })}
-                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium transition-colors ${
-                        draft.status === 'done' ? 'bg-zinc-800 text-white' : 'bg-white text-zinc-600 hover:bg-zinc-50'
-                      }`}
-                    >
-                      <CircleCheck className="h-3.5 w-3.5" />
-                      Đã làm
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => updateDraft({ status: 'in_progress' })}
-                      className={`inline-flex items-center gap-1.5 border-l border-emerald-200 px-3 py-1.5 text-sm font-medium transition-colors ${
-                        draft.status === 'in_progress' ? 'bg-zinc-800 text-white' : 'bg-white text-zinc-600 hover:bg-zinc-50'
-                      }`}
-                    >
-                      <Clock className="h-3.5 w-3.5" />
-                      Dang dở
-                    </button>
+                  <div className="inline-flex items-center gap-0.5">
+                    {([1, 2, 3, 4, 5] as const).map((star) => (
+                      <button key={star} type="button" onClick={() => updateDraft({ priority: star })}>
+                        <Star
+                          className={`h-3.5 w-3.5 ${
+                            star <= draft.priority ? 'fill-amber-400 text-amber-400' : 'text-zinc-300'
+                          }`}
+                        />
+                      </button>
+                    ))}
+                  </div>
+                  <div className="ml-auto flex items-center gap-1.5 sm:ml-0">
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      step="10"
+                      value={draft.completion_percentage}
+                      onChange={(e) => updateDraft({ completion_percentage: Number(e.target.value) })}
+                      className="w-48"
+                    />
+                    <span className="w-9 text-right text-xs font-medium text-zinc-600">{draft.completion_percentage}%</span>
                   </div>
                 </div>
                 <textarea
@@ -315,6 +345,13 @@ export default function NotesPage() {
                   }}
                   placeholder="Hôm nay bạn đã làm gì..."
                   className={textareaClass}
+                />
+                <Input
+                  type="text"
+                  value={draft.tags}
+                  onChange={(e) => updateDraft({ tags: e.target.value })}
+                  placeholder="Tags, cách nhau bằng dấu phẩy"
+                  className="border-emerald-200 bg-white text-zinc-900"
                 />
                 <div className="flex items-center justify-end gap-2">
                   <Button variant="ghost" size="sm" onClick={cancelDraft} className="text-zinc-600 hover:bg-emerald-100 hover:text-emerald-700">
@@ -364,16 +401,6 @@ export default function NotesPage() {
                 </span>
               </button>
             ))}
-            <button
-              onClick={() => setOnlyInProgress((v) => !v)}
-              className={`ml-auto inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors ${
-                onlyInProgress
-                  ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
-                  : 'border-emerald-100 text-zinc-600 hover:bg-emerald-50 hover:text-zinc-900'
-              }`}
-            >
-              Chỉ hiện đang cải thiện
-            </button>
           </div>
 
           {loading ? (
@@ -396,37 +423,112 @@ export default function NotesPage() {
                         }`}
                       >
                         <div className="min-w-0 flex-1">
-                          {editingId === note.id ? (
-                            <textarea
-                              autoFocus
-                              rows={2}
-                              value={editingContent}
-                              onChange={(e) => setEditingContent(e.target.value)}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Escape') cancelEdit()
-                                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-                                  e.preventDefault()
-                                  saveEdit(note)
-                                }
-                              }}
-                              className={textareaClass}
-                            />
+                          {editingId === note.id && editingDraft ? (
+                            <div className="flex flex-col gap-2">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <div className="inline-flex overflow-hidden rounded-lg border border-emerald-200">
+                                  <button
+                                    type="button"
+                                    onClick={() => updateEditingDraft({ type: 'good' })}
+                                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium transition-colors ${
+                                      editingDraft.type === 'good' ? 'bg-emerald-500 text-white' : 'bg-white text-zinc-600 hover:bg-emerald-50'
+                                    }`}
+                                  >
+                                    <Sparkles className="h-3.5 w-3.5" />
+                                    Tốt
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => updateEditingDraft({ type: 'bad' })}
+                                    className={`inline-flex items-center gap-1.5 border-l border-emerald-200 px-3 py-1.5 text-sm font-medium transition-colors ${
+                                      editingDraft.type === 'bad' ? 'bg-amber-500 text-white' : 'bg-white text-zinc-600 hover:bg-amber-50'
+                                    }`}
+                                  >
+                                    <ThumbsDown className="h-3.5 w-3.5" />
+                                    Chưa tốt
+                                  </button>
+                                </div>
+                                <div className="inline-flex items-center gap-0.5">
+                                  {([1, 2, 3, 4, 5] as const).map((star) => (
+                                    <button key={star} type="button" onClick={() => updateEditingDraft({ priority: star })}>
+                                      <Star
+                                        className={`h-3.5 w-3.5 ${
+                                          star <= editingDraft.priority ? 'fill-amber-400 text-amber-400' : 'text-zinc-300'
+                                        }`}
+                                      />
+                                    </button>
+                                  ))}
+                                </div>
+                                <div className="ml-auto flex items-center gap-1.5 sm:ml-0">
+                                  <input
+                                    type="range"
+                                    min="0"
+                                    max="100"
+                                    step="10"
+                                    value={editingDraft.completion_percentage}
+                                    onChange={(e) => updateEditingDraft({ completion_percentage: Number(e.target.value) })}
+                                    className="w-48"
+                                  />
+                                  <span className="w-9 text-right text-xs font-medium text-zinc-600">
+                                    {editingDraft.completion_percentage}%
+                                  </span>
+                                </div>
+                              </div>
+                              <textarea
+                                ref={editTextareaRef}
+                                autoFocus
+                                value={editingDraft.content}
+                                onChange={(e) => updateEditingDraft({ content: e.target.value })}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Escape') cancelEdit()
+                                  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                                    e.preventDefault()
+                                    saveEdit(note)
+                                  }
+                                }}
+                                className={autoTextareaClass}
+                              />
+                              <Input
+                                type="text"
+                                value={editingDraft.tags}
+                                onChange={(e) => updateEditingDraft({ tags: e.target.value })}
+                                placeholder="Tags, cách nhau bằng dấu phẩy"
+                                className="border-emerald-200 bg-white text-zinc-900"
+                              />
+                            </div>
                           ) : (
-                            <p className="whitespace-pre-wrap text-sm text-zinc-800">{note.content}</p>
+                            <>
+                              <p className="whitespace-pre-wrap text-sm text-zinc-800">{note.content}</p>
+                              <div className="mt-2 flex flex-wrap items-center gap-2">
+                                {note.priority && (
+                                  <span className="inline-flex items-center gap-0.5">
+                                    {([1, 2, 3, 4, 5] as const).map((star) => (
+                                      <Star
+                                        key={star}
+                                        className={`h-3 w-3 ${
+                                          star <= note.priority! ? 'fill-amber-400 text-amber-400' : 'text-zinc-300'
+                                        }`}
+                                      />
+                                    ))}
+                                  </span>
+                                )}
+                                {note.completion_percentage !== undefined && (
+                                  <Badge className="border border-zinc-200 bg-zinc-50 text-zinc-700">
+                                    {note.completion_percentage}% ✓
+                                  </Badge>
+                                )}
+                              </div>
+                              {note.tags && note.tags.length > 0 && (
+                                <div className="mt-2 flex flex-wrap gap-1">
+                                  {(Array.isArray(note.tags) ? note.tags : []).map((tag: string, idx: number) => (
+                                    <span key={idx} className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs text-emerald-700">
+                                      #{tag}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </>
                           )}
-                          <button
-                            onClick={() => toggleStatus(note)}
-                            disabled={busyId === note.id}
-                            className="mt-1.5 inline-block"
-                          >
-                            {note.status === 'done' ? (
-                              <Badge className="border border-emerald-300 bg-emerald-50 text-emerald-700">Đã làm</Badge>
-                            ) : (
-                              <Badge variant="outline" className="border-dashed border-zinc-300 text-zinc-600">
-                                Đang cải thiện
-                              </Badge>
-                            )}
-                          </button>
                         </div>
 
                         <div className="flex shrink-0 items-center gap-1">
@@ -435,7 +537,7 @@ export default function NotesPage() {
                               <Button
                                 variant="ghost"
                                 size="icon-sm"
-                                disabled={busyId === note.id}
+                                disabled={busyId === note.id || !editingDraft?.content.trim()}
                                 onClick={() => saveEdit(note)}
                                 className="text-zinc-600 hover:bg-emerald-100 hover:text-emerald-700"
                               >

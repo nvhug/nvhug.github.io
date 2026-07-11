@@ -41,5 +41,15 @@ export interface Note {
   content: string
   type: 'good' | 'bad'
   status: 'done' | 'in_progress'
+  priority?: number
+  completion_percentage?: number
+  tags?: string[]
+  created_at: string
+}
+
+export interface Quote {
+  id: string
+  content: string
+  author?: string
   created_at: string
 }
