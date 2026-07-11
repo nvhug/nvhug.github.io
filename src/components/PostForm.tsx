@@ -42,6 +42,12 @@ function htmlToPlainText(html: string): string {
 // headings, blockquotes, bullet/numbered lists, fenced code blocks.
 const MARKDOWN_PATTERN = /^ {0,3}(#{1,6}\s|>\s?|[-*+]\s|\d+[.)]\s|```)/m
 
+// Detects if content is already formatted HTML (not just plain markdown).
+// Checks for block-level HTML tags that Quill produces.
+function isFormattedHTML(html: string): boolean {
+  return /<(h[1-6]|p|li|blockquote|pre|div|ul|ol)(?:\s|>|\/)/i.test(html)
+}
+
 function isLikelyMarkdown(plainText: string): boolean {
   return MARKDOWN_PATTERN.test(plainText)
 }
@@ -125,21 +131,18 @@ export default function PostForm({ mode, initialPost, submitting, onSubmit, onDe
     e.preventDefault()
     if (!title.trim() || !slug.trim() || !content.trim()) return
 
-    // The editor's `content` is Quill's HTML. If the user pasted raw
-    // markdown, Quill stores it as plain text (one <p> per line), so the
-    // markdown syntax (#, >, -, etc.) is still literally sitting in the
-    // text. Detect that case on the extracted plain text and convert the
-    // whole thing to real HTML via `marked` here, at save time. Content
-    // produced purely via the toolbar (bold, headings, images, ...) has no
-    // markdown syntax and is left untouched.
     let finalContent = content
-    const plainText = htmlToPlainText(content)
 
-    if (isLikelyMarkdown(plainText)) {
-      try {
-        finalContent = (await marked.parse(plainText, { breaks: true, gfm: true })) as string
-      } catch (error) {
-        console.error('Markdown conversion failed:', error)
+    // If content is already formatted HTML (from previous save or toolbar edits),
+    // leave it as-is. Only convert if it's raw markdown (pasted plain text).
+    if (!isFormattedHTML(content)) {
+      const plainText = htmlToPlainText(content)
+      if (isLikelyMarkdown(plainText)) {
+        try {
+          finalContent = (await marked.parse(plainText, { breaks: true, gfm: true })) as string
+        } catch (error) {
+          console.error('Markdown conversion failed:', error)
+        }
       }
     }
 
