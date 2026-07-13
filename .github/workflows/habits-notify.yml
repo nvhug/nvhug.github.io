@@ -2,7 +2,7 @@ name: Habits Notify
 
 on:
   schedule:
-    - cron: '*/5 * * * *'  # every 5 minutes (UTC); endpoint converts to Vietnam time internally
+    - cron: '0 * * * *'  # every hour at :00 (UTC); endpoint converts to Vietnam time internally
   workflow_dispatch:
 
 jobs:
