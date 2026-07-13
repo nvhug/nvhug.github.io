@@ -2,9 +2,11 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import {
+  Bell,
   Check,
   NotebookPen,
   Pencil,
+  Pin,
   Plus,
   Sparkles,
   Star,
@@ -58,6 +60,12 @@ const autoTextareaClass =
 
 export default function NotesPage() {
   const [notes, setNotes] = useState<Note[]>([])
+  const [pinnedNotes, setPinnedNotes] = useState<Note[]>([])
+  const [pinnedDraft, setPinnedDraft] = useState('')
+  const [savingPinned, setSavingPinned] = useState(false)
+  const [deletingPinnedId, setDeletingPinnedId] = useState<string | null>(null)
+  const [notifyEditId, setNotifyEditId] = useState<string | null>(null)
+  const [notifyDraftTime, setNotifyDraftTime] = useState('')
   const [loading, setLoading] = useState(true)
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
 
@@ -92,7 +100,9 @@ export default function NotesPage() {
         .order('created_at', { ascending: false })
 
       if (error) throw error
-      setNotes((data || []) as Note[])
+      const all = (data || []) as Note[]
+      setPinnedNotes(all.filter((n) => n.pinned))
+      setNotes(all.filter((n) => !n.pinned))
     } catch (error) {
       console.error('Error fetching notes:', error)
     } finally {
@@ -122,6 +132,72 @@ export default function NotesPage() {
 
   function cancelDraft() {
     setDraft(null)
+  }
+
+  async function addHabit() {
+    const content = pinnedDraft.trim()
+    if (!content) return
+    setSavingPinned(true)
+    try {
+      const { error } = await supabase.from('notes').insert([{
+        note_date: todayDate(),
+        content,
+        type: 'good',
+        status: 'in_progress',
+        priority: 5,
+        completion_percentage: 0,
+        tags: [],
+        hide_meta: true,
+        pinned: true,
+      }])
+      if (error) throw error
+      setPinnedDraft('')
+      await fetchNotes(false)
+    } catch {
+      toast.error('Không thể thêm thói quen.')
+    } finally {
+      setSavingPinned(false)
+    }
+  }
+
+  async function deleteHabit(id: string) {
+    setDeletingPinnedId(id)
+    try {
+      const { error } = await supabase.from('notes').delete().eq('id', id)
+      if (error) throw error
+      setPinnedNotes((prev) => prev.filter((n) => n.id !== id))
+    } catch {
+      toast.error('Không thể xoá thói quen.')
+    } finally {
+      setDeletingPinnedId(null)
+    }
+  }
+
+  async function addNotifyTime(habit: Note) {
+    if (!notifyDraftTime) return
+    const updated = [...new Set([...(habit.notify_times || []), notifyDraftTime])].sort()
+    setNotifyEditId(null)
+    setNotifyDraftTime('')
+    setPinnedNotes((prev) => prev.map((n) => (n.id === habit.id ? { ...n, notify_times: updated } : n)))
+    try {
+      const { error } = await supabase.from('notes').update({ notify_times: updated }).eq('id', habit.id)
+      if (error) throw error
+    } catch {
+      toast.error('Không thể cập nhật giờ thông báo.')
+      setPinnedNotes((prev) => prev.map((n) => (n.id === habit.id ? { ...n, notify_times: habit.notify_times } : n)))
+    }
+  }
+
+  async function removeNotifyTime(habit: Note, time: string) {
+    const updated = (habit.notify_times || []).filter((t) => t !== time)
+    setPinnedNotes((prev) => prev.map((n) => (n.id === habit.id ? { ...n, notify_times: updated } : n)))
+    try {
+      const { error } = await supabase.from('notes').update({ notify_times: updated }).eq('id', habit.id)
+      if (error) throw error
+    } catch {
+      toast.error('Không thể cập nhật.')
+      setPinnedNotes((prev) => prev.map((n) => (n.id === habit.id ? { ...n, notify_times: habit.notify_times } : n)))
+    }
   }
 
   function updateDraft(patch: Partial<Draft>) {
@@ -269,10 +345,10 @@ export default function NotesPage() {
       list.push(note)
       map.set(note.note_date, list)
     })
-    return Array.from(map, ([date, items]) => ({
-      date,
-      items: [...items].sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0)),
-    }))
+    return Array.from(map, ([date, items]) => {
+      const sorted = [...items].sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0))
+      return { date, items: sorted, maxPriority: sorted[0]?.priority ?? 0 }
+    }).sort((a, b) => b.maxPriority - a.maxPriority)
   }, [filteredNotes])
 
   const allTags = useMemo(
@@ -314,6 +390,97 @@ export default function NotesPage() {
               <p className="text-xs font-medium text-zinc-600">Chưa tốt</p>
               <p className="mt-2 text-2xl font-semibold leading-none text-amber-600">{counts.bad}</p>
             </article>
+          </div>
+        </section>
+
+        <section className="overflow-hidden rounded-2xl border border-emerald-200 bg-[linear-gradient(130deg,#f0fdf4_0%,#ffffff_100%)] shadow-[0_4px_20px_-8px_rgba(16,185,129,0.25)]">
+          <div className="flex items-center gap-2 border-b border-emerald-100 px-4 py-3">
+            <Pin className="h-3.5 w-3.5 text-emerald-600" />
+            <span className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-600">Thói quen hằng ngày</span>
+          </div>
+          <div className="px-4 py-3 space-y-2">
+            {pinnedNotes.length === 0 && !savingPinned && (
+              <p className="text-xs text-zinc-400 italic">Chưa có thói quen nào. Thêm bên dưới.</p>
+            )}
+            {pinnedNotes.map((habit) => (
+              <div key={habit.id} className="flex flex-wrap items-center gap-2 rounded-lg border border-emerald-100 bg-white px-3 py-2 shadow-[0_1px_0_0_rgba(16,185,129,0.08)]">
+                <div className="h-2 w-2 shrink-0 rounded-full bg-emerald-400" />
+                <span className="min-w-0 flex-1 text-sm text-zinc-700">{habit.content}</span>
+                <div className="flex flex-wrap items-center gap-1">
+                  {(habit.notify_times || []).map((time) => (
+                    <span key={time} className="inline-flex items-center gap-0.5 rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                      <Bell className="h-2.5 w-2.5" />
+                      {time}
+                      <button
+                        type="button"
+                        onClick={() => removeNotifyTime(habit, time)}
+                        className="ml-0.5 rounded-full hover:text-rose-500 transition-colors"
+                      >
+                        <X className="h-2.5 w-2.5" />
+                      </button>
+                    </span>
+                  ))}
+                  {notifyEditId === habit.id ? (
+                    <div className="flex items-center gap-1">
+                      <input
+                        autoFocus
+                        type="time"
+                        value={notifyDraftTime}
+                        onChange={(e) => setNotifyDraftTime(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') { e.preventDefault(); addNotifyTime(habit) }
+                          if (e.key === 'Escape') setNotifyEditId(null)
+                        }}
+                        className="w-24 rounded-md border border-emerald-300 bg-white px-1.5 py-0.5 text-xs text-zinc-800 outline-none focus:border-emerald-500"
+                      />
+                      <button type="button" onClick={() => addNotifyTime(habit)} className="text-emerald-600 hover:text-emerald-700">
+                        <Check className="h-3.5 w-3.5" />
+                      </button>
+                      <button type="button" onClick={() => setNotifyEditId(null)} className="text-zinc-400 hover:text-zinc-600">
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => { setNotifyEditId(habit.id); setNotifyDraftTime('') }}
+                      className="rounded-full border border-dashed border-emerald-200 p-1 text-emerald-400 transition-colors hover:border-emerald-400 hover:text-emerald-600"
+                      title="Thêm giờ thông báo"
+                    >
+                      <Bell className="h-3 w-3" />
+                    </button>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  disabled={deletingPinnedId === habit.id}
+                  onClick={() => deleteHabit(habit.id)}
+                  className="rounded p-0.5 text-zinc-300 transition-colors hover:text-rose-400 disabled:opacity-40"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ))}
+            <form
+              onSubmit={(e) => { e.preventDefault(); addHabit() }}
+              className="flex items-center gap-2"
+            >
+              <input
+                type="text"
+                value={pinnedDraft}
+                onChange={(e) => setPinnedDraft(e.target.value)}
+                placeholder="Thêm thói quen mới..."
+                className="flex-1 rounded-lg border border-dashed border-emerald-200 bg-transparent px-3 py-1.5 text-sm text-zinc-700 outline-none placeholder:text-zinc-400 focus:border-emerald-400 focus:bg-white"
+              />
+              <button
+                type="submit"
+                disabled={savingPinned || !pinnedDraft.trim()}
+                className="inline-flex items-center gap-1 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-100 disabled:opacity-40"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                Thêm
+              </button>
+            </form>
           </div>
         </section>
 
@@ -468,8 +635,12 @@ export default function NotesPage() {
                     {group.items.map((note) => (
                       <div
                         key={note.id}
-                        className={`flex items-start gap-3 rounded-xl border-l-4 bg-white px-3 py-2.5 shadow-[0_1px_0_0_rgba(16,185,129,0.1)] ${
+                        className={`flex items-start gap-3 rounded-xl border-l-4 px-3 py-2.5 ${
                           note.type === 'good' ? 'border-emerald-400' : 'border-amber-400'
+                        } ${
+                          note.priority === 5
+                            ? 'bg-amber-50 shadow-[0_2px_10px_-3px_rgba(217,119,6,0.3)] ring-1 ring-amber-200'
+                            : 'bg-white shadow-[0_1px_0_0_rgba(16,185,129,0.1)]'
                         }`}
                       >
                         <div className="min-w-0 flex-1" onDoubleClick={() => editingId !== note.id && startEdit(note)}>

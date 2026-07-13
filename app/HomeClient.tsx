@@ -83,7 +83,7 @@ export default function HomeClient({
                   </div>
                   <Link href="/quotes" className="min-w-0 flex-1">
                     <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-emerald-600">Daily Quote</p>
-                    <blockquote className="whitespace-pre-wrap font-playfair text-lg font-medium leading-relaxed tracking-wide text-stone-600 hover:underline sm:text-xl">
+                    <blockquote className="whitespace-pre-wrap font-playfair text-lg font-medium leading-relaxed tracking-wide text-stone-600 sm:text-xl">
                       &ldquo;{currentQuote.content}&rdquo;
                     </blockquote>
                     {currentQuote.author && (
