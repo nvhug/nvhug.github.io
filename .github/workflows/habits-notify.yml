@@ -11,6 +11,6 @@ jobs:
     steps:
       - name: Call habits-notify endpoint
         run: |
-          curl -sf \
+          curl -s -w "\nHTTP_STATUS:%{http_code}\n" \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
             "${{ secrets.PROD_URL }}/api/habits-notify"
