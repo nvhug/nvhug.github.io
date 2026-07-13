@@ -36,18 +36,18 @@ export async function GET(request: Request) {
   const [curH, curM] = currentTime.split(':').map(Number)
   const curMinutes = curH * 60 + curM
 
-  // Use a 15-minute window to absorb GitHub Actions cron delay.
-  // Safe because the cron interval is 30 minutes — no double-send risk.
+  // 4-minute window absorbs GitHub Actions delay; safe because cron fires every 5 minutes.
   const scheduled = (habits || []).filter((h: { notify_times?: string[] }) =>
     (h.notify_times || []).some((t) => {
       const [tH, tM] = t.split(':').map(Number)
       const diff = curMinutes - (tH * 60 + tM)
-      return diff >= 0 && diff < 15
+      return diff >= 0 && diff < 4
     })
   )
 
   if (scheduled.length === 0) {
-    return NextResponse.json({ message: `No habits scheduled for ${currentTime}` })
+    const allTimes = (habits || []).flatMap((h: { notify_times?: string[] }) => h.notify_times || [])
+    return NextResponse.json({ message: `No habits scheduled for ${currentTime}`, allTimes })
   }
 
   const today = new Intl.DateTimeFormat('vi-VN', {
