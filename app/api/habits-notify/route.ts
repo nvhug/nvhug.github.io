@@ -36,18 +36,18 @@ export async function GET(request: Request) {
   const [curH, curM] = currentTime.split(':').map(Number)
   const curMinutes = curH * 60 + curM
 
-  // 4-minute window absorbs GitHub Actions delay; safe because cron fires every 5 minutes.
+  // 5-minute window matches any run within 5 min of scheduled time.
+  // Safe: next cron at T+5 has diff=5 which is NOT < 5 — no double-send.
   const scheduled = (habits || []).filter((h: { notify_times?: string[] }) =>
     (h.notify_times || []).some((t) => {
       const [tH, tM] = t.split(':').map(Number)
       const diff = curMinutes - (tH * 60 + tM)
-      return diff >= 0 && diff < 4
+      return diff >= 0 && diff < 5
     })
   )
 
   if (scheduled.length === 0) {
-    const allTimes = (habits || []).flatMap((h: { notify_times?: string[] }) => h.notify_times || [])
-    return NextResponse.json({ message: `No habits scheduled for ${currentTime}`, allTimes })
+    return NextResponse.json({ message: `No habits scheduled for ${currentTime}` })
   }
 
   const today = new Intl.DateTimeFormat('vi-VN', {
@@ -81,9 +81,11 @@ export async function GET(request: Request) {
     body: JSON.stringify(payload),
   })
 
+  const teamsBody = await res.text()
+
   if (!res.ok) {
-    return NextResponse.json({ error: 'Teams webhook failed' }, { status: 500 })
+    return NextResponse.json({ error: 'Teams webhook failed', teamsStatus: res.status, teamsBody }, { status: 500 })
   }
 
-  return NextResponse.json({ ok: true, time: currentTime, count: scheduled.length })
+  return NextResponse.json({ ok: true, time: currentTime, count: scheduled.length, teamsStatus: res.status, teamsBody })
 }
