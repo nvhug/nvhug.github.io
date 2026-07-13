@@ -36,13 +36,14 @@ export async function GET(request: Request) {
   const [curH, curM] = currentTime.split(':').map(Number)
   const curMinutes = curH * 60 + curM
 
-  // 5-minute window matches any run within 5 min of scheduled time.
-  // Safe: next cron at T+5 has diff=5 which is NOT < 5 — no double-send.
+  // 30-minute window handles GitHub Actions delays up to 30 min.
+  // Safe: cron fires every 60 min, so next run has diff=60 — never double-sends.
+  // Also covers :30 scheduled times (e.g. "16:30" matched by 17:00 cron, diff=30).
   const scheduled = (habits || []).filter((h: { notify_times?: string[] }) =>
     (h.notify_times || []).some((t) => {
       const [tH, tM] = t.split(':').map(Number)
       const diff = curMinutes - (tH * 60 + tM)
-      return diff >= 0 && diff < 5
+      return diff >= 0 && diff <= 30
     })
   )
 
