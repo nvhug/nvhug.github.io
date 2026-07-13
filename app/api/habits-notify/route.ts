@@ -33,8 +33,17 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
+  const [curH, curM] = currentTime.split(':').map(Number)
+  const curMinutes = curH * 60 + curM
+
+  // Use a 15-minute window to absorb GitHub Actions cron delay.
+  // Safe because the cron interval is 30 minutes — no double-send risk.
   const scheduled = (habits || []).filter((h: { notify_times?: string[] }) =>
-    (h.notify_times || []).includes(currentTime)
+    (h.notify_times || []).some((t) => {
+      const [tH, tM] = t.split(':').map(Number)
+      const diff = curMinutes - (tH * 60 + tM)
+      return diff >= 0 && diff < 15
+    })
   )
 
   if (scheduled.length === 0) {
