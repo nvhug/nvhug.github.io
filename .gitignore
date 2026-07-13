@@ -59,7 +59,6 @@ temp/
 
 # docs archive
 /docs/
-.github
 CLAUDE.md
 AGENTS.md
 baiviet/
