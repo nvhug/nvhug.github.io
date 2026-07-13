@@ -45,6 +45,8 @@ export interface Note {
   completion_percentage?: number
   tags?: string[]
   hide_meta?: boolean
+  pinned?: boolean
+  notify_times?: string[]
   created_at: string
 }
 
