@@ -52,6 +52,26 @@ type Draft = {
 
 type EditDraft = Omit<Draft, 'note_date'> & { hide_meta: boolean }
 
+const NOTIFY_TIME_OPTIONS = Array.from({ length: 48 }, (_, i) => {
+  const h = String(Math.floor(i / 2)).padStart(2, '0')
+  const m = i % 2 === 0 ? '00' : '30'
+  return `${h}:${m}`
+})
+
+const WORK_HOURLY_NOTIFY_OPTION = '__work-hourly__'
+
+const WORK_HOURLY_NOTIFY_TIMES = Array.from({ length: 10 }, (_, i) => `${String(8 + i).padStart(2, '0')}:00`).filter(
+  (time) => time !== '12:00' && time !== '17:00'
+)
+
+function hasWorkHourlySchedule(times: string[]) {
+  return WORK_HOURLY_NOTIFY_TIMES.every((t) => times.includes(t))
+}
+
+function stripWorkHourlyTimes(times: string[]) {
+  return times.filter((t) => !WORK_HOURLY_NOTIFY_TIMES.includes(t))
+}
+
 const textareaClass =
   'w-full resize-y rounded-lg border border-emerald-200 bg-white px-2.5 py-2 text-sm text-zinc-900 outline-none placeholder:text-zinc-500 focus-visible:border-emerald-400'
 
@@ -175,7 +195,21 @@ export default function NotesPage() {
 
   async function addNotifyTime(habit: Note) {
     if (!notifyDraftTime) return
-    const updated = [...new Set([...(habit.notify_times || []), notifyDraftTime])].sort()
+    const currentTimes = habit.notify_times || []
+    const nextTimes =
+      notifyDraftTime === WORK_HOURLY_NOTIFY_OPTION
+        ? [...currentTimes, ...WORK_HOURLY_NOTIFY_TIMES]
+        : [...currentTimes, notifyDraftTime]
+
+    const updated = [...new Set(nextTimes)].sort()
+
+    if (updated.length === currentTimes.length) {
+      setNotifyEditId(null)
+      setNotifyDraftTime('')
+      toast.error('Khung giờ này đã được thêm trước đó.')
+      return
+    }
+
     setNotifyEditId(null)
     setNotifyDraftTime('')
     setPinnedNotes((prev) => prev.map((n) => (n.id === habit.id ? { ...n, notify_times: updated } : n)))
@@ -190,6 +224,18 @@ export default function NotesPage() {
 
   async function removeNotifyTime(habit: Note, time: string) {
     const updated = (habit.notify_times || []).filter((t) => t !== time)
+    setPinnedNotes((prev) => prev.map((n) => (n.id === habit.id ? { ...n, notify_times: updated } : n)))
+    try {
+      const { error } = await supabase.from('notes').update({ notify_times: updated }).eq('id', habit.id)
+      if (error) throw error
+    } catch {
+      toast.error('Không thể cập nhật.')
+      setPinnedNotes((prev) => prev.map((n) => (n.id === habit.id ? { ...n, notify_times: habit.notify_times } : n)))
+    }
+  }
+
+  async function removeWorkHourlyNotify(habit: Note) {
+    const updated = stripWorkHourlyTimes(habit.notify_times || [])
     setPinnedNotes((prev) => prev.map((n) => (n.id === habit.id ? { ...n, notify_times: updated } : n)))
     try {
       const { error } = await supabase.from('notes').update({ notify_times: updated }).eq('id', habit.id)
@@ -403,40 +449,75 @@ export default function NotesPage() {
               <p className="text-xs text-zinc-400 italic">Chưa có thói quen nào. Thêm bên dưới.</p>
             )}
             {pinnedNotes.map((habit) => (
-              <div key={habit.id} className="flex flex-wrap items-center gap-2 rounded-lg border border-emerald-100 bg-white px-3 py-2 shadow-[0_1px_0_0_rgba(16,185,129,0.08)]">
-                <div className="h-2 w-2 shrink-0 rounded-full bg-emerald-400" />
-                <span className="min-w-0 flex-1 text-sm text-zinc-700">{habit.content}</span>
-                <div className="flex flex-wrap items-center gap-1">
-                  {(habit.notify_times || []).map((time) => (
-                    <span key={time} className="inline-flex items-center gap-0.5 rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-xs font-medium text-emerald-700">
+              <div key={habit.id} className="group flex flex-col gap-2 rounded-xl border border-emerald-100 border-l-2 border-l-emerald-300 bg-white px-3 py-2.5 shadow-[0_1px_4px_0_rgba(16,185,129,0.06)] transition-shadow hover:shadow-[0_3px_10px_0_rgba(16,185,129,0.12)] sm:flex-row sm:items-start">
+                <p className="min-w-0 text-sm font-medium leading-6 text-zinc-700 wrap-break-word sm:flex-1 sm:pr-2">{habit.content}</p>
+                <div className="flex items-start gap-2 sm:ml-auto sm:max-w-[70%]">
+                  <div className="flex min-w-0 flex-wrap items-center gap-1.5 sm:flex-nowrap sm:justify-end sm:overflow-x-auto sm:pb-0.5">
+                  {hasWorkHourlySchedule(habit.notify_times || []) && (
+                    <span className="group/chip inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] whitespace-nowrap">
+                      <Bell className="h-2.5 w-2.5" />
+                      Mỗi 1 giờ (08:00-17:00)
+                      <button
+                        type="button"
+                        onClick={() => removeWorkHourlyNotify(habit)}
+                        className="ml-0.5 rounded-full text-emerald-300 opacity-0 transition-opacity group-hover/chip:opacity-100 hover:text-rose-400"
+                      >
+                        <X className="h-2.5 w-2.5" />
+                      </button>
+                    </span>
+                  )}
+                  {stripWorkHourlyTimes(habit.notify_times || []).map((time) => (
+                    <span key={time} className="group/chip inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold tabular-nums text-emerald-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] whitespace-nowrap">
                       <Bell className="h-2.5 w-2.5" />
                       {time}
                       <button
                         type="button"
                         onClick={() => removeNotifyTime(habit, time)}
-                        className="ml-0.5 rounded-full hover:text-rose-500 transition-colors"
+                        className="ml-0.5 rounded-full text-emerald-300 opacity-0 transition-opacity group-hover/chip:opacity-100 hover:text-rose-400"
                       >
                         <X className="h-2.5 w-2.5" />
                       </button>
                     </span>
                   ))}
                   {notifyEditId === habit.id ? (
-                    <div className="flex items-center gap-1">
-                      <input
+                    <div className="inline-flex items-center gap-1 whitespace-nowrap">
+                      <select
                         autoFocus
-                        type="time"
                         value={notifyDraftTime}
                         onChange={(e) => setNotifyDraftTime(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') { e.preventDefault(); addNotifyTime(habit) }
-                          if (e.key === 'Escape') setNotifyEditId(null)
-                        }}
-                        className="w-24 rounded-md border border-emerald-300 bg-white px-1.5 py-0.5 text-xs text-zinc-800 outline-none focus:border-emerald-500"
-                      />
-                      <button type="button" onClick={() => addNotifyTime(habit)} className="text-emerald-600 hover:text-emerald-700">
+                        className="h-8 min-w-28 rounded-md border border-emerald-200 bg-white px-2 text-xs font-semibold text-emerald-700 outline-none focus:border-emerald-400"
+                      >
+                        <option value="">Chọn giờ...</option>
+                        <option
+                          value={WORK_HOURLY_NOTIFY_OPTION}
+                          disabled={hasWorkHourlySchedule(habit.notify_times || [])}
+                        >
+                          Mỗi 1 giờ (08:00-17:00, trừ 12:00 & 17:00)
+                        </option>
+                        {NOTIFY_TIME_OPTIONS.map((t) => (
+                          <option key={t} value={t} disabled={(habit.notify_times || []).includes(t)}>
+                            {t}{(habit.notify_times || []).includes(t) ? ' (đã có)' : ''}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => addNotifyTime(habit)}
+                        disabled={
+                          !notifyDraftTime ||
+                          (notifyDraftTime !== WORK_HOURLY_NOTIFY_OPTION && (habit.notify_times || []).includes(notifyDraftTime))
+                        }
+                        className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-emerald-600 text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-45"
+                        aria-label="Lưu giờ thông báo"
+                      >
                         <Check className="h-3.5 w-3.5" />
                       </button>
-                      <button type="button" onClick={() => setNotifyEditId(null)} className="text-zinc-400 hover:text-zinc-600">
+                      <button
+                        type="button"
+                        onClick={() => setNotifyEditId(null)}
+                        className="inline-flex h-7 w-7 items-center justify-center rounded-md text-zinc-500 transition-colors hover:bg-white hover:text-zinc-700"
+                        aria-label="Huỷ chọn giờ thông báo"
+                      >
                         <X className="h-3.5 w-3.5" />
                       </button>
                     </div>
@@ -444,21 +525,22 @@ export default function NotesPage() {
                     <button
                       type="button"
                       onClick={() => { setNotifyEditId(habit.id); setNotifyDraftTime('') }}
-                      className="rounded-full border border-dashed border-emerald-200 p-1 text-emerald-400 transition-colors hover:border-emerald-400 hover:text-emerald-600"
-                      title="Thêm giờ thông báo"
+                      className="inline-flex items-center gap-1 rounded-full border border-dashed border-emerald-200 px-2.5 py-0.5 text-xs text-emerald-400 transition-colors hover:border-emerald-400 hover:bg-emerald-50 hover:text-emerald-600 whitespace-nowrap"
                     >
-                      <Bell className="h-3 w-3" />
+                      <Bell className="h-2.5 w-2.5" />
+                      Thêm giờ
                     </button>
                   )}
+                  </div>
+                  <button
+                    type="button"
+                    disabled={deletingPinnedId === habit.id}
+                    onClick={() => deleteHabit(habit.id)}
+                    className="mt-0.5 shrink-0 rounded p-0.5 text-zinc-300 opacity-20 transition-opacity group-hover:opacity-100 hover:text-rose-400 disabled:opacity-40"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  disabled={deletingPinnedId === habit.id}
-                  onClick={() => deleteHabit(habit.id)}
-                  className="rounded p-0.5 text-zinc-300 transition-colors hover:text-rose-400 disabled:opacity-40"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
               </div>
             ))}
             <form
