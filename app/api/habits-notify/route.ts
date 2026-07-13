@@ -36,14 +36,12 @@ export async function GET(request: Request) {
   const [curH, curM] = currentTime.split(':').map(Number)
   const curMinutes = curH * 60 + curM
 
-  // 30-minute window handles GitHub Actions delays up to 30 min.
-  // Safe: cron fires every 60 min, so next run has diff=60 — never double-sends.
-  // Also covers :30 scheduled times (e.g. "16:30" matched by 17:00 cron, diff=30).
+  // 14-minute window: safe for two cron jobs at :00 and :30 (30 min apart).
   const scheduled = (habits || []).filter((h: { notify_times?: string[] }) =>
     (h.notify_times || []).some((t) => {
       const [tH, tM] = t.split(':').map(Number)
       const diff = curMinutes - (tH * 60 + tM)
-      return diff >= 0 && diff <= 30
+      return diff >= 0 && diff < 14
     })
   )
 
