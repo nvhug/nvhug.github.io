@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { LogOut } from 'lucide-react'
 import { Toaster } from 'sonner'
 
 export function RootLayoutClient({ children }: { children: React.ReactNode }) {
@@ -52,9 +53,10 @@ export function RootLayoutClient({ children }: { children: React.ReactNode }) {
               <button
                 type="button"
                 onClick={handleLogout}
-                className="ml-1 rounded-lg border border-emerald-200 px-3 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-emerald-50 hover:text-zinc-900"
+                className="ml-1 rounded-lg bg-transparent text-zinc-600 transition-colors hover:bg-emerald-50 hover:text-zinc-900"
+                aria-label="Đăng xuất"
               >
-                Đăng xuất
+                <LogOut className="h-5 w-5" />
               </button>
             </div>
           </div>
