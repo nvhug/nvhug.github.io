@@ -61,7 +61,7 @@ export async function GET(request: Request) {
     '@type': 'MessageCard',
     '@context': 'http://schema.org/extensions',
     themeColor: '10b981',
-    summary: 'Thói quen hằng ngày',
+    summary: scheduled.map((h: { content: string }) => h.content).join(' | '),
     sections: [
       {
         activityTitle: `🌿 Nhắc nhở lúc ${currentTime}`,

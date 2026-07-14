@@ -50,6 +50,15 @@ export interface Note {
   created_at: string
 }
 
+export interface Todo {
+  id: string
+  content: string
+  is_done: boolean
+  priority?: number
+  created_at: string
+  updated_at: string
+}
+
 export interface Quote {
   id: string
   content: string

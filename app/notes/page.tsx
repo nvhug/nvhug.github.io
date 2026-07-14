@@ -4,6 +4,9 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import {
   Bell,
   Check,
+  CheckCircle2,
+  Circle,
+  ListTodo,
   NotebookPen,
   Pencil,
   Pin,
@@ -18,7 +21,7 @@ import {
 import { toast } from 'sonner'
 
 import { supabase } from '@/lib/supabase'
-import { Note } from '@/types'
+import { Note, Todo } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ConfirmModal } from '@/components/ui/confirm-modal'
@@ -78,7 +81,11 @@ const textareaClass =
 const autoTextareaClass =
   'w-full min-h-24 resize-none overflow-y-hidden rounded-lg border border-emerald-200 bg-white px-2.5 py-2 text-sm text-zinc-900 outline-none placeholder:text-zinc-500 focus-visible:border-emerald-400'
 
+type TabType = 'notes' | 'todos'
+
 export default function NotesPage() {
+  const [currentTab, setCurrentTab] = useState<TabType>('notes')
+
   const [notes, setNotes] = useState<Note[]>([])
   const [pinnedNotes, setPinnedNotes] = useState<Note[]>([])
   const [pinnedDraft, setPinnedDraft] = useState('')
@@ -88,6 +95,18 @@ export default function NotesPage() {
   const [notifyDraftTime, setNotifyDraftTime] = useState('')
   const [loading, setLoading] = useState(true)
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
+
+  const [todos, setTodos] = useState<Todo[]>([])
+  const [todoDraft, setTodoDraft] = useState('')
+  const [savingTodo, setSavingTodo] = useState(false)
+  const [todoFilter, setTodoFilter] = useState<'all' | 'pending' | 'done'>('all')
+  const [deleteTodo, setDeleteTodo] = useState<Todo | null>(null)
+  const [deletingTodo, setDeletingTodo] = useState(false)
+
+  const [editingHabitId, setEditingHabitId] = useState<string | null>(null)
+  const [editingHabitDraft, setEditingHabitDraft] = useState('')
+  const [savingHabit, setSavingHabit] = useState(false)
+  const habitInputRef = useRef<HTMLInputElement | null>(null)
 
   const [draft, setDraft] = useState<Draft | null>(null)
   const [savingDraft, setSavingDraft] = useState(false)
@@ -130,9 +149,76 @@ export default function NotesPage() {
     }
   }
 
+  async function fetchTodos() {
+    try {
+      const { data, error } = await supabase
+        .from('todos')
+        .select('*')
+        .order('created_at', { ascending: false })
+
+      if (error) throw error
+      setTodos((data || []) as Todo[])
+    } catch (error) {
+      console.error('Error fetching todos:', error)
+    }
+  }
+
+  async function addTodo() {
+    const content = todoDraft.trim()
+    if (!content) return
+
+    setSavingTodo(true)
+    try {
+      const { error } = await supabase.from('todos').insert([{
+        content,
+        is_done: false,
+        priority: 3,
+      }])
+      if (error) throw error
+      setTodoDraft('')
+      await fetchTodos()
+      toast.success('Thêm việc cần làm thành công.')
+    } catch {
+      toast.error('Không thể thêm việc cần làm.')
+    } finally {
+      setSavingTodo(false)
+    }
+  }
+
+  async function toggleTodo(todo: Todo) {
+    try {
+      const { error } = await supabase
+        .from('todos')
+        .update({ is_done: !todo.is_done })
+        .eq('id', todo.id)
+
+      if (error) throw error
+      setTodos((prev) => prev.map((t) => (t.id === todo.id ? { ...t, is_done: !t.is_done } : t)))
+    } catch {
+      toast.error('Không thể cập nhật.')
+    }
+  }
+
+  async function confirmDeleteTodo() {
+    if (!deleteTodo) return
+    setDeletingTodo(true)
+    try {
+      const { error } = await supabase.from('todos').delete().eq('id', deleteTodo.id)
+      if (error) throw error
+      setTodos((prev) => prev.filter((t) => t.id !== deleteTodo.id))
+      setDeleteTodo(null)
+      toast.success('Đã xoá việc cần làm.')
+    } catch {
+      toast.error('Không thể xoá.')
+    } finally {
+      setDeletingTodo(false)
+    }
+  }
+
   useEffect(() => {
     const timer = window.setTimeout(() => {
       void fetchNotes(false)
+      void fetchTodos()
     }, 0)
 
     return () => window.clearTimeout(timer)
@@ -190,6 +276,38 @@ export default function NotesPage() {
       toast.error('Không thể xoá thói quen.')
     } finally {
       setDeletingPinnedId(null)
+    }
+  }
+
+  function startEditingHabit(habit: Note) {
+    setEditingHabitId(habit.id)
+    setEditingHabitDraft(habit.content)
+  }
+
+  function cancelEditingHabit() {
+    setEditingHabitId(null)
+    setEditingHabitDraft('')
+  }
+
+  async function saveEditingHabit(habit: Note) {
+    const content = editingHabitDraft.trim()
+    if (!content) {
+      toast.error('Nội dung không được để trống.')
+      return
+    }
+
+    setSavingHabit(true)
+    try {
+      const { error } = await supabase.from('notes').update({ content }).eq('id', habit.id)
+      if (error) throw error
+      setPinnedNotes((prev) => prev.map((n) => (n.id === habit.id ? { ...n, content } : n)))
+      setEditingHabitId(null)
+      setEditingHabitDraft('')
+      toast.success('Cập nhật thói quen thành công.')
+    } catch {
+      toast.error('Không thể cập nhật thói quen.')
+    } finally {
+      setSavingHabit(false)
     }
   }
 
@@ -375,8 +493,10 @@ export default function NotesPage() {
       all: notes.length,
       good: notes.filter((n) => n.type === 'good').length,
       bad: notes.filter((n) => n.type === 'bad').length,
+      todos: todos.length,
+      pendingTodos: todos.filter((t) => !t.is_done).length,
     }),
-    [notes]
+    [notes, todos]
   )
 
   const filteredNotes = notes.filter((note) => {
@@ -423,7 +543,7 @@ export default function NotesPage() {
             </div>
           </div>
 
-          <div className="mt-5 grid gap-3 sm:grid-cols-3">
+          <div className="mt-5 grid gap-3 sm:grid-cols-4">
             <article className="rounded-xl border border-emerald-100 bg-white p-3 shadow-[0_1px_0_0_rgba(16,185,129,0.15)]">
               <p className="text-xs font-medium text-zinc-600">Tổng số</p>
               <p className="mt-2 text-2xl font-semibold leading-none text-zinc-900">{counts.all}</p>
@@ -436,9 +556,44 @@ export default function NotesPage() {
               <p className="text-xs font-medium text-zinc-600">Chưa tốt</p>
               <p className="mt-2 text-2xl font-semibold leading-none text-amber-600">{counts.bad}</p>
             </article>
+            <article className="rounded-xl border border-blue-100 bg-white p-3 shadow-[0_1px_0_0_rgba(59,130,246,0.15)]">
+              <p className="text-xs font-medium text-zinc-600">Cần làm</p>
+              <p className="mt-2 text-2xl font-semibold leading-none text-blue-600">{counts.pendingTodos}</p>
+            </article>
           </div>
         </section>
 
+        <div className="flex gap-2 border-b border-emerald-200">
+          <button
+            onClick={() => setCurrentTab('notes')}
+            className={`px-4 py-3 font-medium text-sm transition-colors ${
+              currentTab === 'notes'
+                ? 'border-b-2 border-emerald-600 text-emerald-600'
+                : 'text-zinc-600 hover:text-zinc-900'
+            }`}
+          >
+            <span className="flex items-center gap-2">
+              <NotebookPen className="h-4 w-4" />
+              Notes
+            </span>
+          </button>
+          <button
+            onClick={() => setCurrentTab('todos')}
+            className={`px-4 py-3 font-medium text-sm transition-colors ${
+              currentTab === 'todos'
+                ? 'border-b-2 border-emerald-600 text-emerald-600'
+                : 'text-zinc-600 hover:text-zinc-900'
+            }`}
+          >
+            <span className="flex items-center gap-2">
+              <ListTodo className="h-4 w-4" />
+              Todos
+            </span>
+          </button>
+        </div>
+
+        {currentTab === 'notes' && (
+        <>
         <section className="overflow-hidden rounded-2xl border border-emerald-200 bg-[linear-gradient(130deg,#f0fdf4_0%,#ffffff_100%)] shadow-[0_4px_20px_-8px_rgba(16,185,129,0.25)]">
           <div className="flex items-center gap-2 border-b border-emerald-100 px-4 py-3">
             <Pin className="h-3.5 w-3.5 text-emerald-600" />
@@ -450,7 +605,53 @@ export default function NotesPage() {
             )}
             {pinnedNotes.map((habit) => (
               <div key={habit.id} className="group flex flex-col gap-2 rounded-xl border border-emerald-100 border-l-2 border-l-emerald-300 bg-white px-3 py-2.5 shadow-[0_1px_4px_0_rgba(16,185,129,0.06)] transition-shadow hover:shadow-[0_3px_10px_0_rgba(16,185,129,0.12)] sm:flex-row sm:items-start">
-                <p className="min-w-0 text-sm font-medium leading-6 text-zinc-700 wrap-break-word sm:flex-1 sm:pr-2">{habit.content}</p>
+                {editingHabitId === habit.id ? (
+                  <div className="flex flex-1 flex-col gap-2 sm:flex-row sm:items-center sm:gap-2">
+                    <input
+                      ref={habitInputRef}
+                      type="text"
+                      autoFocus
+                      value={editingHabitDraft}
+                      onChange={(e) => setEditingHabitDraft(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          void saveEditingHabit(habit)
+                        } else if (e.key === 'Escape') {
+                          cancelEditingHabit()
+                        }
+                      }}
+                      className="min-w-0 flex-1 rounded-lg border border-emerald-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-emerald-500"
+                      placeholder="Thói quen..."
+                    />
+                    <div className="flex items-center gap-1 sm:ml-auto">
+                      <button
+                        type="button"
+                        onClick={() => void saveEditingHabit(habit)}
+                        disabled={savingHabit || !editingHabitDraft.trim()}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-emerald-600 text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-45"
+                        aria-label="Lưu"
+                      >
+                        <Check className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={cancelEditingHabit}
+                        disabled={savingHabit}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-md text-zinc-500 transition-colors hover:bg-white hover:text-zinc-700 disabled:opacity-40"
+                        aria-label="Huỷ"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <p
+                    onDoubleClick={() => startEditingHabit(habit)}
+                    className="min-w-0 cursor-pointer text-sm font-medium leading-6 text-zinc-700 wrap-break-word transition-colors hover:text-zinc-900 sm:flex-1 sm:pr-2"
+                  >
+                    {habit.content}
+                  </p>
+                )}
                 <div className="flex items-start gap-2 sm:ml-auto sm:max-w-[70%]">
                   <div className="flex min-w-0 flex-wrap items-center gap-1.5 sm:flex-nowrap sm:justify-end sm:overflow-x-auto sm:pb-0.5">
                   {hasWorkHourlySchedule(habit.notify_times || []) && (
@@ -918,13 +1119,131 @@ export default function NotesPage() {
             </div>
           )}
         </section>
+        </>
+        )}
+
+        {currentTab === 'todos' && (
+        <section className="overflow-hidden rounded-2xl border border-emerald-200 bg-[linear-gradient(130deg,#f0fdf4_0%,#ffffff_100%)] shadow-[0_4px_20px_-8px_rgba(16,185,129,0.25)]">
+          <div className="flex items-center justify-between border-b border-emerald-100 px-4 py-3">
+            <div className="flex items-center gap-2">
+              <ListTodo className="h-3.5 w-3.5 text-emerald-600" />
+              <span className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-600">Việc cần làm</span>
+            </div>
+            <span className="text-xs font-medium text-emerald-600">{todos.length} việc</span>
+          </div>
+
+          <div className="px-4 py-3">
+            <div className="mb-4 flex gap-2">
+              {(['all', 'pending', 'done'] as const).map((filter) => (
+                <button
+                  key={filter}
+                  onClick={() => setTodoFilter(filter)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                    todoFilter === filter
+                      ? 'bg-emerald-100 text-emerald-700'
+                      : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
+                  }`}
+                >
+                  {filter === 'all' && 'Tất cả'}
+                  {filter === 'pending' && 'Chưa làm'}
+                  {filter === 'done' && 'Đã làm'}
+                </button>
+              ))}
+            </div>
+
+            <div className="space-y-2 mb-4">
+              {todos
+                .filter((t) => {
+                  if (todoFilter === 'pending') return !t.is_done
+                  if (todoFilter === 'done') return t.is_done
+                  return true
+                })
+                .map((todo) => (
+                  <div
+                    key={todo.id}
+                    className="flex items-center gap-3 rounded-lg border border-emerald-100 bg-white p-3 hover:bg-emerald-50 transition-colors"
+                  >
+                    <button
+                      onClick={() => toggleTodo(todo)}
+                      className="shrink-0 text-emerald-600 hover:text-emerald-700 transition-colors"
+                    >
+                      {todo.is_done ? (
+                        <CheckCircle2 className="h-5 w-5" />
+                      ) : (
+                        <Circle className="h-5 w-5" />
+                      )}
+                    </button>
+                    <span
+                      className={`flex-1 text-sm ${
+                        todo.is_done ? 'line-through text-zinc-400' : 'text-zinc-900'
+                      }`}
+                    >
+                      {todo.content}
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={() => setDeleteTodo(todo)}
+                      className="text-rose-300 hover:bg-rose-500/15"
+                    >
+                      <Trash2 />
+                    </Button>
+                  </div>
+                ))}
+
+              {todos.filter((t) => {
+                if (todoFilter === 'pending') return !t.is_done
+                if (todoFilter === 'done') return t.is_done
+                return true
+              }).length === 0 && (
+                <div className="text-center py-8 text-zinc-500">
+                  {todoFilter === 'all' && 'Chưa có việc cần làm nào.'}
+                  {todoFilter === 'pending' && 'Tất cả việc đã xong!'}
+                  {todoFilter === 'done' && 'Chưa có việc nào hoàn thành.'}
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-2 border-t border-emerald-100 pt-4">
+              <Input
+                type="text"
+                placeholder="Thêm việc cần làm..."
+                value={todoDraft}
+                onChange={(e) => setTodoDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    void addTodo()
+                  }
+                }}
+                className="flex-1"
+              />
+              <Button
+                onClick={() => void addTodo()}
+                disabled={savingTodo || !todoDraft.trim()}
+                className="gap-2"
+              >
+                <Plus className="h-4 w-4" />
+                Thêm
+              </Button>
+            </div>
+          </div>
+        </section>
+        )}
       </div>
+
       <ConfirmModal
         open={!!deleteTarget}
         itemContent={deleteTarget?.content}
         loading={deleting}
         onConfirm={confirmDelete}
         onCancel={() => setDeleteTarget(null)}
+      />
+      <ConfirmModal
+        open={!!deleteTodo}
+        itemContent={deleteTodo?.content}
+        loading={deletingTodo}
+        onConfirm={confirmDeleteTodo}
+        onCancel={() => setDeleteTodo(null)}
       />
     </main>
   )
