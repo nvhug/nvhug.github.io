@@ -76,6 +76,16 @@ export default function EditPostPage({ params }: { params: Promise<{ id: string 
         if (tagError) throw tagError
       }
 
+      // Revalidate home page cache
+      await fetch('/api/revalidate', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.NEXT_PUBLIC_REVALIDATE_SECRET}`,
+        },
+      }).catch(() => {
+        // Silently fail if revalidation doesn't work
+      })
+
       router.push('/admin')
     } catch (error) {
       console.error('Error updating post:', error)

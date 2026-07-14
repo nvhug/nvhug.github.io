@@ -881,26 +881,45 @@ export default function NotesPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2 border-b border-emerald-100 px-4 py-3.5">
-            {typeTabs.map((tab) => (
-              <button
-                key={tab.key}
-                onClick={() => setTypeFilter(tab.key)}
-                className={`inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors ${
-                  typeFilter === tab.key
-                    ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
-                    : 'border-emerald-100 text-zinc-600 hover:bg-emerald-50 hover:text-zinc-900'
-                }`}
-              >
-                {tab.label}
-                <span
-                  className={`inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-xs ${
-                    typeFilter === tab.key ? 'bg-emerald-100 text-emerald-700' : 'bg-zinc-100 text-zinc-600'
-                  }`}
+            {typeTabs.map((tab) => {
+              const isSelected = typeFilter === tab.key
+              let bgColor = 'border-emerald-100 text-zinc-600 hover:bg-emerald-50 hover:text-zinc-900'
+              let badgeBg = 'bg-zinc-100 text-zinc-600'
+
+              if (isSelected) {
+                if (tab.key === 'good') {
+                  bgColor = 'border-emerald-300 bg-emerald-50 text-emerald-700'
+                  badgeBg = 'bg-emerald-100 text-emerald-700'
+                } else if (tab.key === 'bad') {
+                  bgColor = 'border-amber-300 bg-amber-50 text-amber-700'
+                  badgeBg = 'bg-amber-100 text-amber-700'
+                } else {
+                  bgColor = 'border-emerald-300 bg-emerald-50 text-emerald-700'
+                  badgeBg = 'bg-emerald-100 text-emerald-700'
+                }
+              } else {
+                if (tab.key === 'good') {
+                  bgColor = 'border-emerald-100 text-emerald-600 hover:bg-emerald-50'
+                } else if (tab.key === 'bad') {
+                  bgColor = 'border-amber-100 text-amber-600 hover:bg-amber-50'
+                }
+              }
+
+              return (
+                <button
+                  key={tab.key}
+                  onClick={() => setTypeFilter(tab.key)}
+                  className={`inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors ${bgColor}`}
                 >
-                  {tab.count}
-                </span>
-              </button>
-            ))}
+                  {tab.label}
+                  <span
+                    className={`inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-xs ${badgeBg}`}
+                  >
+                    {tab.count}
+                  </span>
+                </button>
+              )
+            })}
           </div>
 
           {loading ? (
@@ -1134,21 +1153,66 @@ export default function NotesPage() {
 
           <div className="px-4 py-3">
             <div className="mb-4 flex gap-2">
-              {(['all', 'pending', 'done'] as const).map((filter) => (
-                <button
-                  key={filter}
-                  onClick={() => setTodoFilter(filter)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                    todoFilter === filter
-                      ? 'bg-emerald-100 text-emerald-700'
-                      : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
-                  }`}
-                >
-                  {filter === 'all' && 'Tất cả'}
-                  {filter === 'pending' && 'Chưa làm'}
-                  {filter === 'done' && 'Đã làm'}
-                </button>
-              ))}
+              {(['all', 'pending', 'done'] as const).map((filter) => {
+                const isSelected = todoFilter === filter
+                const pendingCount = todos.filter((t) => !t.is_done).length
+                const doneCount = todos.filter((t) => t.is_done).length
+
+                let label = ''
+                let count = 0
+                let bgColor = 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
+
+                if (filter === 'all') {
+                  label = 'Tất cả'
+                  count = todos.length
+                  bgColor = isSelected ? 'bg-emerald-100 text-emerald-700' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
+                } else if (filter === 'pending') {
+                  label = 'Chưa làm'
+                  count = pendingCount
+                  bgColor = isSelected ? 'bg-blue-100 text-blue-700' : 'bg-blue-50 text-blue-600 hover:bg-blue-100'
+                } else if (filter === 'done') {
+                  label = 'Đã làm'
+                  count = doneCount
+                  bgColor = isSelected ? 'bg-emerald-100 text-emerald-700' : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'
+                }
+
+                return (
+                  <button
+                    key={filter}
+                    onClick={() => setTodoFilter(filter)}
+                    className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${bgColor} ${
+                      isSelected
+                        ? filter === 'all'
+                          ? 'border-emerald-300'
+                          : filter === 'pending'
+                          ? 'border-blue-300'
+                          : 'border-emerald-300'
+                        : filter === 'all'
+                        ? 'border-zinc-200'
+                        : filter === 'pending'
+                        ? 'border-blue-100'
+                        : 'border-emerald-100'
+                    }`}
+                  >
+                    {label}
+                    <span className={`inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-xs font-semibold ${
+                      isSelected
+                        ? filter === 'all'
+                          ? 'bg-emerald-200 text-emerald-900'
+                          : filter === 'pending'
+                          ? 'bg-blue-200 text-blue-900'
+                          : 'bg-emerald-200 text-emerald-900'
+                        : filter === 'all'
+                        ? 'bg-zinc-200 text-zinc-700'
+                        : filter === 'pending'
+                        ? 'bg-blue-100 text-blue-700'
+                        : 'bg-emerald-100 text-emerald-700'
+                    }`}>
+                      {count}
+                    </span>
+                  </button>
+                )
+              })}
             </div>
 
             <div className="space-y-2 mb-4">
