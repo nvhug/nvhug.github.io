@@ -30,9 +30,10 @@ import { Input } from '@/components/ui/input'
 import { ConfirmModal } from '@/components/ui/confirm-modal'
 import { TagInput } from '@/components/ui/tag-input'
 import { CalorieTracker } from '@/components/CalorieTracker'
+import { MealScheduleTracker } from '@/components/MealScheduleTracker'
 
 type TypeFilter = 'all' | 'good' | 'bad'
-type TabType = 'notes' | 'todos' | 'goals' | 'calo' | 'health'
+type TabType = 'notes' | 'todos' | 'goals' | 'calo' | 'meals' | 'health'
 
 function todayDate() {
   return new Date().toISOString().slice(0, 10)
@@ -924,7 +925,7 @@ export default function NotesPage() {
             </div>
           </div>
 
-          <div className="mt-5 grid gap-3 sm:grid-cols-5">
+          <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
             <article className="rounded-xl border border-emerald-100 bg-white p-3 shadow-[0_1px_0_0_rgba(16,185,129,0.15)]">
               <p className="text-xs font-medium text-zinc-600">Tổng số</p>
               <p className="mt-2 text-2xl font-semibold leading-none text-zinc-900">{counts.all}</p>
@@ -949,70 +950,83 @@ export default function NotesPage() {
           </div>
         </section>
 
-        <div className="flex gap-2 border-b border-emerald-200">
+        <div className="flex flex-wrap gap-1 border-b border-emerald-200 sm:gap-2">
           <button
             onClick={() => setCurrentTab('notes')}
-            className={`px-4 py-3 font-medium text-sm transition-colors ${
+            className={`px-2 py-2 text-xs font-medium transition-colors sm:px-4 sm:py-3 sm:text-sm ${
               currentTab === 'notes'
                 ? 'border-b-2 border-emerald-600 text-emerald-600'
                 : 'text-zinc-600 hover:text-zinc-900'
             }`}
           >
-            <span className="flex items-center gap-2">
-              <NotebookPen className="h-4 w-4" />
-              Notes
+            <span className="flex items-center gap-1 sm:gap-2">
+              <NotebookPen className="h-4 w-4 sm:h-5 sm:w-5" />
+              <span className="hidden sm:inline">Notes</span>
             </span>
           </button>
           <button
             onClick={() => setCurrentTab('todos')}
-            className={`px-4 py-3 font-medium text-sm transition-colors ${
+            className={`px-2 py-2 text-xs font-medium transition-colors sm:px-4 sm:py-3 sm:text-sm ${
               currentTab === 'todos'
                 ? 'border-b-2 border-emerald-600 text-emerald-600'
                 : 'text-zinc-600 hover:text-zinc-900'
             }`}
           >
-            <span className="flex items-center gap-2">
-              <ListTodo className="h-4 w-4" />
-              Todos
+            <span className="flex items-center gap-1 sm:gap-2">
+              <ListTodo className="h-4 w-4 sm:h-5 sm:w-5" />
+              <span className="hidden sm:inline">Todos</span>
             </span>
           </button>
           <button
             onClick={() => setCurrentTab('goals')}
-            className={`px-4 py-3 font-medium text-sm transition-colors ${
+            className={`px-2 py-2 text-xs font-medium transition-colors sm:px-4 sm:py-3 sm:text-sm ${
               currentTab === 'goals'
                 ? 'border-b-2 border-emerald-600 text-emerald-600'
                 : 'text-zinc-600 hover:text-zinc-900'
             }`}
           >
-            <span className="flex items-center gap-2">
-              <Target className="h-4 w-4" />
-              Mục tiêu
+            <span className="flex items-center gap-1 sm:gap-2">
+              <Target className="h-4 w-4 sm:h-5 sm:w-5" />
+              <span className="hidden sm:inline">Mục tiêu</span>
             </span>
           </button>
           <button
             onClick={() => setCurrentTab('calo')}
-            className={`px-4 py-3 font-medium text-sm transition-colors ${
+            className={`px-2 py-2 text-xs font-medium transition-colors sm:px-4 sm:py-3 sm:text-sm ${
               currentTab === 'calo'
                 ? 'border-b-2 border-emerald-600 text-emerald-600'
                 : 'text-zinc-600 hover:text-zinc-900'
             }`}
           >
-            <span className="flex items-center gap-2">
-              🔥
-              Calo
+            <span className="flex items-center gap-1 sm:gap-2">
+              <span className="text-sm sm:text-base">🔥</span>
+              <span className="hidden sm:inline">Calo</span>
+            </span>
+          </button>
+          <button
+            onClick={() => setCurrentTab('meals')}
+            className={`px-2 py-2 text-xs font-medium transition-colors sm:px-4 sm:py-3 sm:text-sm ${
+              currentTab === 'meals'
+                ? 'border-b-2 border-emerald-600 text-emerald-600'
+                : 'text-zinc-600 hover:text-zinc-900'
+            }`}
+          >
+            <span className="flex items-center gap-1 sm:gap-2">
+              <span className="text-sm sm:text-base">🍽️</span>
+              <span className="hidden sm:inline">Meal Plan</span>
             </span>
           </button>
           <button
             onClick={() => setCurrentTab('health')}
-            className={`px-4 py-3 font-medium text-sm transition-colors ${
+            className={`px-2 py-2 text-xs font-medium transition-colors sm:px-4 sm:py-3 sm:text-sm ${
               currentTab === 'health'
                 ? 'border-b-2 border-emerald-600 text-emerald-600'
                 : 'text-zinc-600 hover:text-zinc-900'
             }`}
           >
-            <span className="flex items-center gap-2">
-              💪
-              Sức Khỏe
+            <span className="flex items-center gap-1 sm:gap-2">
+              <span className="text-sm sm:text-base">💪</span>
+              <span className="hidden sm:inline">Sức Khỏe</span>
             </span>
           </button>
         </div>
@@ -1236,7 +1250,7 @@ export default function NotesPage() {
                       </button>
                     ))}
                   </div>
-                  <div className="ml-auto flex items-center gap-1.5 sm:ml-0">
+                  <div className="flex items-center gap-1.5">
                     <input
                       type="range"
                       min="0"
@@ -1244,9 +1258,9 @@ export default function NotesPage() {
                       step="10"
                       value={draft.completion_percentage}
                       onChange={(e) => updateDraft({ completion_percentage: Number(e.target.value) })}
-                      className="w-48"
+                      className="w-24 sm:w-48"
                     />
-                    <span className="w-9 text-right text-xs font-medium text-zinc-600">{draft.completion_percentage}%</span>
+                    <span className="w-8 text-right text-xs font-medium text-zinc-600">{draft.completion_percentage}%</span>
                     <label className="inline-flex cursor-pointer items-center gap-1.5 text-xs text-zinc-500 select-none">
                       <input
                         type="checkbox"
@@ -1254,7 +1268,7 @@ export default function NotesPage() {
                         onChange={(e) => updateDraft({ hide_meta: e.target.checked })}
                         className="h-3.5 w-3.5 accent-emerald-500"
                       />
-                      Ẩn tiến độ
+                      <span className="hidden sm:inline">Ẩn tiến độ</span>
                     </label>
                   </div>
                 </div>
@@ -1407,7 +1421,7 @@ export default function NotesPage() {
                                     </button>
                                   ))}
                                 </div>
-                                <div className="ml-auto flex items-center gap-1.5 sm:ml-0">
+                                <div className="flex items-center gap-1.5">
                                   <input
                                     type="range"
                                     min="0"
@@ -1415,9 +1429,9 @@ export default function NotesPage() {
                                     step="10"
                                     value={editingDraft.completion_percentage}
                                     onChange={(e) => updateEditingDraft({ completion_percentage: Number(e.target.value) })}
-                                    className="w-48"
+                                    className="w-24 sm:w-48"
                                   />
-                                  <span className="w-9 text-right text-xs font-medium text-zinc-600">
+                                  <span className="w-8 text-right text-xs font-medium text-zinc-600">
                                     {editingDraft.completion_percentage}%
                                   </span>
                                   <label className="inline-flex cursor-pointer items-center gap-1.5 text-xs text-zinc-500 select-none">
@@ -1427,7 +1441,7 @@ export default function NotesPage() {
                                       onChange={(e) => updateEditingDraft({ hide_meta: e.target.checked })}
                                       className="h-3.5 w-3.5 accent-emerald-500"
                                     />
-                                    Ẩn tiến độ
+                                    <span className="hidden sm:inline">Ẩn tiến độ</span>
                                   </label>
                                 </div>
                               </div>
@@ -1862,9 +1876,10 @@ export default function NotesPage() {
               {goals
                 .filter((goal) => goalFilter === 'all' || goal.status === goalFilter)
                 .map((goal) => (
-                  <div key={goal.id} className="rounded-xl border border-emerald-100 bg-white p-3 shadow-[0_1px_4px_0_rgba(16,185,129,0.06)] hover:shadow-[0_3px_10px_0_rgba(16,185,129,0.12)] transition-shadow">
-                    <div className="flex items-start gap-3">
-                      <div className="flex-1 min-w-0">
+                  <div key={goal.id} className="rounded-xl border border-emerald-100 bg-white p-3 sm:p-4 shadow-[0_1px_4px_0_rgba(16,185,129,0.06)] hover:shadow-[0_3px_10px_0_rgba(16,185,129,0.12)] transition-shadow group">
+                    <div className="flex flex-col gap-3">
+                      {/* Goal Header */}
+                      <div className="w-full">
                         {editingGoalId === goal.id && editingGoalDraft ? (
                           <div className="flex flex-col gap-2 mb-3">
                             <input
@@ -1943,21 +1958,23 @@ export default function NotesPage() {
                             </div>
                           </div>
                         ) : (
-                          <>
+                          <div className="space-y-3">
                             <div className="flex items-center gap-2 flex-wrap">
                               <h3 className="font-medium text-sm text-zinc-900">{goal.title}</h3>
-                              <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">{goal.type}</span>
+                              <span className="text-xs px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700 font-medium">{goal.type}</span>
                             </div>
 
                             {/* Timeline */}
                             {(goal.start_date || goal.target_date) && (
-                              <div className="mt-1 text-xs text-zinc-500 space-y-0.5">
-                                {goal.start_date && (
-                                  <p>📅 Bắt đầu: <span className="font-medium text-zinc-700">{new Date(goal.start_date).toLocaleDateString('vi-VN')}</span></p>
-                                )}
-                                {goal.target_date && (
-                                  <p>🎯 Kết thúc: <span className="font-medium text-zinc-700">{new Date(goal.target_date).toLocaleDateString('vi-VN')}</span></p>
-                                )}
+                              <div className="text-xs text-zinc-600 space-y-1">
+                                <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3">
+                                  {goal.start_date && (
+                                    <span>📅 <span className="text-zinc-700 font-medium">{new Date(goal.start_date).toLocaleDateString('vi-VN')}</span></span>
+                                  )}
+                                  {goal.target_date && (
+                                    <span>🎯 <span className="text-zinc-700 font-medium">{new Date(goal.target_date).toLocaleDateString('vi-VN')}</span></span>
+                                  )}
+                                </div>
                                 {goal.start_date && goal.target_date && (() => {
                                   const start = new Date(goal.start_date)
                                   const end = new Date(goal.target_date)
@@ -1966,36 +1983,38 @@ export default function NotesPage() {
                                   const elapsedDays = Math.ceil((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
                                   const remainingDays = Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
                                   return (
-                                    <p>⏱️ Đã trôi: <span className="font-medium text-zinc-700">{Math.max(0, elapsedDays)}</span> / {totalDays} ngày | Còn lại: <span className="font-medium text-zinc-700">{Math.max(0, remainingDays)}</span> ngày</p>
+                                    <div className="text-xs text-zinc-600">⏱️ <span className="font-medium text-zinc-700">{Math.max(0, elapsedDays)}/{totalDays}</span> ngày | Còn: <span className="font-medium text-zinc-700">{Math.max(0, remainingDays)}</span></div>
                                   )
                                 })()}
                               </div>
                             )}
 
                             {goal.description && (
-                              <p className="mt-2 text-xs text-zinc-600 whitespace-pre-wrap">{goal.description}</p>
+                              <p className="text-xs text-zinc-600 whitespace-pre-wrap">{goal.description}</p>
                             )}
 
                             {/* Progress Bar */}
                             {goal.completion_percentage !== undefined && (
-                              <div className="mt-2 -mx-3 px-3">
-                                <div className="flex items-center justify-between mb-1">
+                              <div>
+                                <div className="flex items-center justify-between mb-1.5">
                                   <span className="text-xs font-medium text-zinc-700">Tiến độ</span>
                                   <span className="text-xs font-semibold text-emerald-600">{goal.completion_percentage}%</span>
                                 </div>
-                                <div className="w-full bg-emerald-100 rounded-full h-2.5 overflow-hidden shadow-inner">
+                                <div className="w-full bg-emerald-100 rounded-full h-2 overflow-hidden shadow-inner">
                                   <div
-                                    className="bg-linear-to-r from-emerald-500 to-emerald-600 h-full transition-all duration-500 rounded-full"
+                                    className="bg-linear-to-r from-emerald-500 to-emerald-600 h-full transition-all duration-300"
                                     style={{ width: `${goal.completion_percentage}%` }}
                                   />
                                 </div>
                               </div>
                             )}
-                          </>
+                            </div>
                         )}
                       </div>
+
+                      {/* Actions */}
                       {editingGoalId !== goal.id && (
-                        <div className="flex shrink-0 items-center gap-1">
+                        <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-emerald-50">
                           <select
                             value={goal.status}
                             onChange={(e) => updateGoalStatus(goal, e.target.value as Goal['status'])}
@@ -2005,22 +2024,24 @@ export default function NotesPage() {
                             <option value="completed">Hoàn thành</option>
                             <option value="archived">Lưu trữ</option>
                           </select>
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            onClick={() => startEditingGoal(goal)}
-                            className="text-emerald-400 hover:bg-emerald-100 hover:text-emerald-600"
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            onClick={() => setDeleteGoal(goal)}
-                            className="text-rose-300 hover:bg-rose-500/15"
-                          >
-                            <Trash2 />
-                          </Button>
+                          <div className="flex items-center gap-1 ml-auto">
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              onClick={() => startEditingGoal(goal)}
+                              className="text-emerald-400 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-emerald-100 hover:text-emerald-600"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              onClick={() => setDeleteGoal(goal)}
+                              className="text-rose-300 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-rose-500/15"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </div>
                       )}
                     </div>
@@ -2072,7 +2093,7 @@ export default function NotesPage() {
                                   startEditingGoalItem(item)
                                 }
                               }}
-                              className={`flex items-start gap-2 rounded-lg border p-2 transition-all cursor-move group ${
+                              className={`flex flex-col sm:flex-row sm:items-start gap-2 rounded-lg border p-2 transition-all cursor-move group ${
                                 draggedItemId === item.id ? 'opacity-50 border-emerald-400 bg-emerald-100' : 'border-emerald-50 bg-emerald-50/50'
                               } ${
                                 dragOverItemId === item.id && draggedItemId !== item.id ? 'border-emerald-400 bg-emerald-100/50' : ''
@@ -2088,7 +2109,7 @@ export default function NotesPage() {
                                   <Circle className="h-4 w-4" />
                                 )}
                               </button>
-                              <div className="flex-1 min-w-0">
+                              <div className="flex-1 w-full">
                                 {editingGoalItemId === item.id && editingGoalItemDraft ? (
                                   <div className="flex flex-col gap-2 w-full">
                                     <input
@@ -2286,6 +2307,18 @@ export default function NotesPage() {
           </div>
           <div className="p-4">
             <CalorieTracker />
+          </div>
+        </section>
+        )}
+
+        {currentTab === 'meals' && (
+        <section className="overflow-hidden rounded-2xl border border-orange-200 bg-white shadow-[0_4px_20px_-8px_rgba(234,88,12,0.25)]">
+          <div className="border-b border-orange-100 px-4 py-3.5">
+            <h3 className="font-semibold text-zinc-900">Lịch Ăn - Tăng Cân</h3>
+            <p className="mt-1 text-xs text-zinc-600">Kế hoạch 5 bữa/ngày để tăng cân 61kg → 75kg. Tự động nhận nhắc nhở qua Teams lúc đúng giờ ăn.</p>
+          </div>
+          <div className="p-4">
+            <MealScheduleTracker />
           </div>
         </section>
         )}

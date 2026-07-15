@@ -3,6 +3,22 @@ import { createClient } from '@supabase/supabase-js'
 
 export const dynamic = 'force-dynamic'
 
+const MEAL_SCHEDULE = [
+  { time: '07:00', mealType: 'breakfast', name: 'Bữa sáng', icon: '🌅', calories: 520 },
+  { time: '09:30', mealType: 'mid_morning', name: 'Sáng muộn', icon: '☀️', calories: 380 },
+  { time: '12:00', mealType: 'lunch', name: 'Bữa trưa', icon: '🍽️', calories: 680 },
+  { time: '15:00', mealType: 'afternoon', name: 'Chiều', icon: '🥤', calories: 360 },
+  { time: '17:00', mealType: 'dinner', name: 'Tối', icon: '🥛', calories: 460 },
+]
+
+const MEAL_FOODS = {
+  breakfast: ['Cơm trắng: 150g', 'Trứng luộc: 2 quả', 'Sữa nóng: 150ml', 'Mật ong: 1.5 thìa'],
+  mid_morning: ['Bánh mì trắng: 2 lát', 'Bơ: 1 thìa', 'Chuối: 1 quả', 'Sữa chua plain: 100g'],
+  lunch: ['Cơm trắng: 250g', 'Gà nướng: 180g (không da)', 'Cháo gạo nhạt: 150ml'],
+  afternoon: ['Bánh mì trắng nướng: 2 lát', 'Bơ: 1 thìa', 'Mật ong pha sữa ấm: 250ml', 'Chuối: 0.5 quả'],
+  dinner: ['Sữa nóng: 300ml', 'Yến mạch: 40g', 'Trứng luộc: 1 quả', 'Mật ong: 1 thìa'],
+}
+
 export async function GET(request: Request) {
   const authHeader = request.headers.get('authorization')
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
@@ -86,5 +102,50 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Teams webhook failed', teamsStatus: res.status, teamsBody }, { status: 500 })
   }
 
-  return NextResponse.json({ ok: true, time: currentTime, count: scheduled.length, teamsStatus: res.status, teamsBody })
+  // Check for meal notifications
+  const meal = MEAL_SCHEDULE.find((m) => {
+    const [mH, mM] = m.time.split(':').map(Number)
+    const mealMinutes = mH * 60 + mM
+    const diff = curMinutes - mealMinutes
+    return diff >= 0 && diff < 14 // 14-minute window
+  })
+
+  if (meal) {
+    const mealFoods = MEAL_FOODS[meal.mealType as keyof typeof MEAL_FOODS] || []
+    const foodsList = mealFoods.map((f) => f).join('\n')
+
+    const mealPayload = {
+      '@type': 'MessageCard',
+      '@context': 'http://schema.org/extensions',
+      themeColor: 'FF8C00',
+      summary: `${meal.icon} ${meal.name} - ${meal.time}`,
+      sections: [
+        {
+          activityTitle: `${meal.icon} ${meal.name}`,
+          activitySubtitle: `⏰ ${meal.time} | 🔥 ${meal.calories} kcal`,
+          text: `📋 Thực phẩm gợi ý:\n${foodsList}\n\n💡 Ăn chậm & nhai kỹ (30-40 phút)\n✅ Check in tại app khi ăn xong`,
+        },
+        {
+          activityTitle: '💪 Mục tiêu hôm nay',
+          text: 'Tăng cân: 61kg → 75kg\nMục tiêu: 2400 kcal/ngày',
+        },
+      ],
+    }
+
+    try {
+      const mealRes = await fetch(webhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(mealPayload),
+      })
+
+      if (!mealRes.ok) {
+        console.error('Meal notification failed:', mealRes.status)
+      }
+    } catch (error) {
+      console.error('Error sending meal notification:', error)
+    }
+  }
+
+  return NextResponse.json({ ok: true, time: currentTime, habitsCount: scheduled.length, meal: meal?.name || null, teamsStatus: res.status })
 }

@@ -113,3 +113,18 @@ export interface DailyFood {
   created_at: string
   updated_at: string
 }
+
+export interface Meal {
+  id: string
+  date: string
+  meal_type: string // 'breakfast', 'mid_morning', 'lunch', 'afternoon', 'dinner'
+  time: string // 'HH:MM' format like "07:00"
+  name: string // 'Bữa sáng', 'Sáng muộn', etc.
+  target_calories: number
+  foods: string[] // Array of food items like ["Cơm 150g", "Trứng luộc 2"]
+  notes?: string
+  is_completed: boolean
+  completed_at?: string
+  created_at: string
+  updated_at: string
+}
