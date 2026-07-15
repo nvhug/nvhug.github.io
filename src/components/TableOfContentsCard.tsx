@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { marked } from 'marked'
 import { Post } from '@/types'
 import { formatDate, getTagColor } from '@/lib/utils'
 
@@ -25,9 +26,12 @@ export default function TableOfContentsCard({ post, index }: TableOfContentsCard
 
           {/* Description */}
           {post.excerpt && (
-            <p className="toc-description">
-              {post.excerpt}
-            </p>
+            <p
+              className="toc-description"
+              dangerouslySetInnerHTML={{
+                __html: marked.parseInline(post.excerpt) as string,
+              }}
+            />
           )}
 
           {/* Meta */}

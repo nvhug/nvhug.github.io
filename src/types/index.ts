@@ -65,3 +65,51 @@ export interface Quote {
   author?: string
   created_at: string
 }
+
+export interface Goal {
+  id: string
+  title: string
+  type: string // 'health', 'learning', 'fitness', etc.
+  description?: string
+  start_date?: string
+  target_date?: string
+  status: 'active' | 'completed' | 'archived'
+  completion_percentage?: number
+  created_at: string
+  updated_at?: string
+}
+
+export interface GoalItem {
+  id: string
+  goal_id: string
+  content: string
+  item_type: string // 'meal', 'routine', 'lesson', 'exercise', etc.
+  metadata?: Record<string, any> // JSON: { calories, duration, reps, etc. }
+  result?: string // Kết quả sau khi hoàn thành
+  is_completed?: boolean
+  order?: number // For drag-drop sorting
+  created_at: string
+  updated_at?: string
+}
+
+export interface FoodTemplate {
+  id: string
+  name: string
+  calories_per_unit: number
+  unit: string // 'g', 'chén', 'quả', 'lát', etc.
+  category?: string
+  created_at: string
+}
+
+export interface DailyFood {
+  id: string
+  date: string
+  food_template_id?: string
+  custom_food_name?: string
+  quantity: number
+  unit?: string
+  total_calories: number
+  notes?: string
+  created_at: string
+  updated_at: string
+}
