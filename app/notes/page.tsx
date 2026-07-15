@@ -16,18 +16,23 @@ import {
   ThumbsDown,
   Trash2,
   X,
+  Target,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react'
 
 import { toast } from 'sonner'
 
 import { supabase } from '@/lib/supabase'
-import { Note, Todo } from '@/types'
+import { Note, Todo, Goal, GoalItem, Post } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ConfirmModal } from '@/components/ui/confirm-modal'
 import { TagInput } from '@/components/ui/tag-input'
+import { CalorieTracker } from '@/components/CalorieTracker'
 
 type TypeFilter = 'all' | 'good' | 'bad'
+type TabType = 'notes' | 'todos' | 'goals' | 'calo' | 'health'
 
 function todayDate() {
   return new Date().toISOString().slice(0, 10)
@@ -81,7 +86,8 @@ const textareaClass =
 const autoTextareaClass =
   'w-full min-h-24 resize-none overflow-y-hidden rounded-lg border border-emerald-200 bg-white px-2.5 py-2 text-sm text-zinc-900 outline-none placeholder:text-zinc-500 focus-visible:border-emerald-400'
 
-type TabType = 'notes' | 'todos'
+type GoalDraft = Omit<Goal, 'id' | 'created_at'>
+type GoalItemDraft = Omit<GoalItem, 'id' | 'goal_id' | 'created_at' | 'updated_at'>
 
 export default function NotesPage() {
   const [currentTab, setCurrentTab] = useState<TabType>('notes')
@@ -95,6 +101,7 @@ export default function NotesPage() {
   const [notifyDraftTime, setNotifyDraftTime] = useState('')
   const [loading, setLoading] = useState(true)
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
+  const [todayCalories, setTodayCalories] = useState(0)
 
   const [todos, setTodos] = useState<Todo[]>([])
   const [todoDraft, setTodoDraft] = useState('')
@@ -102,6 +109,27 @@ export default function NotesPage() {
   const [todoFilter, setTodoFilter] = useState<'all' | 'pending' | 'done'>('all')
   const [deleteTodo, setDeleteTodo] = useState<Todo | null>(null)
   const [deletingTodo, setDeletingTodo] = useState(false)
+
+  const [healthPosts, setHealthPosts] = useState<Post[]>([])
+
+  const [goals, setGoals] = useState<Goal[]>([])
+  const [goalDraft, setGoalDraft] = useState<GoalDraft | null>(null)
+  const [savingGoal, setSavingGoal] = useState(false)
+  const [goalFilter, setGoalFilter] = useState<'active' | 'completed' | 'all'>('active')
+  const [deleteGoal, setDeleteGoal] = useState<Goal | null>(null)
+  const [deletingGoal, setDeletingGoal] = useState(false)
+  const [expandedGoal, setExpandedGoal] = useState<string | null>(null)
+  const [goalItems, setGoalItems] = useState<{ [goalId: string]: GoalItem[] }>({})
+  const [goalItemDraft, setGoalItemDraft] = useState<{ [goalId: string]: GoalItemDraft }>({})
+  const [savingGoalItem, setSavingGoalItem] = useState(false)
+  const [deleteGoalItem, setDeleteGoalItem] = useState<GoalItem | null>(null)
+  const [deletingGoalItem, setDeletingGoalItem] = useState(false)
+  const [editingGoalItemId, setEditingGoalItemId] = useState<string | null>(null)
+  const [editingGoalItemDraft, setEditingGoalItemDraft] = useState<GoalItemDraft | null>(null)
+  const [draggedItemId, setDraggedItemId] = useState<string | null>(null)
+  const [dragOverItemId, setDragOverItemId] = useState<string | null>(null)
+  const [editingGoalId, setEditingGoalId] = useState<string | null>(null)
+  const [editingGoalDraft, setEditingGoalDraft] = useState<GoalDraft | null>(null)
 
   const [editingHabitId, setEditingHabitId] = useState<string | null>(null)
   const [editingHabitDraft, setEditingHabitDraft] = useState('')
@@ -119,6 +147,8 @@ export default function NotesPage() {
   const [percentEditId, setPercentEditId] = useState<string | null>(null)
   const [percentEditValue, setPercentEditValue] = useState('')
   const editTextareaRef = useRef<HTMLTextAreaElement | null>(null)
+  const goalDescriptionRef = useRef<HTMLTextAreaElement | null>(null)
+  const editingGoalDescriptionRef = useRef<HTMLTextAreaElement | null>(null)
 
   useLayoutEffect(() => {
     const el = editTextareaRef.current
@@ -126,6 +156,20 @@ export default function NotesPage() {
     el.style.height = 'auto'
     el.style.height = `${el.scrollHeight}px`
   }, [editingId, editingDraft?.content])
+
+  useLayoutEffect(() => {
+    const el = goalDescriptionRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = `${el.scrollHeight}px`
+  }, [goalDraft?.description])
+
+  useLayoutEffect(() => {
+    const el = editingGoalDescriptionRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = `${el.scrollHeight}px`
+  }, [editingGoalDraft?.description])
 
   async function fetchNotes(withLoading = true) {
     if (withLoading) {
@@ -160,6 +204,77 @@ export default function NotesPage() {
       setTodos((data || []) as Todo[])
     } catch (error) {
       console.error('Error fetching todos:', error)
+    }
+  }
+
+  async function fetchGoals() {
+    try {
+      const { data, error } = await supabase
+        .from('goals')
+        .select('*')
+        .order('created_at', { ascending: false })
+
+      if (error) throw error
+      setGoals((data || []) as Goal[])
+    } catch (error) {
+      console.error('Error fetching goals:', error)
+    }
+  }
+
+  async function fetchHealthPosts() {
+    try {
+      const { data, error } = await supabase
+        .from('posts')
+        .select('*, post_tags(tags(id, name))')
+        .eq('published', true)
+        .order('created_at', { ascending: false })
+
+      if (error) throw error
+      const rows = (data || []) as (Post & { post_tags: { tags: { id: string; name: string } | null }[] })[]
+      const posts = rows.map(({ post_tags, ...post }) => ({
+        ...post,
+        tags: post_tags
+          .map((pt) => pt.tags)
+          .filter((tag): tag is { id: string; name: string } => tag !== null)
+          .map(tag => ({ id: tag.id, name: tag.name })),
+      }))
+      const filtered = posts.filter((p) => p.tags?.some((tag) => tag.name === 'Sức Khỏe'))
+      setHealthPosts(filtered)
+    } catch (error) {
+      console.error('Error fetching health posts:', error)
+    }
+  }
+
+  async function fetchTodayCalories() {
+    try {
+      const today = todayDate()
+      const { data, error } = await supabase
+        .from('daily_foods')
+        .select('total_calories')
+        .eq('date', today)
+
+      if (error) throw error
+      const total = (data || []).reduce((sum: number, food: any) => sum + (food.total_calories || 0), 0)
+      setTodayCalories(total)
+    } catch (error) {
+      console.error('Error fetching today calories:', error)
+    }
+  }
+
+  async function fetchGoalItems(goalId: string): Promise<GoalItem[]> {
+    try {
+      const { data, error } = await supabase
+        .from('goal_items')
+        .select('*')
+        .eq('goal_id', goalId)
+        .order('order', { ascending: true })
+        .order('created_at', { ascending: true })
+
+      if (error) throw error
+      return (data || []) as GoalItem[]
+    } catch (error) {
+      console.error('Error fetching goal items:', error)
+      return []
     }
   }
 
@@ -215,14 +330,280 @@ export default function NotesPage() {
     }
   }
 
+  function openGoalDraft() {
+    setGoalDraft({
+      title: '',
+      type: 'health',
+      description: '',
+      target_date: '',
+      status: 'active',
+      completion_percentage: 0,
+    })
+  }
+
+  function cancelGoalDraft() {
+    setGoalDraft(null)
+  }
+
+  async function addGoal() {
+    if (!goalDraft || !goalDraft.title.trim()) return
+    setSavingGoal(true)
+    try {
+      const { error } = await supabase.from('goals').insert([goalDraft])
+      if (error) throw error
+      setGoalDraft(null)
+      await fetchGoals()
+      toast.success('Thêm mục tiêu thành công.')
+    } catch {
+      toast.error('Không thể thêm mục tiêu.')
+    } finally {
+      setSavingGoal(false)
+    }
+  }
+
+  async function confirmDeleteGoal() {
+    if (!deleteGoal) return
+    setDeletingGoal(true)
+    try {
+      const { error } = await supabase.from('goals').delete().eq('id', deleteGoal.id)
+      if (error) throw error
+      setGoals((prev) => prev.filter((g) => g.id !== deleteGoal.id))
+      setDeleteGoal(null)
+      toast.success('Đã xoá mục tiêu.')
+    } catch {
+      toast.error('Không thể xoá.')
+    } finally {
+      setDeletingGoal(false)
+    }
+  }
+
+  async function updateGoalStatus(goal: Goal, newStatus: Goal['status']) {
+    try {
+      const { error } = await supabase.from('goals').update({ status: newStatus }).eq('id', goal.id)
+      if (error) throw error
+      setGoals((prev) => prev.map((g) => (g.id === goal.id ? { ...g, status: newStatus } : g)))
+      toast.success('Cập nhật trạng thái thành công.')
+    } catch {
+      toast.error('Không thể cập nhật trạng thái.')
+    }
+  }
+
+  async function addGoalItem(goal: Goal) {
+    const draft = goalItemDraft[goal.id]
+    if (!draft || !draft.content.trim()) return
+
+    setSavingGoalItem(true)
+    try {
+      const { error } = await supabase.from('goal_items').insert([{
+        goal_id: goal.id,
+        content: draft.content,
+        item_type: draft.item_type,
+        metadata: draft.metadata || {},
+        is_completed: false,
+      }])
+      if (error) throw error
+      const items = await fetchGoalItems(goal.id)
+      setGoalItems((prev) => ({ ...prev, [goal.id]: items }))
+      setGoalItemDraft((prev) => ({ ...prev, [goal.id]: { content: '', item_type: draft.item_type, metadata: {} } }))
+      toast.success('Thêm mục tiêu con thành công.')
+    } catch {
+      toast.error('Không thể thêm mục tiêu con.')
+    } finally {
+      setSavingGoalItem(false)
+    }
+  }
+
+  async function confirmDeleteGoalItem() {
+    if (!deleteGoalItem) return
+    setDeletingGoalItem(true)
+    try {
+      const { error } = await supabase.from('goal_items').delete().eq('id', deleteGoalItem.id)
+      if (error) throw error
+      setGoalItems((prev) => ({
+        ...prev,
+        [deleteGoalItem.goal_id]: prev[deleteGoalItem.goal_id]?.filter((i) => i.id !== deleteGoalItem.id) || []
+      }))
+      setDeleteGoalItem(null)
+      toast.success('Đã xoá.')
+    } catch {
+      toast.error('Không thể xoá.')
+    } finally {
+      setDeletingGoalItem(false)
+    }
+  }
+
+  async function toggleGoalItem(item: GoalItem) {
+    try {
+      const { error } = await supabase.from('goal_items').update({ is_completed: !item.is_completed }).eq('id', item.id)
+      if (error) throw error
+    } catch {
+      toast.error('Không thể cập nhật.')
+    }
+  }
+
+  async function reorderGoalItems(goalId: string, fromIndex: number, toIndex: number) {
+    const items = goalItems[goalId]
+    if (!items || fromIndex === toIndex) return
+
+    const newItems = [...items]
+    const [movedItem] = newItems.splice(fromIndex, 1)
+    newItems.splice(toIndex, 0, movedItem)
+
+    // Update local state immediately
+    setGoalItems((prev) => ({ ...prev, [goalId]: newItems }))
+
+    // Update order in database
+    try {
+      const updates = newItems.map((item, idx) => ({
+        id: item.id,
+        order: idx + 1
+      }))
+
+      for (const update of updates) {
+        const { error } = await supabase
+          .from('goal_items')
+          .update({ order: update.order })
+          .eq('id', update.id)
+        if (error) throw error
+      }
+    } catch {
+      toast.error('Không thể sắp xếp lại.')
+      // Revert to previous state on error
+      const items = await fetchGoalItems(goalId)
+      setGoalItems((prev) => ({ ...prev, [goalId]: items }))
+    }
+  }
+
+  function startEditingGoalItem(item: GoalItem) {
+    setEditingGoalItemId(item.id)
+    setEditingGoalItemDraft({
+      content: item.content,
+      item_type: item.item_type,
+      metadata: item.metadata || {}
+    })
+  }
+
+  function cancelEditingGoalItem() {
+    setEditingGoalItemId(null)
+    setEditingGoalItemDraft(null)
+  }
+
+  async function saveEditingGoalItem(item: GoalItem) {
+    if (!editingGoalItemDraft || !editingGoalItemDraft.content.trim()) {
+      toast.error('Nội dung không được để trống.')
+      return
+    }
+
+    // Validate metadata JSON
+    try {
+      if (editingGoalItemDraft.metadata && typeof editingGoalItemDraft.metadata === 'object') {
+        JSON.stringify(editingGoalItemDraft.metadata)
+      }
+    } catch {
+      toast.error('Metadata JSON không hợp lệ.')
+      return
+    }
+
+    setSavingGoalItem(true)
+    try {
+      const { error } = await supabase.from('goal_items').update({
+        content: editingGoalItemDraft.content,
+        item_type: editingGoalItemDraft.item_type,
+        result: editingGoalItemDraft.result || null,
+        metadata: editingGoalItemDraft.metadata || {},
+        is_completed: editingGoalItemDraft.is_completed || false
+      }).eq('id', item.id)
+      if (error) throw error
+
+      // Update local state only (no full reload)
+      setGoalItems((prev) => ({
+        ...prev,
+        [item.goal_id]: prev[item.goal_id]?.map((i) =>
+          i.id === item.id
+            ? { ...i, content: editingGoalItemDraft.content, item_type: editingGoalItemDraft.item_type, result: editingGoalItemDraft.result, metadata: editingGoalItemDraft.metadata, is_completed: editingGoalItemDraft.is_completed }
+            : i
+        ) || []
+      }))
+
+      setEditingGoalItemId(null)
+      setEditingGoalItemDraft(null)
+      toast.success('Cập nhật thành công.')
+    } catch {
+      toast.error('Không thể cập nhật.')
+    } finally {
+      setSavingGoalItem(false)
+    }
+  }
+
+  function startEditingGoal(goal: Goal) {
+    setEditingGoalId(goal.id)
+    setEditingGoalDraft({
+      title: goal.title,
+      type: goal.type,
+      description: goal.description || '',
+      start_date: goal.start_date || '',
+      target_date: goal.target_date || '',
+      status: goal.status,
+      completion_percentage: goal.completion_percentage || 0
+    })
+  }
+
+  function cancelEditingGoal() {
+    setEditingGoalId(null)
+    setEditingGoalDraft(null)
+  }
+
+  async function saveEditingGoal(goal: Goal) {
+    if (!editingGoalDraft || !editingGoalDraft.title.trim()) {
+      toast.error('Tên mục tiêu không được để trống.')
+      return
+    }
+
+    setSavingGoal(true)
+    try {
+      const { error } = await supabase.from('goals').update({
+        title: editingGoalDraft.title,
+        type: editingGoalDraft.type,
+        description: editingGoalDraft.description,
+        start_date: editingGoalDraft.start_date,
+        target_date: editingGoalDraft.target_date,
+        completion_percentage: editingGoalDraft.completion_percentage
+      }).eq('id', goal.id)
+      if (error) throw error
+
+      // Update local state only (no full reload)
+      setGoals((prev) => prev.map((g) => g.id === goal.id ? { ...g, ...editingGoalDraft } : g))
+
+      setEditingGoalId(null)
+      setEditingGoalDraft(null)
+      toast.success('Cập nhật mục tiêu thành công.')
+    } catch {
+      toast.error('Không thể cập nhật mục tiêu.')
+    } finally {
+      setSavingGoal(false)
+    }
+  }
+
   useEffect(() => {
     const timer = window.setTimeout(() => {
       void fetchNotes(false)
       void fetchTodos()
+      void fetchGoals()
+      void fetchHealthPosts()
+      void fetchTodayCalories()
     }, 0)
 
     return () => window.clearTimeout(timer)
   }, [])
+
+  useEffect(() => {
+    if (expandedGoal && !goalItems[expandedGoal]) {
+      void (async () => {
+        const items = await fetchGoalItems(expandedGoal)
+        setGoalItems((prev) => ({ ...prev, [expandedGoal]: items }))
+      })()
+    }
+  }, [expandedGoal])
 
   function openDraft() {
     setDraft({
@@ -543,7 +924,7 @@ export default function NotesPage() {
             </div>
           </div>
 
-          <div className="mt-5 grid gap-3 sm:grid-cols-4">
+          <div className="mt-5 grid gap-3 sm:grid-cols-5">
             <article className="rounded-xl border border-emerald-100 bg-white p-3 shadow-[0_1px_0_0_rgba(16,185,129,0.15)]">
               <p className="text-xs font-medium text-zinc-600">Tổng số</p>
               <p className="mt-2 text-2xl font-semibold leading-none text-zinc-900">{counts.all}</p>
@@ -559,6 +940,11 @@ export default function NotesPage() {
             <article className="rounded-xl border border-blue-100 bg-white p-3 shadow-[0_1px_0_0_rgba(59,130,246,0.15)]">
               <p className="text-xs font-medium text-zinc-600">Cần làm</p>
               <p className="mt-2 text-2xl font-semibold leading-none text-blue-600">{counts.pendingTodos}</p>
+            </article>
+            <article className="rounded-xl border border-orange-100 bg-white p-3 shadow-[0_1px_0_0_rgba(234,88,12,0.15)]">
+              <p className="text-xs font-medium text-zinc-600">Calo hôm nay</p>
+              <p className="mt-2 text-2xl font-semibold leading-none text-orange-600">{Math.round(todayCalories)}</p>
+              <p className="text-xs text-zinc-500">/ 2400 kcal</p>
             </article>
           </div>
         </section>
@@ -588,6 +974,45 @@ export default function NotesPage() {
             <span className="flex items-center gap-2">
               <ListTodo className="h-4 w-4" />
               Todos
+            </span>
+          </button>
+          <button
+            onClick={() => setCurrentTab('goals')}
+            className={`px-4 py-3 font-medium text-sm transition-colors ${
+              currentTab === 'goals'
+                ? 'border-b-2 border-emerald-600 text-emerald-600'
+                : 'text-zinc-600 hover:text-zinc-900'
+            }`}
+          >
+            <span className="flex items-center gap-2">
+              <Target className="h-4 w-4" />
+              Mục tiêu
+            </span>
+          </button>
+          <button
+            onClick={() => setCurrentTab('calo')}
+            className={`px-4 py-3 font-medium text-sm transition-colors ${
+              currentTab === 'calo'
+                ? 'border-b-2 border-emerald-600 text-emerald-600'
+                : 'text-zinc-600 hover:text-zinc-900'
+            }`}
+          >
+            <span className="flex items-center gap-2">
+              🔥
+              Calo
+            </span>
+          </button>
+          <button
+            onClick={() => setCurrentTab('health')}
+            className={`px-4 py-3 font-medium text-sm transition-colors ${
+              currentTab === 'health'
+                ? 'border-b-2 border-emerald-600 text-emerald-600'
+                : 'text-zinc-600 hover:text-zinc-900'
+            }`}
+          >
+            <span className="flex items-center gap-2">
+              💪
+              Sức Khỏe
             </span>
           </button>
         </div>
@@ -1293,6 +1718,614 @@ export default function NotesPage() {
           </div>
         </section>
         )}
+
+        {currentTab === 'goals' && (
+        <section className="overflow-hidden rounded-2xl border border-emerald-200 bg-[linear-gradient(130deg,#f0fdf4_0%,#ffffff_100%)] shadow-[0_4px_20px_-8px_rgba(16,185,129,0.25)]">
+          <div className="flex items-center gap-2 border-b border-emerald-100 px-4 py-3">
+            <Target className="h-3.5 w-3.5 text-emerald-600" />
+            <span className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-600">Mục tiêu của tôi</span>
+          </div>
+
+          <div className="px-4 py-3">
+            <div className="mb-4 flex gap-2">
+              {(['all', 'active', 'completed'] as const).map((filter) => {
+                const isSelected = goalFilter === filter
+                const allGoals = goals.length
+                const activeGoals = goals.filter((g) => g.status === 'active').length
+                const completedGoals = goals.filter((g) => g.status === 'completed').length
+
+                let label = ''
+                let count = 0
+                let bgColor = 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
+
+                if (filter === 'all') {
+                  label = 'Tất cả'
+                  count = allGoals
+                  bgColor = isSelected ? 'bg-emerald-100 text-emerald-700' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
+                } else if (filter === 'active') {
+                  label = 'Đang làm'
+                  count = activeGoals
+                  bgColor = isSelected ? 'bg-blue-100 text-blue-700' : 'bg-blue-50 text-blue-600 hover:bg-blue-100'
+                } else {
+                  label = 'Hoàn thành'
+                  count = completedGoals
+                  bgColor = isSelected ? 'bg-emerald-100 text-emerald-700' : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'
+                }
+
+                return (
+                  <button
+                    key={filter}
+                    onClick={() => setGoalFilter(filter)}
+                    className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${bgColor} ${
+                      isSelected
+                        ? filter === 'active'
+                          ? 'border-blue-300'
+                          : 'border-emerald-300'
+                        : filter === 'active'
+                        ? 'border-blue-100'
+                        : 'border-emerald-100'
+                    }`}
+                  >
+                    {label}
+                    <span className={`inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-xs font-semibold ${
+                      isSelected
+                        ? filter === 'active'
+                          ? 'bg-blue-200 text-blue-900'
+                          : 'bg-emerald-200 text-emerald-900'
+                        : filter === 'active'
+                        ? 'bg-blue-100 text-blue-700'
+                        : 'bg-emerald-100 text-emerald-700'
+                    }`}>
+                      {count}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+
+            {goalDraft ? (
+              <div className="mb-4 flex flex-col gap-3 rounded-xl border-l-4 border-dashed border-emerald-300 bg-emerald-50/40 p-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Input
+                    type="text"
+                    value={goalDraft.title}
+                    onChange={(e) => setGoalDraft((prev) => prev ? { ...prev, title: e.target.value } : null)}
+                    placeholder="Tên mục tiêu..."
+                    className="flex-1 h-8 border-emerald-200 bg-white text-zinc-900"
+                  />
+                  <select
+                    value={goalDraft.type}
+                    onChange={(e) => setGoalDraft((prev) => prev ? { ...prev, type: e.target.value } : null)}
+                    className="h-8 rounded-md border border-emerald-200 bg-white px-2 text-xs font-semibold text-emerald-700 outline-none focus:border-emerald-400"
+                  >
+                    <option value="health">Sức khỏe</option>
+                    <option value="learning">Học tập</option>
+                    <option value="fitness">Thể dục</option>
+                    <option value="work">Công việc</option>
+                    <option value="personal">Cá nhân</option>
+                    <option value="other">Khác</option>
+                  </select>
+                </div>
+                <textarea
+                  ref={goalDescriptionRef}
+                  value={goalDraft.description || ''}
+                  onChange={(e) => setGoalDraft((prev) => prev ? { ...prev, description: e.target.value } : null)}
+                  placeholder="Mô tả (tùy chọn)..."
+                  rows={2}
+                  className={autoTextareaClass}
+                />
+                <div className="flex flex-wrap items-center gap-2">
+                  <Input
+                    type="date"
+                    value={goalDraft.target_date || ''}
+                    onChange={(e) => setGoalDraft((prev) => prev ? { ...prev, target_date: e.target.value } : null)}
+                    className="h-8 w-auto border-emerald-200 bg-white text-zinc-900"
+                  />
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    step="10"
+                    value={goalDraft.completion_percentage || 0}
+                    onChange={(e) => setGoalDraft((prev) => prev ? { ...prev, completion_percentage: Number(e.target.value) } : null)}
+                    className="flex-1 min-w-48"
+                  />
+                  <span className="w-9 text-right text-xs font-medium text-zinc-600">{goalDraft.completion_percentage || 0}%</span>
+                </div>
+                <div className="flex items-center justify-end gap-2">
+                  <Button variant="ghost" size="sm" onClick={cancelGoalDraft} className="text-zinc-600 hover:bg-emerald-100 hover:text-emerald-700">
+                    Huỷ
+                  </Button>
+                  <Button
+                    size="sm"
+                    disabled={savingGoal || !goalDraft.title.trim()}
+                    onClick={addGoal}
+                    className="bg-linear-to-r from-emerald-500 to-emerald-600 text-white hover:from-emerald-400 hover:to-emerald-500"
+                  >
+                    <Check />
+                    Thêm
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={openGoalDraft}
+                className="mb-4 inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-emerald-300 py-2.5 text-sm font-medium text-emerald-700 transition-colors hover:bg-emerald-50"
+              >
+                <Plus className="h-4 w-4" />
+                Thêm mục tiêu mới
+              </button>
+            )}
+
+            <div className="space-y-2">
+              {goals
+                .filter((goal) => goalFilter === 'all' || goal.status === goalFilter)
+                .map((goal) => (
+                  <div key={goal.id} className="rounded-xl border border-emerald-100 bg-white p-3 shadow-[0_1px_4px_0_rgba(16,185,129,0.06)] hover:shadow-[0_3px_10px_0_rgba(16,185,129,0.12)] transition-shadow">
+                    <div className="flex items-start gap-3">
+                      <div className="flex-1 min-w-0">
+                        {editingGoalId === goal.id && editingGoalDraft ? (
+                          <div className="flex flex-col gap-2 mb-3">
+                            <input
+                              autoFocus
+                              type="text"
+                              value={editingGoalDraft.title}
+                              onChange={(e) => setEditingGoalDraft((prev) => prev ? { ...prev, title: e.target.value } : null)}
+                              placeholder="Tên mục tiêu..."
+                              className="w-full rounded-md border border-emerald-300 bg-white px-2 py-1.5 text-sm font-medium text-zinc-900 outline-none focus:border-emerald-500"
+                            />
+                            <div className="flex flex-wrap gap-2">
+                              <select
+                                value={editingGoalDraft.type}
+                                onChange={(e) => setEditingGoalDraft((prev) => prev ? { ...prev, type: e.target.value } : null)}
+                                className="h-8 rounded-md border border-emerald-200 bg-white px-2 text-xs font-semibold text-emerald-700 outline-none focus:border-emerald-400"
+                              >
+                                <option value="health">Sức khỏe</option>
+                                <option value="learning">Học tập</option>
+                                <option value="fitness">Thể dục</option>
+                                <option value="work">Công việc</option>
+                                <option value="personal">Cá nhân</option>
+                                <option value="other">Khác</option>
+                              </select>
+                              <Input
+                                type="date"
+                                value={editingGoalDraft.start_date || ''}
+                                onChange={(e) => setEditingGoalDraft((prev) => prev ? { ...prev, start_date: e.target.value } : null)}
+                                className="h-8 w-auto border-emerald-200 bg-white text-zinc-900"
+                              />
+                              <Input
+                                type="date"
+                                value={editingGoalDraft.target_date || ''}
+                                onChange={(e) => setEditingGoalDraft((prev) => prev ? { ...prev, target_date: e.target.value } : null)}
+                                className="h-8 w-auto border-emerald-200 bg-white text-zinc-900"
+                              />
+                            </div>
+                            <textarea
+                              ref={editingGoalDescriptionRef}
+                              value={editingGoalDraft.description || ''}
+                              onChange={(e) => setEditingGoalDraft((prev) => prev ? { ...prev, description: e.target.value } : null)}
+                              placeholder="Mô tả (tùy chọn)..."
+                              rows={2}
+                              className={autoTextareaClass}
+                            />
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="range"
+                                min="0"
+                                max="100"
+                                step="10"
+                                value={editingGoalDraft.completion_percentage || 0}
+                                onChange={(e) => setEditingGoalDraft((prev) => prev ? { ...prev, completion_percentage: Number(e.target.value) } : null)}
+                                className="flex-1"
+                              />
+                              <span className="w-12 text-right text-xs font-medium text-zinc-600">{editingGoalDraft.completion_percentage || 0}%</span>
+                            </div>
+                            <div className="flex gap-1">
+                              <Button
+                                variant="ghost"
+                                size="icon-sm"
+                                disabled={savingGoal || !editingGoalDraft.title.trim()}
+                                onClick={() => void saveEditingGoal(goal)}
+                                className="text-emerald-600 hover:bg-emerald-100"
+                              >
+                                <Check className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon-sm"
+                                disabled={savingGoal}
+                                onClick={cancelEditingGoal}
+                                className="text-zinc-500 hover:bg-zinc-200"
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h3 className="font-medium text-sm text-zinc-900">{goal.title}</h3>
+                              <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">{goal.type}</span>
+                            </div>
+
+                            {/* Timeline */}
+                            {(goal.start_date || goal.target_date) && (
+                              <div className="mt-1 text-xs text-zinc-500 space-y-0.5">
+                                {goal.start_date && (
+                                  <p>📅 Bắt đầu: <span className="font-medium text-zinc-700">{new Date(goal.start_date).toLocaleDateString('vi-VN')}</span></p>
+                                )}
+                                {goal.target_date && (
+                                  <p>🎯 Kết thúc: <span className="font-medium text-zinc-700">{new Date(goal.target_date).toLocaleDateString('vi-VN')}</span></p>
+                                )}
+                                {goal.start_date && goal.target_date && (() => {
+                                  const start = new Date(goal.start_date)
+                                  const end = new Date(goal.target_date)
+                                  const now = new Date()
+                                  const totalDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
+                                  const elapsedDays = Math.ceil((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
+                                  const remainingDays = Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+                                  return (
+                                    <p>⏱️ Đã trôi: <span className="font-medium text-zinc-700">{Math.max(0, elapsedDays)}</span> / {totalDays} ngày | Còn lại: <span className="font-medium text-zinc-700">{Math.max(0, remainingDays)}</span> ngày</p>
+                                  )
+                                })()}
+                              </div>
+                            )}
+
+                            {goal.description && (
+                              <p className="mt-2 text-xs text-zinc-600 whitespace-pre-wrap">{goal.description}</p>
+                            )}
+
+                            {/* Progress Bar */}
+                            {goal.completion_percentage !== undefined && (
+                              <div className="mt-2 -mx-3 px-3">
+                                <div className="flex items-center justify-between mb-1">
+                                  <span className="text-xs font-medium text-zinc-700">Tiến độ</span>
+                                  <span className="text-xs font-semibold text-emerald-600">{goal.completion_percentage}%</span>
+                                </div>
+                                <div className="w-full bg-emerald-100 rounded-full h-2.5 overflow-hidden shadow-inner">
+                                  <div
+                                    className="bg-linear-to-r from-emerald-500 to-emerald-600 h-full transition-all duration-500 rounded-full"
+                                    style={{ width: `${goal.completion_percentage}%` }}
+                                  />
+                                </div>
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
+                      {editingGoalId !== goal.id && (
+                        <div className="flex shrink-0 items-center gap-1">
+                          <select
+                            value={goal.status}
+                            onChange={(e) => updateGoalStatus(goal, e.target.value as Goal['status'])}
+                            className="h-8 rounded-md border border-emerald-200 bg-white px-2 text-xs font-semibold text-emerald-700 outline-none focus:border-emerald-400"
+                          >
+                            <option value="active">Đang làm</option>
+                            <option value="completed">Hoàn thành</option>
+                            <option value="archived">Lưu trữ</option>
+                          </select>
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            onClick={() => startEditingGoal(goal)}
+                            className="text-emerald-400 hover:bg-emerald-100 hover:text-emerald-600"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            onClick={() => setDeleteGoal(goal)}
+                            className="text-rose-300 hover:bg-rose-500/15"
+                          >
+                            <Trash2 />
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+
+                    <button
+                      onClick={() => setExpandedGoal(expandedGoal === goal.id ? null : goal.id)}
+                      className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-emerald-600 hover:text-emerald-700"
+                    >
+                      {expandedGoal === goal.id ? (
+                        <>
+                          <ChevronUp className="h-4 w-4" />
+                          Ẩn chi tiết
+                        </>
+                      ) : (
+                        <>
+                          <ChevronDown className="h-4 w-4" />
+                          Xem chi tiết
+                        </>
+                      )}
+                    </button>
+
+                    {expandedGoal === goal.id && (
+                      <div className="mt-3 border-t border-emerald-100 pt-3">
+                        <div className="space-y-2 mb-3">
+                          {(goalItems[goal.id] || []).map((item, itemIndex) => (
+                            <div
+                              key={item.id}
+                              draggable
+                              onDragStart={() => setDraggedItemId(item.id)}
+                              onDragOver={(e) => {
+                                e.preventDefault()
+                                setDragOverItemId(item.id)
+                              }}
+                              onDragLeave={() => setDragOverItemId(null)}
+                              onDrop={() => {
+                                if (draggedItemId && draggedItemId !== item.id) {
+                                  const draggedIndex = (goalItems[goal.id] || []).findIndex((i) => i.id === draggedItemId)
+                                  void reorderGoalItems(goal.id, draggedIndex, itemIndex)
+                                }
+                                setDraggedItemId(null)
+                                setDragOverItemId(null)
+                              }}
+                              onDragEnd={() => {
+                                setDraggedItemId(null)
+                                setDragOverItemId(null)
+                              }}
+                              onDoubleClick={() => {
+                                if (editingGoalItemId !== item.id) {
+                                  startEditingGoalItem(item)
+                                }
+                              }}
+                              className={`flex items-start gap-2 rounded-lg border p-2 transition-all cursor-move group ${
+                                draggedItemId === item.id ? 'opacity-50 border-emerald-400 bg-emerald-100' : 'border-emerald-50 bg-emerald-50/50'
+                              } ${
+                                dragOverItemId === item.id && draggedItemId !== item.id ? 'border-emerald-400 bg-emerald-100/50' : ''
+                              } hover:bg-emerald-100/30`}
+                            >
+                              <button
+                                onClick={() => void toggleGoalItem(item)}
+                                className="shrink-0 mt-0.5 text-emerald-600 hover:text-emerald-700 transition-colors"
+                              >
+                                {item.is_completed ? (
+                                  <CheckCircle2 className="h-4 w-4" />
+                                ) : (
+                                  <Circle className="h-4 w-4" />
+                                )}
+                              </button>
+                              <div className="flex-1 min-w-0">
+                                {editingGoalItemId === item.id && editingGoalItemDraft ? (
+                                  <div className="flex flex-col gap-2 w-full">
+                                    <input
+                                      autoFocus
+                                      type="text"
+                                      value={editingGoalItemDraft.content}
+                                      onChange={(e) => setEditingGoalItemDraft((prev) => prev ? { ...prev, content: e.target.value } : null)}
+                                      placeholder="Nội dung..."
+                                      className="w-full rounded-md border border-emerald-300 bg-white px-2 py-1.5 text-xs text-zinc-900 outline-none focus:border-emerald-500"
+                                    />
+                                    <div className="flex gap-2">
+                                      <select
+                                        value={editingGoalItemDraft.item_type}
+                                        onChange={(e) => setEditingGoalItemDraft((prev) => prev ? { ...prev, item_type: e.target.value } : null)}
+                                        className="h-7 rounded-md border border-emerald-200 bg-white px-2 text-xs font-semibold text-emerald-700 outline-none focus:border-emerald-400"
+                                      >
+                                        <option value="routine">Routine</option>
+                                        <option value="meal">Ăn</option>
+                                        <option value="lesson">Bài học</option>
+                                        <option value="exercise">Bài tập</option>
+                                        <option value="other">Khác</option>
+                                      </select>
+                                      <label className="flex items-center gap-1.5 cursor-pointer">
+                                        <input
+                                          type="checkbox"
+                                          checked={editingGoalItemDraft.is_completed || false}
+                                          onChange={(e) => setEditingGoalItemDraft((prev) => prev ? { ...prev, is_completed: e.target.checked } : null)}
+                                          className="h-4 w-4 accent-emerald-500"
+                                        />
+                                        <span className="text-xs font-medium text-zinc-600">Hoàn thành</span>
+                                      </label>
+                                    </div>
+                                    <div>
+                                      <label className="text-xs font-medium text-zinc-700 block mb-1">📝 Kết quả:</label>
+                                      <textarea
+                                        value={editingGoalItemDraft.result || ''}
+                                        onChange={(e) => setEditingGoalItemDraft((prev) => prev ? { ...prev, result: e.target.value } : null)}
+                                        placeholder="Nhập kết quả sau khi hoàn thành..."
+                                        rows={3}
+                                        className="w-full rounded-md border border-emerald-200 bg-white px-2 py-1.5 text-xs text-zinc-900 outline-none focus:border-emerald-500 resize-none"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="text-xs font-medium text-zinc-700 block mb-1">Metadata (JSON):</label>
+                                      <textarea
+                                        value={JSON.stringify(editingGoalItemDraft.metadata || {}, null, 2)}
+                                        onChange={(e) => {
+                                          try {
+                                            const parsed = JSON.parse(e.target.value)
+                                            setEditingGoalItemDraft((prev) => prev ? { ...prev, metadata: parsed } : null)
+                                          } catch {
+                                            // Allow user to type, validation on save
+                                          }
+                                        }}
+                                        placeholder='{"key": "value"}'
+                                        rows={6}
+                                        className="w-full rounded-md border border-emerald-200 bg-white px-2 py-1.5 text-xs font-mono text-zinc-900 outline-none focus:border-emerald-500 resize-none"
+                                      />
+                                    </div>
+                                    <div className="flex gap-1">
+                                      <Button
+                                        variant="ghost"
+                                        size="icon-sm"
+                                        disabled={savingGoalItem || !editingGoalItemDraft.content.trim()}
+                                        onClick={() => void saveEditingGoalItem(item)}
+                                        className="text-emerald-600 hover:bg-emerald-100"
+                                      >
+                                        <Check className="h-4 w-4" />
+                                      </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon-sm"
+                                        disabled={savingGoalItem}
+                                        onClick={cancelEditingGoalItem}
+                                        className="text-zinc-500 hover:bg-zinc-200"
+                                      >
+                                        <X className="h-4 w-4" />
+                                      </Button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <>
+                                    <p
+                                      className={`text-xs px-1 py-0.5 rounded ${
+                                        item.is_completed ? 'line-through text-zinc-400' : 'text-zinc-900'
+                                      }`}
+                                    >
+                                      {item.content}
+                                    </p>
+                                    <div className="flex gap-1.5 flex-wrap items-center mt-1">
+                                      <span className="text-xs px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 inline-block">
+                                        {item.item_type}
+                                      </span>
+                                      {item.is_completed && (
+                                        <span className="text-xs px-1.5 py-0.5 rounded bg-emerald-500 text-white inline-block">
+                                          ✓ Hoàn thành
+                                        </span>
+                                      )}
+                                    </div>
+                                    {item.result && (
+                                      <div className="mt-1.5 p-1.5 rounded-md bg-blue-50 border border-blue-100">
+                                        <p className="text-xs font-medium text-blue-900">📝 Kết quả:</p>
+                                        <p className="text-xs text-blue-800 whitespace-pre-wrap mt-0.5">{item.result}</p>
+                                      </div>
+                                    )}
+                                    {item.metadata && Object.keys(item.metadata).length > 0 && (
+                                      <p className="text-xs text-zinc-600 mt-1">
+                                        {Object.entries(item.metadata).map(([k, v]) => `${k}: ${v}`).join(', ')}
+                                      </p>
+                                    )}
+                                  </>
+                                )}
+                              </div>
+                              {editingGoalItemId !== item.id && (
+                                <div className="flex gap-1 shrink-0">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon-sm"
+                                    onClick={() => startEditingGoalItem(item)}
+                                    className="text-emerald-400 hover:bg-emerald-100 hover:text-emerald-600"
+                                  >
+                                    <Pencil className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon-sm"
+                                    onClick={() => setDeleteGoalItem(item)}
+                                    className="text-rose-300 hover:bg-rose-500/15"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                          {(goalItems[goal.id] || []).length === 0 && (
+                            <p className="text-xs text-zinc-400 italic">Chưa có chi tiết nào.</p>
+                          )}
+                        </div>
+                        <form
+                          onSubmit={(e) => { e.preventDefault(); void addGoalItem(goal) }}
+                          className="flex gap-2"
+                        >
+                          <input
+                            type="text"
+                            value={goalItemDraft[goal.id]?.content || ''}
+                            onChange={(e) => setGoalItemDraft((prev) => ({
+                              ...prev,
+                              [goal.id]: { ...prev[goal.id], content: e.target.value, item_type: prev[goal.id]?.item_type || 'routine' }
+                            }))}
+                            placeholder="Thêm chi tiết..."
+                            className="flex-1 rounded-lg border border-dashed border-emerald-200 bg-transparent px-2 py-1.5 text-xs text-zinc-700 outline-none placeholder:text-zinc-400 focus:border-emerald-400 focus:bg-white"
+                          />
+                          <select
+                            value={goalItemDraft[goal.id]?.item_type || 'routine'}
+                            onChange={(e) => setGoalItemDraft((prev) => ({
+                              ...prev,
+                              [goal.id]: { ...prev[goal.id], item_type: e.target.value }
+                            }))}
+                            className="h-8 rounded-md border border-emerald-200 bg-white px-2 text-xs font-semibold text-emerald-700 outline-none focus:border-emerald-400"
+                          >
+                            <option value="routine">Routine</option>
+                            <option value="meal">Ăn</option>
+                            <option value="lesson">Bài học</option>
+                            <option value="exercise">Bài tập</option>
+                            <option value="other">Khác</option>
+                          </select>
+                          <button
+                            type="submit"
+                            disabled={savingGoalItem || !goalItemDraft[goal.id]?.content.trim()}
+                            className="inline-flex items-center gap-1 rounded-lg border border-emerald-300 bg-emerald-50 px-2 py-1.5 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-100 disabled:opacity-40"
+                          >
+                            <Plus className="h-3.5 w-3.5" />
+                            Thêm
+                          </button>
+                        </form>
+                      </div>
+                    )}
+                  </div>
+                ))}
+
+              {goals.filter((goal) => goalFilter === 'all' || goal.status === goalFilter).length === 0 && (
+                <div className="text-center py-8 text-zinc-500">Chưa có mục tiêu nào.</div>
+              )}
+            </div>
+          </div>
+        </section>
+        )}
+
+        {currentTab === 'calo' && (
+        <section className="overflow-hidden rounded-2xl border border-emerald-200 bg-white shadow-[0_4px_20px_-8px_rgba(16,185,129,0.25)]">
+          <div className="border-b border-emerald-100 px-4 py-3.5">
+            <h3 className="font-semibold text-zinc-900">Theo dõi calo</h3>
+            <p className="mt-1 text-xs text-zinc-600">Ghi lại thực phẩm ăn trong ngày và theo dõi tiến độ đạt mục tiêu calo hàng ngày.</p>
+          </div>
+          <div className="p-4">
+            <CalorieTracker />
+          </div>
+        </section>
+        )}
+
+        {currentTab === 'health' && (
+        <section className="overflow-hidden rounded-2xl border border-emerald-200 bg-[linear-gradient(130deg,#f0fdf4_0%,#ffffff_100%)] shadow-[0_4px_20px_-8px_rgba(16,185,129,0.25)]">
+          <div className="flex items-center gap-2 border-b border-emerald-100 px-4 py-3">
+            <span className="text-xl">💪</span>
+            <span className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-600">Bài viết sức khỏe</span>
+          </div>
+
+          <div className="px-4 py-3">
+            {healthPosts.length === 0 ? (
+              <div className="text-center py-8 text-zinc-500">Chưa có bài viết nào.</div>
+            ) : (
+              <div className="space-y-3">
+                {healthPosts.map((post) => (
+                  <a
+                    key={post.id}
+                    href={`/blog/${post.slug}`}
+                    className="block rounded-lg border border-emerald-100 bg-white p-4 hover:shadow-md transition-shadow"
+                  >
+                    <h3 className="font-semibold text-zinc-900 hover:text-emerald-600">{post.title}</h3>
+                    <p className="mt-1 text-sm text-zinc-600 line-clamp-2">{post.excerpt}</p>
+                    {post.tags && post.tags.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {post.tags.map((tag) => (
+                          <span key={tag.id} className="text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
+                            #{tag.name}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </a>
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
+        )}
       </div>
 
       <ConfirmModal
@@ -1308,6 +2341,20 @@ export default function NotesPage() {
         loading={deletingTodo}
         onConfirm={confirmDeleteTodo}
         onCancel={() => setDeleteTodo(null)}
+      />
+      <ConfirmModal
+        open={!!deleteGoal}
+        itemContent={deleteGoal?.title}
+        loading={deletingGoal}
+        onConfirm={confirmDeleteGoal}
+        onCancel={() => setDeleteGoal(null)}
+      />
+      <ConfirmModal
+        open={!!deleteGoalItem}
+        itemContent={deleteGoalItem?.content}
+        loading={deletingGoalItem}
+        onConfirm={confirmDeleteGoalItem}
+        onCancel={() => setDeleteGoalItem(null)}
       />
     </main>
   )

@@ -20,10 +20,12 @@ async function getPosts(): Promise<Post[]> {
     .eq('published', true)
     .order('created_at', { ascending: false })
   const rows = (data || []) as PostRow[]
-  return rows.map(({ post_tags, ...post }) => ({
-    ...post,
-    tags: post_tags.map((pt) => pt.tags).filter((tag): tag is Tag => tag !== null),
-  }))
+  return rows
+    .map(({ post_tags, ...post }) => ({
+      ...post,
+      tags: post_tags.map((pt) => pt.tags).filter((tag): tag is Tag => tag !== null),
+    }))
+    .filter((post) => !post.tags?.some((tag) => tag.name === 'Sức Khỏe'))
 }
 
 async function getQuotes(): Promise<Quote[]> {
