@@ -21,11 +21,20 @@ const DEFAULT_MEALS = [
   { time: '17:00', name: 'Tối', target_calories: 460, foods: ['Sữa nóng: 300ml', 'Yến mạch: 40g', 'Trứng luộc: 1 quả', 'Mật ong: 1 thìa'] },
 ]
 
+type EditForm = {
+  time: string
+  name: string
+  target_calories: string
+  foods: string
+}
+
 export function MealScheduleTracker() {
   const [meals, setMeals] = useState<Meal[]>([])
   const [selectedDate, setSelectedDate] = useState(todayDate())
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editForm, setEditForm] = useState<EditForm>({ time: '', name: '', target_calories: '', foods: '' })
 
   async function fetchMeals() {
     try {
@@ -122,6 +131,45 @@ export function MealScheduleTracker() {
     }
   }
 
+  function startEdit(meal: Meal) {
+    setEditingId(meal.id)
+    setEditForm({
+      time: meal.time,
+      name: meal.name,
+      target_calories: String(meal.target_calories),
+      foods: meal.foods.join('\n'),
+    })
+  }
+
+  function cancelEdit() {
+    setEditingId(null)
+  }
+
+  async function saveEdit(id: string) {
+    const calories = parseInt(editForm.target_calories, 10)
+    if (!editForm.name.trim() || !editForm.time || isNaN(calories)) {
+      toast.error('Vui lòng điền đầy đủ thông tin.')
+      return
+    }
+    const foods = editForm.foods.split('\n').map((f) => f.trim()).filter(Boolean)
+    try {
+      const { error } = await supabase
+        .from('meals')
+        .update({ time: editForm.time, name: editForm.name.trim(), target_calories: calories, foods })
+        .eq('id', id)
+      if (error) throw error
+      setMeals((prev) =>
+        prev.map((m) =>
+          m.id === id ? { ...m, time: editForm.time, name: editForm.name.trim(), target_calories: calories, foods } : m
+        )
+      )
+      setEditingId(null)
+      toast.success('Đã cập nhật bữa ăn.')
+    } catch {
+      toast.error('Không thể cập nhật.')
+    }
+  }
+
   const totalCalories = meals.reduce((sum, m) => sum + m.target_calories, 0)
   const completedCount = meals.filter((m) => m.is_completed).length
   const completedCalories = meals
@@ -190,52 +238,103 @@ export function MealScheduleTracker() {
             {meals.map((meal) => (
               <div
                 key={meal.id}
-                className={`rounded-lg border p-2 sm:p-3 transition-all ${
-                  meal.is_completed
-                    ? 'border-emerald-200 bg-emerald-50 shadow-sm'
-                    : 'border-emerald-100 bg-white shadow-[0_1px_2px_0_rgba(16,185,129,0.1)]'
-                } hover:shadow-md`}
+                onDoubleClick={() => editingId !== meal.id && startEdit(meal)}
+                className={`rounded-lg border p-2 sm:p-3 transition-all cursor-pointer select-none ${
+                  editingId === meal.id
+                    ? 'border-emerald-400 bg-emerald-50 shadow-md ring-1 ring-emerald-300'
+                    : meal.is_completed
+                      ? 'border-emerald-200 bg-emerald-50 shadow-sm hover:shadow-md'
+                      : 'border-emerald-100 bg-white shadow-[0_1px_2px_0_rgba(16,185,129,0.1)] hover:shadow-md'
+                }`}
               >
-                <div className="flex flex-col sm:flex-row sm:items-start gap-2 sm:gap-3">
-                  <button
-                    onClick={() => toggleMealComplete(meal)}
-                    className="shrink-0 mt-0.5"
-                  >
-                    {meal.is_completed ? (
-                      <CheckCircle2 className="h-5 w-5 text-emerald-600" />
-                    ) : (
-                      <Circle className="h-5 w-5 text-zinc-300 hover:text-emerald-400" />
-                    )}
-                  </button>
-
-                  <div className="flex-1 w-full min-w-0">
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 mb-1">
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        <Clock className="h-3.5 w-3.5 text-zinc-500" />
-                        <span className="font-medium text-sm text-zinc-900">{meal.time}</span>
-                      </div>
-                      <span className="text-sm font-medium text-zinc-700">{meal.name}</span>
-                      <span className="sm:ml-auto shrink-0 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700">
-                        {meal.target_calories} kcal
-                      </span>
+                {editingId === meal.id ? (
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap gap-2">
+                      <input
+                        type="time"
+                        value={editForm.time}
+                        onChange={(e) => setEditForm((f) => ({ ...f, time: e.target.value }))}
+                        className="rounded border border-emerald-300 px-2 py-1 text-xs w-24 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                      />
+                      <input
+                        type="text"
+                        value={editForm.name}
+                        onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
+                        className="rounded border border-emerald-300 px-2 py-1 text-xs flex-1 min-w-28 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                        placeholder="Tên bữa ăn"
+                      />
+                      <input
+                        type="number"
+                        value={editForm.target_calories}
+                        onChange={(e) => setEditForm((f) => ({ ...f, target_calories: e.target.value }))}
+                        className="rounded border border-emerald-300 px-2 py-1 text-xs w-20 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                        placeholder="kcal"
+                      />
                     </div>
-
-                    <div className="ml-0 sm:ml-6 space-y-0.5">
-                      {meal.foods.map((food, idx) => (
-                        <p key={idx} className="text-xs text-zinc-600">
-                          • {food}
-                        </p>
-                      ))}
+                    <textarea
+                      value={editForm.foods}
+                      onChange={(e) => setEditForm((f) => ({ ...f, foods: e.target.value }))}
+                      rows={Math.max(meal.foods.length, 2) + 1}
+                      className="w-full rounded border border-emerald-300 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-400 resize-none"
+                      placeholder="Mỗi dòng một món ăn..."
+                    />
+                    <div className="flex justify-end gap-2">
+                      <button
+                        onClick={cancelEdit}
+                        className="flex items-center gap-1 rounded px-2 py-1 text-xs text-zinc-500 hover:bg-zinc-100 transition-colors"
+                      >
+                        <X className="h-3.5 w-3.5" /> Hủy
+                      </button>
+                      <button
+                        onClick={() => saveEdit(meal.id)}
+                        className="flex items-center gap-1 rounded bg-emerald-500 px-2.5 py-1 text-xs font-medium text-white hover:bg-emerald-600 transition-colors"
+                      >
+                        <Check className="h-3.5 w-3.5" /> Lưu
+                      </button>
                     </div>
                   </div>
+                ) : (
+                  <div className="flex flex-col sm:flex-row sm:items-start gap-2 sm:gap-3">
+                    <button
+                      onClick={() => toggleMealComplete(meal)}
+                      className="shrink-0 mt-0.5"
+                    >
+                      {meal.is_completed ? (
+                        <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                      ) : (
+                        <Circle className="h-5 w-5 text-zinc-300 hover:text-emerald-400" />
+                      )}
+                    </button>
 
-                  <button
-                    onClick={() => deleteMeal(meal.id)}
-                    className="shrink-0 rounded p-1 text-zinc-300 opacity-60 hover:text-rose-600 hover:opacity-100 transition-all"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
+                    <div className="flex-1 w-full min-w-0">
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 mb-1">
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <Clock className="h-3.5 w-3.5 text-zinc-500" />
+                          <span className="font-medium text-sm text-zinc-900">{meal.time}</span>
+                        </div>
+                        <span className="text-sm font-medium text-zinc-700">{meal.name}</span>
+                        <span className="sm:ml-auto shrink-0 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+                          {meal.target_calories} kcal
+                        </span>
+                      </div>
+
+                      <div className="ml-0 sm:ml-6 space-y-0.5">
+                        {meal.foods.map((food, idx) => (
+                          <p key={idx} className="text-xs text-zinc-600">
+                            • {food}
+                          </p>
+                        ))}
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => deleteMeal(meal.id)}
+                      className="shrink-0 rounded p-1 text-zinc-300 opacity-60 hover:text-rose-600 hover:opacity-100 transition-all"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
           </div>

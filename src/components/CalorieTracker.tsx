@@ -133,14 +133,24 @@ export function CalorieTracker() {
     }
   }
 
+  function startEdit(food: DailyFood) {
+    const template = foodTemplates.find((f) => f.id === food.food_template_id)
+    setEditingId(food.id)
+    setEditingData({
+      ...food,
+      custom_food_name: food.custom_food_name ?? template?.name ?? '',
+    })
+  }
+
   async function updateFood(food: DailyFood) {
     if (!editingData) return
 
     setSaving(true)
     try {
       const { error } = await supabase.from('daily_foods').update({
-        quantity: editingData.quantity,
+        custom_food_name: editingData.custom_food_name,
         total_calories: editingData.total_calories,
+        quantity: editingData.quantity,
         notes: editingData.notes,
       }).eq('id', food.id)
 
@@ -322,80 +332,65 @@ export function CalorieTracker() {
               const isEditing = editingId === food.id
 
               return (
-                <div key={food.id} className="flex items-center gap-2 rounded-lg border border-emerald-100 bg-emerald-50 p-3">
+                <div
+                  key={food.id}
+                  onDoubleClick={() => !isEditing && startEdit(food)}
+                  className={`rounded-lg border p-3 transition-all cursor-pointer select-none ${
+                    isEditing
+                      ? 'border-emerald-400 bg-emerald-50 shadow-md ring-1 ring-emerald-300'
+                      : 'border-emerald-100 bg-emerald-50 hover:shadow-sm'
+                  }`}
+                >
                   {isEditing ? (
-                    <div className="flex flex-1 items-center gap-2">
-                      {template ? (
-                        <>
-                          <input
-                            type="number"
-                            value={editingData?.quantity || 1}
-                            onChange={(e) => {
-                              const qty = Number(e.target.value) || 1
-                              const cals = Math.round(template.calories_per_unit * qty * 10) / 10
-                              setEditingData({ ...editingData, quantity: qty, total_calories: cals })
-                            }}
-                            min="0.1"
-                            step="0.1"
-                            className="w-16 rounded-md border border-emerald-300 bg-white px-2 py-1 text-sm text-zinc-900"
-                          />
-                          <span className="text-xs text-zinc-600">{template.unit}</span>
-                          <span className="text-xs font-medium text-emerald-600">
-                            = {Math.round((editingData?.total_calories || 0) * 10) / 10} kcal
-                          </span>
-                        </>
-                      ) : (
-                        <>
-                          <input
-                            type="number"
-                            value={editingData?.total_calories || 0}
-                            onChange={(e) => {
-                              const cals = Number(e.target.value) || 0
-                              setEditingData({ ...editingData, total_calories: cals })
-                            }}
-                            min="0"
-                            step="1"
-                            className="w-20 rounded-md border border-emerald-300 bg-white px-2 py-1 text-sm text-zinc-900"
-                          />
-                          <span className="text-xs text-zinc-600">kcal</span>
-                        </>
-                      )}
-                      <div className="ml-auto flex items-center gap-1">
-                        <button
-                          onClick={() => updateFood(food)}
-                          disabled={saving}
-                          className="rounded-md bg-emerald-500 p-1 text-white hover:bg-emerald-600"
-                        >
-                          <Check className="h-3.5 w-3.5" />
-                        </button>
-                        <button
-                          onClick={() => {
-                            setEditingId(null)
-                            setEditingData(null)
-                          }}
-                          className="rounded-md text-zinc-500 hover:bg-white"
-                        >
-                          <X className="h-3.5 w-3.5" />
-                        </button>
+                    <div className="flex flex-col gap-2">
+                      <input
+                        type="text"
+                        value={editingData?.custom_food_name ?? ''}
+                        onChange={(e) => setEditingData({ ...editingData, custom_food_name: e.target.value })}
+                        className="rounded border border-emerald-300 px-2 py-1 text-sm text-zinc-900 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                        placeholder="Tên thực phẩm"
+                      />
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          value={editingData?.total_calories ?? 0}
+                          onChange={(e) => setEditingData({ ...editingData, total_calories: Number(e.target.value) || 0 })}
+                          className="w-24 rounded border border-emerald-300 px-2 py-1 text-sm text-zinc-900 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                          min="0"
+                          step="1"
+                        />
+                        <span className="text-xs text-zinc-600">kcal</span>
+                        <div className="ml-auto flex items-center gap-1">
+                          <button
+                            onClick={() => { setEditingId(null); setEditingData(null) }}
+                            className="flex items-center gap-1 rounded px-2 py-1 text-xs text-zinc-500 hover:bg-white transition-colors"
+                          >
+                            <X className="h-3.5 w-3.5" /> Hủy
+                          </button>
+                          <button
+                            onClick={() => updateFood(food)}
+                            disabled={saving}
+                            className="flex items-center gap-1 rounded bg-emerald-500 px-2.5 py-1 text-xs font-medium text-white hover:bg-emerald-600 transition-colors disabled:opacity-50"
+                          >
+                            <Check className="h-3.5 w-3.5" /> Lưu
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ) : (
-                    <>
+                    <div className="flex items-center gap-2">
                       <div className="flex-1 text-sm">
                         <p className="font-medium text-zinc-900">
                           {food.custom_food_name || template?.name}
                         </p>
                         <p className="text-xs text-zinc-500">
-                          {template ? `${food.quantity} ${template.unit}` : ''} {template ? '•' : ''} {Math.round(food.total_calories * 10) / 10} kcal
+                          {template && !food.custom_food_name ? `${food.quantity} ${template.unit} • ` : ''}{Math.round(food.total_calories * 10) / 10} kcal
                         </p>
                       </div>
 
                       <div className="flex items-center gap-1">
                         <button
-                          onClick={() => {
-                            setEditingId(food.id)
-                            setEditingData(food)
-                          }}
+                          onClick={() => startEdit(food)}
                           className="rounded-md text-zinc-400 hover:bg-emerald-100 hover:text-emerald-600 p-1"
                         >
                           <Edit2 className="h-3.5 w-3.5" />
@@ -407,7 +402,7 @@ export function CalorieTracker() {
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>
                       </div>
-                    </>
+                    </div>
                   )}
                 </div>
               )

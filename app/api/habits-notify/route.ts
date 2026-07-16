@@ -113,7 +113,7 @@ export async function GET(request: Request) {
   let mealStatus: number | null = null
   if (meal) {
     const mealFoods = MEAL_FOODS[meal.mealType as keyof typeof MEAL_FOODS] || []
-    const foodsList = mealFoods.map((f) => f).join('\n')
+    const foodsList = mealFoods.map((f) => `• ${f}`).join('\n\n')
 
     const mealPayload = {
       '@type': 'MessageCard',
@@ -124,11 +124,11 @@ export async function GET(request: Request) {
         {
           activityTitle: `${meal.icon} ${meal.name}`,
           activitySubtitle: `⏰ ${meal.time} | 🔥 ${meal.calories} kcal`,
-          text: `📋 Thực phẩm gợi ý:\n${foodsList}\n\n💡 Ăn chậm & nhai kỹ (30-40 phút)\n✅ Check in tại app khi ăn xong`,
+          text: `📋 Thực phẩm gợi ý:\n\n${foodsList}\n\n💡 Ăn chậm & nhai kỹ (30-40 phút)\n\n✅ Check in tại app khi ăn xong`,
         },
         {
           activityTitle: '💪 Mục tiêu hôm nay',
-          text: 'Tăng cân: 61kg → 75kg\nMục tiêu: 2400 kcal/ngày',
+          text: 'Mục tiêu: 2400 kcal/ngày\n\nTăng cân: 61kg → 75kg',
         },
       ],
     }
