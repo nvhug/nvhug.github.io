@@ -30,6 +30,7 @@ import { Input } from '@/components/ui/input'
 import { ConfirmModal } from '@/components/ui/confirm-modal'
 import { TagInput } from '@/components/ui/tag-input'
 import { CalorieTracker } from '@/components/CalorieTracker'
+import { CalorieAnalytics } from '@/components/CalorieAnalytics'
 import { MealScheduleTracker } from '@/components/MealScheduleTracker'
 
 type TypeFilter = 'all' | 'good' | 'bad'
@@ -92,6 +93,19 @@ type GoalItemDraft = Omit<GoalItem, 'id' | 'goal_id' | 'created_at' | 'updated_a
 
 export default function NotesPage() {
   const [currentTab, setCurrentTab] = useState<TabType>('notes')
+
+  useEffect(() => {
+    const hash = window.location.hash.slice(1) as TabType
+    const validTabs: TabType[] = ['notes', 'todos', 'goals', 'calo', 'meals', 'health']
+    if (hash && validTabs.includes(hash)) {
+      setCurrentTab(hash)
+    }
+  }, [])
+
+  const handleTabChange = (tab: TabType) => {
+    setCurrentTab(tab)
+    window.history.pushState(null, '', `#${tab}`)
+  }
 
   const [notes, setNotes] = useState<Note[]>([])
   const [pinnedNotes, setPinnedNotes] = useState<Note[]>([])
@@ -952,7 +966,7 @@ export default function NotesPage() {
 
         <div className="flex flex-wrap gap-1 border-b border-emerald-200 sm:gap-2">
           <button
-            onClick={() => setCurrentTab('notes')}
+            onClick={() => handleTabChange('notes')}
             className={`px-2 py-2 text-xs font-medium transition-colors sm:px-4 sm:py-3 sm:text-sm ${
               currentTab === 'notes'
                 ? 'border-b-2 border-emerald-600 text-emerald-600'
@@ -965,7 +979,7 @@ export default function NotesPage() {
             </span>
           </button>
           <button
-            onClick={() => setCurrentTab('todos')}
+            onClick={() => handleTabChange('todos')}
             className={`px-2 py-2 text-xs font-medium transition-colors sm:px-4 sm:py-3 sm:text-sm ${
               currentTab === 'todos'
                 ? 'border-b-2 border-emerald-600 text-emerald-600'
@@ -978,7 +992,7 @@ export default function NotesPage() {
             </span>
           </button>
           <button
-            onClick={() => setCurrentTab('goals')}
+            onClick={() => handleTabChange('goals')}
             className={`px-2 py-2 text-xs font-medium transition-colors sm:px-4 sm:py-3 sm:text-sm ${
               currentTab === 'goals'
                 ? 'border-b-2 border-emerald-600 text-emerald-600'
@@ -991,7 +1005,7 @@ export default function NotesPage() {
             </span>
           </button>
           <button
-            onClick={() => setCurrentTab('calo')}
+            onClick={() => handleTabChange('calo')}
             className={`px-2 py-2 text-xs font-medium transition-colors sm:px-4 sm:py-3 sm:text-sm ${
               currentTab === 'calo'
                 ? 'border-b-2 border-emerald-600 text-emerald-600'
@@ -1004,7 +1018,7 @@ export default function NotesPage() {
             </span>
           </button>
           <button
-            onClick={() => setCurrentTab('meals')}
+            onClick={() => handleTabChange('meals')}
             className={`px-2 py-2 text-xs font-medium transition-colors sm:px-4 sm:py-3 sm:text-sm ${
               currentTab === 'meals'
                 ? 'border-b-2 border-emerald-600 text-emerald-600'
@@ -1017,7 +1031,7 @@ export default function NotesPage() {
             </span>
           </button>
           <button
-            onClick={() => setCurrentTab('health')}
+            onClick={() => handleTabChange('health')}
             className={`px-2 py-2 text-xs font-medium transition-colors sm:px-4 sm:py-3 sm:text-sm ${
               currentTab === 'health'
                 ? 'border-b-2 border-emerald-600 text-emerald-600'
@@ -2300,6 +2314,7 @@ export default function NotesPage() {
         )}
 
         {currentTab === 'calo' && (
+        <>
         <section className="overflow-hidden rounded-2xl border border-emerald-200 bg-white shadow-[0_4px_20px_-8px_rgba(16,185,129,0.25)]">
           <div className="border-b border-emerald-100 px-4 py-3.5">
             <h3 className="font-semibold text-zinc-900">Theo dõi calo</h3>
@@ -2309,6 +2324,16 @@ export default function NotesPage() {
             <CalorieTracker />
           </div>
         </section>
+        <section className="overflow-hidden rounded-2xl border border-emerald-200 bg-[linear-gradient(130deg,#f0fdf4_0%,#ffffff_100%)] shadow-[0_4px_20px_-8px_rgba(16,185,129,0.25)]">
+          <div className="border-b border-emerald-100 px-4 py-3.5">
+            <h3 className="font-semibold text-zinc-900">Phân tích calo</h3>
+            <p className="mt-1 text-xs text-zinc-600">Xu hướng 14 ngày gần nhất và top thực phẩm trong 30 ngày.</p>
+          </div>
+          <div className="p-4">
+            <CalorieAnalytics />
+          </div>
+        </section>
+        </>
         )}
 
         {currentTab === 'meals' && (

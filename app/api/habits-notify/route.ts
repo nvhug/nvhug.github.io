@@ -61,55 +61,56 @@ export async function GET(request: Request) {
     })
   )
 
-  if (scheduled.length === 0) {
-    return NextResponse.json({ message: `No habits scheduled for ${currentTime}` })
+  // --- Send habits notification (if any habits scheduled) ---
+  let habitsStatus: number | null = null
+  if (scheduled.length > 0) {
+    const today = new Intl.DateTimeFormat('vi-VN', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      timeZone: 'Asia/Ho_Chi_Minh',
+    }).format(new Date())
+
+    const habitsPayload = {
+      '@type': 'MessageCard',
+      '@context': 'http://schema.org/extensions',
+      themeColor: '10b981',
+      summary: scheduled.map((h: { content: string }) => h.content).join(' | '),
+      sections: [
+        {
+          activityTitle: `🌿 Nhắc nhở lúc ${currentTime}`,
+          activitySubtitle: today,
+          facts: scheduled.map((h: { content: string }) => ({
+            name: '✅',
+            value: h.content,
+          })),
+        },
+      ],
+    }
+
+    try {
+      const res = await fetch(webhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(habitsPayload),
+      })
+      habitsStatus = res.status
+      if (!res.ok) console.error('Habits notification failed:', res.status)
+    } catch (err) {
+      console.error('Error sending habits notification:', err)
+    }
   }
 
-  const today = new Intl.DateTimeFormat('vi-VN', {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    timeZone: 'Asia/Ho_Chi_Minh',
-  }).format(new Date())
-
-  const payload = {
-    '@type': 'MessageCard',
-    '@context': 'http://schema.org/extensions',
-    themeColor: '10b981',
-    summary: scheduled.map((h: { content: string }) => h.content).join(' | '),
-    sections: [
-      {
-        activityTitle: `🌿 Nhắc nhở lúc ${currentTime}`,
-        activitySubtitle: today,
-        facts: scheduled.map((h: { content: string }) => ({
-          name: '✅',
-          value: h.content,
-        })),
-      },
-    ],
-  }
-
-  const res = await fetch(webhookUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  })
-
-  const teamsBody = await res.text()
-
-  if (!res.ok) {
-    return NextResponse.json({ error: 'Teams webhook failed', teamsStatus: res.status, teamsBody }, { status: 500 })
-  }
-
-  // Check for meal notifications
+  // --- Send meal notification (independent of habits) ---
   const meal = MEAL_SCHEDULE.find((m) => {
     const [mH, mM] = m.time.split(':').map(Number)
     const mealMinutes = mH * 60 + mM
     const diff = curMinutes - mealMinutes
-    return diff >= 0 && diff < 14 // 14-minute window
+    return diff >= 0 && diff < 14
   })
 
+  let mealStatus: number | null = null
   if (meal) {
     const mealFoods = MEAL_FOODS[meal.mealType as keyof typeof MEAL_FOODS] || []
     const foodsList = mealFoods.map((f) => f).join('\n')
@@ -138,14 +139,19 @@ export async function GET(request: Request) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(mealPayload),
       })
-
-      if (!mealRes.ok) {
-        console.error('Meal notification failed:', mealRes.status)
-      }
-    } catch (error) {
-      console.error('Error sending meal notification:', error)
+      mealStatus = mealRes.status
+      if (!mealRes.ok) console.error('Meal notification failed:', mealRes.status)
+    } catch (err) {
+      console.error('Error sending meal notification:', err)
     }
   }
 
-  return NextResponse.json({ ok: true, time: currentTime, habitsCount: scheduled.length, meal: meal?.name || null, teamsStatus: res.status })
+  return NextResponse.json({
+    ok: true,
+    time: currentTime,
+    habitsCount: scheduled.length,
+    habitsStatus,
+    meal: meal?.name || null,
+    mealStatus,
+  })
 }
