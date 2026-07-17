@@ -86,6 +86,7 @@ export default function EditPostPage({ params }: { params: Promise<{ id: string 
         // Silently fail if revalidation doesn't work
       })
 
+      router.refresh()
       router.push('/admin')
     } catch (error) {
       console.error('Error updating post:', error)

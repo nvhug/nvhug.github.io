@@ -134,17 +134,20 @@ export default function PostForm({ mode, initialPost, submitting, onSubmit, onDe
     let finalContent = content
     const plainText = htmlToPlainText(content)
 
-    // Always check if content is markdown first (takes priority over HTML detection)
-    // This handles cases where markdown is pasted into Quill and wrapped in <p> tags
-    if (isLikelyMarkdown(plainText)) {
+    // Only convert if content is plain paragraphs — i.e. raw markdown pasted into Quill
+    // (Quill wraps each line in <p> with no semantic tags).
+    // If content already has semantic HTML from the toolbar or a prior save
+    // (headings, lists, bold, code…), preserve it as-is; running marked.parse on the
+    // stripped plain text would destroy the heading/formatting structure.
+    const contentIsPlain = !/<(h[1-6]|ul|ol|li|blockquote|pre|strong|em|b|i|code)[\s>\/]/i.test(content)
+    if (contentIsPlain && isLikelyMarkdown(plainText)) {
       try {
         finalContent = (await marked.parse(plainText, { breaks: true, gfm: true })) as string
       } catch (error) {
         console.error('Markdown conversion failed:', error)
       }
     }
-    // If no markdown detected, keep the content as-is (already formatted HTML)
-    // This preserves intentional toolbar formatting
+    // If content already has formatted HTML, keep it as-is
 
     await onSubmit({
       title: title.trim(),

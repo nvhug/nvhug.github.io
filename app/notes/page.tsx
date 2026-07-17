@@ -2377,7 +2377,7 @@ export default function NotesPage() {
                 {healthPosts.map((post) => (
                   <a
                     key={post.id}
-                    href={`/blog/${post.slug}`}
+                    href={`/blog/${post.slug}?from=health`}
                     className="block rounded-lg border border-emerald-100 bg-white p-4 hover:shadow-md transition-shadow"
                   >
                     <h3 className="font-semibold text-zinc-900 hover:text-emerald-600">{post.title}</h3>
