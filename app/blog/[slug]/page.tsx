@@ -2,6 +2,7 @@
 
 import { useEffect, useState, use } from 'react'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { Post, Comment } from '@/types'
 import { formatDate } from '@/lib/utils'
@@ -9,6 +10,8 @@ import { formatDate } from '@/lib/utils'
 
 export default function BlogPost({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = use(params)
+  const searchParams = useSearchParams()
+  const backHref = searchParams.get('from') === 'health' ? '/notes#health' : '/'
   const [post, setPost] = useState<Post | null>(null)
   const [comments, setComments] = useState<Comment[]>([])
   const [newComment, setNewComment] = useState({ author: '', content: '' })
@@ -96,7 +99,7 @@ export default function BlogPost({ params }: { params: Promise<{ slug: string }>
       <main className="min-h-svh bg-[#f7f4ed] px-4 pb-16 pt-24 sm:px-6">
         <div className="mx-auto w-full max-w-3xl rounded-2xl border border-[#e5e0d5] bg-white/75 p-16 text-center shadow-[0_18px_45px_-34px_rgba(23,23,23,0.35)]">
           <h1 className="mb-4 font-poppins text-3xl font-semibold text-zinc-900">Post not found</h1>
-          <Link href="/" className="text-sm font-semibold text-[#8a4a2a] hover:underline">
+          <Link href={backHref} className="text-sm font-semibold text-[#8a4a2a] hover:underline">
             ← Back to blog
           </Link>
         </div>
@@ -109,7 +112,7 @@ export default function BlogPost({ params }: { params: Promise<{ slug: string }>
       {/* Post Header & Content */}
       <section className="mx-auto w-full max-w-3xl px-4 sm:px-6">
         <div className="rounded-[28px] border border-[#e5e0d5] bg-[#fffdf8]/82 px-5 py-6 shadow-[0_24px_70px_-48px_rgba(23,23,23,0.55)] backdrop-blur sm:px-8 sm:py-8">
-          <Link href="/" className="inline-flex rounded-full border border-[#e5e0d5] bg-white/70 px-3 py-1.5 text-sm font-medium text-zinc-500 transition-colors hover:border-[#c9bba8] hover:text-[#8a4a2a]">
+          <Link href={backHref} className="inline-flex rounded-full border border-[#e5e0d5] bg-white/70 px-3 py-1.5 text-sm font-medium text-zinc-500 transition-colors hover:border-[#c9bba8] hover:text-[#8a4a2a]">
             ← Back to articles
           </Link>
 
