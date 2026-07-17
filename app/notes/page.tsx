@@ -31,10 +31,11 @@ import { ConfirmModal } from '@/components/ui/confirm-modal'
 import { TagInput } from '@/components/ui/tag-input'
 import { CalorieTracker } from '@/components/CalorieTracker'
 import { CalorieAnalytics } from '@/components/CalorieAnalytics'
+import { NotesAnalytics } from '@/components/NotesAnalytics'
 import { MealScheduleTracker } from '@/components/MealScheduleTracker'
 
 type TypeFilter = 'all' | 'good' | 'bad'
-type TabType = 'notes' | 'todos' | 'goals' | 'calo' | 'meals' | 'health'
+type TabType = 'notes' | 'todos' | 'goals' | 'calo' | 'meals' | 'health' | 'stats'
 
 function todayDate() {
   return new Date().toISOString().slice(0, 10)
@@ -96,7 +97,7 @@ export default function NotesPage() {
 
   useEffect(() => {
     const hash = window.location.hash.slice(1) as TabType
-    const validTabs: TabType[] = ['notes', 'todos', 'goals', 'calo', 'meals', 'health']
+    const validTabs: TabType[] = ['notes', 'todos', 'goals', 'calo', 'meals', 'health', 'stats']
     if (hash && validTabs.includes(hash)) {
       setCurrentTab(hash)
     }
@@ -900,18 +901,27 @@ export default function NotesPage() {
     return true
   })
 
-  const groups = useMemo(() => {
-    const map = new Map<string, Note[]>()
-    filteredNotes.forEach((note) => {
-      const list = map.get(note.note_date) ?? []
-      list.push(note)
-      map.set(note.note_date, list)
+  const sortedNotes = useMemo(() => {
+    return [...filteredNotes].sort((a, b) => {
+      const pa = a.hide_meta ? 0 : (a.priority ?? 0)
+      const pb = b.hide_meta ? 0 : (b.priority ?? 0)
+      if (pb !== pa) return pb - pa
+      return b.created_at.localeCompare(a.created_at)
     })
-    return Array.from(map, ([date, items]) => {
-      const sorted = [...items].sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0))
-      return { date, items: sorted, maxPriority: sorted[0]?.priority ?? 0 }
-    }).sort((a, b) => b.maxPriority - a.maxPriority)
   }, [filteredNotes])
+
+  const noteGroups = useMemo(() => {
+    const result: { date: string; items: Note[] }[] = []
+    sortedNotes.forEach((note) => {
+      const last = result[result.length - 1]
+      if (last && last.date === note.note_date) {
+        last.items.push(note)
+      } else {
+        result.push({ date: note.note_date, items: [note] })
+      }
+    })
+    return result
+  }, [sortedNotes])
 
   const allTags = useMemo(
     () => [...new Set(notes.flatMap((n) => n.tags ?? []))].sort(),
@@ -1041,6 +1051,19 @@ export default function NotesPage() {
             <span className="flex items-center gap-1 sm:gap-2">
               <span className="text-sm sm:text-base">💪</span>
               <span className="hidden sm:inline">Sức Khỏe</span>
+            </span>
+          </button>
+          <button
+            onClick={() => handleTabChange('stats')}
+            className={`px-2 py-2 text-xs font-medium transition-colors sm:px-4 sm:py-3 sm:text-sm ${
+              currentTab === 'stats'
+                ? 'border-b-2 border-emerald-600 text-emerald-600'
+                : 'text-zinc-600 hover:text-zinc-900'
+            }`}
+          >
+            <span className="flex items-center gap-1 sm:gap-2">
+              <span className="text-sm sm:text-base">📊</span>
+              <span className="hidden sm:inline">Thống kê</span>
             </span>
           </button>
         </div>
@@ -1377,12 +1400,12 @@ export default function NotesPage() {
 
           {loading ? (
             <div className="py-16 text-center text-sm text-zinc-500">Đang tải...</div>
-          ) : groups.length === 0 ? (
+          ) : noteGroups.length === 0 ? (
             <div className="py-16 text-center text-sm text-zinc-500">Chưa có note nào.</div>
           ) : (
             <div className="divide-y divide-emerald-50">
-              {groups.map((group) => (
-                <div key={group.date} className="px-4 py-3.5">
+              {noteGroups.map((group, gi) => (
+                <div key={`${group.date}-${gi}`} className="px-4 py-3.5">
                   <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">
                     {formatNoteDate(group.date)}
                   </p>
@@ -2324,15 +2347,6 @@ export default function NotesPage() {
             <CalorieTracker />
           </div>
         </section>
-        <section className="overflow-hidden rounded-2xl border border-emerald-200 bg-[linear-gradient(130deg,#f0fdf4_0%,#ffffff_100%)] shadow-[0_4px_20px_-8px_rgba(16,185,129,0.25)]">
-          <div className="border-b border-emerald-100 px-4 py-3.5">
-            <h3 className="font-semibold text-zinc-900">Phân tích calo</h3>
-            <p className="mt-1 text-xs text-zinc-600">Xu hướng 14 ngày gần nhất và top thực phẩm trong 30 ngày.</p>
-          </div>
-          <div className="p-4">
-            <CalorieAnalytics />
-          </div>
-        </section>
         </>
         )}
 
@@ -2383,6 +2397,27 @@ export default function NotesPage() {
             )}
           </div>
         </section>
+        )}
+
+        {currentTab === 'stats' && (
+        <div className="space-y-4">
+          <section className="overflow-hidden rounded-2xl border border-emerald-200 bg-[linear-gradient(130deg,#f0fdf4_0%,#ffffff_100%)] shadow-[0_4px_20px_-8px_rgba(16,185,129,0.25)]">
+            <div className="flex items-center gap-2 border-b border-emerald-100 px-4 py-3">
+              <span className="text-xl">📊</span>
+              <span className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-600">Thống kê Notes</span>
+            </div>
+            <NotesAnalytics notes={notes} />
+          </section>
+          <section className="overflow-hidden rounded-2xl border border-emerald-200 bg-[linear-gradient(130deg,#f0fdf4_0%,#ffffff_100%)] shadow-[0_4px_20px_-8px_rgba(16,185,129,0.25)]">
+            <div className="border-b border-emerald-100 px-4 py-3.5">
+              <h3 className="font-semibold text-zinc-900">Phân tích calo</h3>
+              <p className="mt-1 text-xs text-zinc-600">Xu hướng 14 ngày gần nhất và top thực phẩm trong 30 ngày.</p>
+            </div>
+            <div className="p-4">
+              <CalorieAnalytics />
+            </div>
+          </section>
+        </div>
         )}
       </div>
 

@@ -32,6 +32,7 @@ type DayData = { date: string; calories: number }
 export function CalorieAnalytics() {
   const [allDays, setAllDays] = useState<DayData[]>([])
   const [loading, setLoading] = useState(true)
+  const [hoveredIdx, setHoveredIdx] = useState<number | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -189,25 +190,53 @@ export function CalorieAnalytics() {
                   const y = TOP_PAD + CHART_H - barH
                   const onGoal = day.calories >= DAILY_GOAL * 0.85
                   return (
-                    <g key={day.date}>
+                    <g
+                      key={day.date}
+                      style={{ cursor: 'pointer' }}
+                      onMouseEnter={() => setHoveredIdx(i)}
+                      onMouseLeave={() => setHoveredIdx(null)}
+                    >
                       <rect
                         x={x} y={y}
                         width={BAR_W} height={barH}
                         rx={3}
                         fill={onGoal ? '#10b981' : '#34d399'}
+                        opacity={hoveredIdx === i ? 0.8 : 1}
                       />
                       <text
                         x={x + BAR_W / 2}
                         y={TOP_PAD + CHART_H + LABEL_H - 2}
                         textAnchor="middle"
                         fontSize={8}
-                        fill="#a1a1aa"
+                        fill={hoveredIdx === i ? '#10b981' : '#a1a1aa'}
+                        fontWeight={hoveredIdx === i ? '600' : 'normal'}
                       >
                         {shortDate(day.date)}
                       </text>
                     </g>
                   )
                 })}
+
+                {/* Tooltip */}
+                {hoveredIdx !== null && (() => {
+                  const day = allDays[hoveredIdx]
+                  const barH = Math.max((day.calories / maxTick) * CHART_H, 2)
+                  const cx = hoveredIdx * SLOT + SLOT / 2
+                  const barTop = TOP_PAD + CHART_H - barH
+                  const label = day.calories.toLocaleString() + ' kcal'
+                  const TIP_W = 62
+                  const TIP_H = 17
+                  const tipX = Math.max(2, Math.min(cx - TIP_W / 2, svgWidth - TIP_W - 2))
+                  const tipY = Math.max(2, barTop - TIP_H - 5)
+                  return (
+                    <g style={{ pointerEvents: 'none' }}>
+                      <rect x={tipX} y={tipY} width={TIP_W} height={TIP_H} rx={4} fill="white" stroke="#d4d4d8" strokeWidth={1} />
+                      <text x={tipX + TIP_W / 2} y={tipY + TIP_H - 4} textAnchor="middle" fontSize={9} fontWeight="600" fill="#18181b">
+                        {label}
+                      </text>
+                    </g>
+                  )
+                })()}
               </svg>
             </div>
           </div>
