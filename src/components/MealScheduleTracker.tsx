@@ -49,7 +49,7 @@ export function MealScheduleTracker() {
 
       // Deduplicate by meal_type, keep the first occurrence
       const seen = new Set<string>()
-      const deduped = (data || []).filter((m) => {
+      const deduped = (data || []).filter((m: Meal) => {
         if (seen.has(m.meal_type)) return false
         seen.add(m.meal_type)
         return true
