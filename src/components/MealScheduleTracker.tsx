@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Clock, CheckCircle2, Circle, Plus, Trash2, X, Edit2, Check } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
@@ -32,6 +32,7 @@ export function MealScheduleTracker() {
   const [meals, setMeals] = useState<Meal[]>([])
   const [selectedDate, setSelectedDate] = useState(todayDate())
   const [loading, setLoading] = useState(true)
+  const isSettingUpRef = useRef(false)
   const [saving, setSaving] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editForm, setEditForm] = useState<EditForm>({ time: '', name: '', target_calories: '', foods: '' })
@@ -46,11 +47,21 @@ export function MealScheduleTracker() {
 
       if (error) throw error
 
-      // If no meals exist for this date, create default ones
-      if (!data || data.length === 0) {
+      // Deduplicate by meal_type, keep the first occurrence
+      const seen = new Set<string>()
+      const deduped = (data || []).filter((m) => {
+        if (seen.has(m.meal_type)) return false
+        seen.add(m.meal_type)
+        return true
+      })
+
+      if (deduped.length === 0) {
+        if (isSettingUpRef.current) return
+        isSettingUpRef.current = true
         await setupDefaultMeals()
+        isSettingUpRef.current = false
       } else {
-        setMeals((data || []) as Meal[])
+        setMeals(deduped as Meal[])
         setLoading(false)
       }
     } catch (error) {
@@ -61,6 +72,7 @@ export function MealScheduleTracker() {
   }
 
   useEffect(() => {
+    isSettingUpRef.current = false
     setLoading(true)
     void fetchMeals()
   }, [selectedDate])
