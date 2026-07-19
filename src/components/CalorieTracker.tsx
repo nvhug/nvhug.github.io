@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Plus, Trash2, Edit2, X, Check } from 'lucide-react'
+import { Plus, Trash2, Edit2, X, Check, Clock } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import { FoodTemplate, DailyFood } from '@/types'
@@ -12,6 +12,11 @@ const DAILY_CALORIE_GOAL = 2400
 
 function todayDate() {
   return new Date().toISOString().slice(0, 10)
+}
+
+function currentTimeStr() {
+  const now = new Date()
+  return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
 }
 
 export function CalorieTracker() {
@@ -25,7 +30,8 @@ export function CalorieTracker() {
   const [quantity, setQuantity] = useState<string>('1')
   const [customFoodName, setCustomFoodName] = useState<string>('')
   const [customCalories, setCustomCalories] = useState<string>('')
-  const [useCustom, setUseCustom] = useState(false)
+  const [useCustom, setUseCustom] = useState(true)
+  const [customTime, setCustomTime] = useState(currentTimeStr)
   const [saving, setSaving] = useState(false)
 
   // Edit state
@@ -86,12 +92,14 @@ export function CalorieTracker() {
 
     setSaving(true)
     try {
+      const createdAt = new Date(`${selectedDate}T${customTime}:00`).toISOString()
       const food = useCustom
         ? {
             date: selectedDate,
             custom_food_name: customFoodName.trim(),
             quantity: 1,
             total_calories: Number(customCalories) || 0,
+            created_at: createdAt,
           }
         : (() => {
             const template = foodTemplates.find((f) => f.id === selectedFoodId)
@@ -102,6 +110,7 @@ export function CalorieTracker() {
               food_template_id: selectedFoodId,
               quantity: qty,
               total_calories: Math.round(template.calories_per_unit * qty * 10) / 10,
+              created_at: createdAt,
             }
           })()
 
@@ -113,6 +122,7 @@ export function CalorieTracker() {
       setQuantity('1')
       setCustomFoodName('')
       setCustomCalories('')
+      setCustomTime(currentTimeStr())
       setUseCustom(false)
       toast.success('Thêm thực phẩm thành công.')
     } catch {
@@ -221,17 +231,6 @@ export function CalorieTracker() {
         <div className="mb-3 flex gap-2">
           <button
             type="button"
-            onClick={() => setUseCustom(false)}
-            className={`flex-1 rounded-lg px-3 py-2 text-xs font-medium transition-colors ${
-              !useCustom
-                ? 'bg-emerald-500 text-white'
-                : 'border border-emerald-200 text-emerald-700 hover:bg-emerald-50'
-            }`}
-          >
-            Danh sách
-          </button>
-          <button
-            type="button"
             onClick={() => setUseCustom(true)}
             className={`flex-1 rounded-lg px-3 py-2 text-xs font-medium transition-colors ${
               useCustom
@@ -240,6 +239,17 @@ export function CalorieTracker() {
             }`}
           >
             Tùy chỉnh
+          </button>
+          <button
+            type="button"
+            onClick={() => setUseCustom(false)}
+            className={`flex-1 rounded-lg px-3 py-2 text-xs font-medium transition-colors ${
+              !useCustom
+                ? 'bg-emerald-500 text-white'
+                : 'border border-emerald-200 text-emerald-700 hover:bg-emerald-50'
+            }`}
+          >
+            Danh sách
           </button>
         </div>
 
@@ -252,13 +262,24 @@ export function CalorieTracker() {
               placeholder="Tên thực phẩm (ví dụ: bánh mì nướng)"
               className="w-full rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-emerald-400"
             />
-            <input
-              type="number"
-              value={customCalories}
-              onChange={(e) => setCustomCalories(e.target.value)}
-              placeholder="Calo"
-              className="w-full rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-emerald-400"
-            />
+            <div className="flex gap-2">
+              <input
+                type="number"
+                value={customCalories}
+                onChange={(e) => setCustomCalories(e.target.value)}
+                placeholder="Calo"
+                className="w-24 rounded-lg border border-emerald-200 bg-white px-2 py-1.5 text-sm text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-emerald-400"
+              />
+              <div className="flex items-center gap-1.5 rounded-lg border border-emerald-200 px-2 py-1.5 w-fit">
+                <Clock className="h-3 w-3 text-zinc-400 shrink-0" />
+                <input
+                  type="time"
+                  value={customTime}
+                  onChange={(e) => setCustomTime(e.target.value)}
+                  className="w-full text-sm text-zinc-900 outline-none bg-transparent"
+                />
+              </div>
+            </div>
             <button
               type="button"
               onClick={addFood}
@@ -284,7 +305,16 @@ export function CalorieTracker() {
               ))}
             </select>
 
-            <div className="flex gap-2">
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 rounded-lg border border-emerald-200 px-2 py-1.5 w-fit">
+                <Clock className="h-3 w-3 text-zinc-400 shrink-0" />
+                <input
+                  type="time"
+                  value={customTime}
+                  onChange={(e) => setCustomTime(e.target.value)}
+                  className="w-fit text-sm text-zinc-900 outline-none bg-transparent"
+                />
+              </div>
               <input
                 type="number"
                 value={quantity}
@@ -292,18 +322,13 @@ export function CalorieTracker() {
                 placeholder="Số lượng"
                 min="0.1"
                 step="0.1"
-                className="w-24 rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-emerald-400"
+                className="w-24 rounded-lg border border-emerald-200 bg-white px-2 py-1.5 text-sm text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-emerald-400"
               />
-              <span className="flex items-center text-sm text-zinc-600">
-                {selectedTemplate?.unit}
-              </span>
+              <span className="text-sm text-zinc-600">{selectedTemplate?.unit}</span>
               {previewCalories > 0 && (
-                <span className="flex items-center text-sm font-medium text-emerald-600">
-                  = {previewCalories} kcal
-                </span>
+                <span className="text-sm font-medium text-emerald-600">= {previewCalories} kcal</span>
               )}
             </div>
-
             <button
               type="button"
               onClick={addFood}
@@ -378,29 +403,34 @@ export function CalorieTracker() {
                       </div>
                     </div>
                   ) : (
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1 text-sm">
-                        <p className="font-medium text-zinc-900">
+                    <div className="flex flex-col gap-1">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="text-sm font-medium text-zinc-900 leading-snug">
                           {food.custom_food_name || template?.name}
                         </p>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            onClick={() => startEdit(food)}
+                            className="rounded-md text-zinc-400 hover:bg-emerald-100 hover:text-emerald-600 p-1"
+                          >
+                            <Edit2 className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            onClick={() => deleteFood(food.id)}
+                            className="rounded-md text-zinc-300 hover:bg-rose-100 hover:text-rose-600 p-1"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-medium text-emerald-600">
+                          <Clock className="h-3 w-3" />
+                          {new Date(food.created_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                        </span>
                         <p className="text-xs text-zinc-500">
                           {template && !food.custom_food_name ? `${food.quantity} ${template.unit} • ` : ''}{Math.round(food.total_calories * 10) / 10} kcal
                         </p>
-                      </div>
-
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => startEdit(food)}
-                          className="rounded-md text-zinc-400 hover:bg-emerald-100 hover:text-emerald-600 p-1"
-                        >
-                          <Edit2 className="h-3.5 w-3.5" />
-                        </button>
-                        <button
-                          onClick={() => deleteFood(food.id)}
-                          className="rounded-md text-zinc-300 hover:bg-rose-100 hover:text-rose-600 p-1"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
                       </div>
                     </div>
                   )}
