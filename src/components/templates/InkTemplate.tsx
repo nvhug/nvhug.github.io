@@ -39,7 +39,7 @@ export function InkTemplate({
             ← Back
           </Link>
 
-          <h1 className="mt-5 text-4xl font-extrabold leading-tight tracking-tight text-white sm:text-5xl">
+          <h1 className="mt-5 text-4xl font-bold leading-tight tracking-tight text-white sm:text-5xl">
             {post.title}
           </h1>
 
