@@ -292,8 +292,8 @@ export function WeightTracker() {
 
       <ConfirmModal
         open={!!deleteId}
-        title="Xóa bản ghi cân nặng?"
-        description="Hành động này không thể hoàn tác."
+        itemContent="Xóa bản ghi cân nặng?"
+        itemMeta="Hành động này không thể hoàn tác."
         onConfirm={() => { if (deleteId) { handleDelete(deleteId); setDeleteId(null) } }}
         onCancel={() => setDeleteId(null)}
       />
