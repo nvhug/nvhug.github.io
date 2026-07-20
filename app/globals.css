@@ -71,7 +71,7 @@ nav {
 }
 
 .logo {
-  font-family: var(--font-poppins), sans-serif;
+  font-family: var(--font-monda), var(--font-poppins), sans-serif;
   font-size: 24px;
   font-weight: 700;
   text-decoration: none;
@@ -107,7 +107,7 @@ nav a:hover {
 .container h4,
 .container h5,
 .container h6 {
-  font-family: var(--font-poppins), sans-serif;
+  font-family: var(--font-monda), var(--font-poppins), sans-serif;
   font-weight: 700;
 }
 
@@ -330,7 +330,7 @@ button.btn-secondary:hover {
 }
 
 .toc-number {
-  font-family: var(--font-poppins), sans-serif;
+  font-family: var(--font-monda), var(--font-poppins), sans-serif;
   font-size: 48px;
   font-weight: 700;
   color: #171717;
@@ -346,7 +346,7 @@ button.btn-secondary:hover {
 }
 
 .toc-title {
-  font-family: var(--font-poppins), sans-serif;
+  font-family: var(--font-monda), var(--font-poppins), sans-serif;
   font-size: 20px;
   font-weight: 700;
   color: #171717;
@@ -468,7 +468,7 @@ button.btn-secondary:hover {
   }
 
   .toc-title {
-    font-size: 18px;
+    font-size: 22px;
   }
 
   .toc-description {
@@ -693,12 +693,12 @@ button.btn-secondary:hover {
    Rounded card, drop cap, amber accents
    ══════════════════════════════════════════ */
 
-.tpl-parchment .tpl-content { font-size: 16.5px; color: #52525b; }
+.tpl-parchment .tpl-content { font-size: 19px; color: #52525b; }
 
 .tpl-parchment .tpl-content h1,
 .tpl-parchment .tpl-content h2,
 .tpl-parchment .tpl-content h3 {
-  font-family: var(--font-poppins), sans-serif;
+  font-family: var(--font-monda), var(--font-poppins), sans-serif;
   font-weight: 700;
   color: #18181b;
   letter-spacing: -0.02em;
@@ -722,7 +722,7 @@ button.btn-secondary:hover {
 /* Drop cap on first paragraph */
 .tpl-parchment .tpl-content > div > p:first-of-type::first-letter {
   float: left;
-  font-family: var(--font-poppins), sans-serif;
+  font-family: var(--font-monda), var(--font-poppins), sans-serif;
   font-size: 4rem;
   font-weight: 700;
   line-height: 0.82;
@@ -964,7 +964,7 @@ button.btn-secondary:hover {
    ══════════════════════════════════════════ */
 
 .tpl-ink {
-  font-family: var(--font-poppins), sans-serif;
+  font-family: var(--font-monda), var(--font-poppins), sans-serif;
 }
 
 .tpl-ink .tpl-content {
@@ -1032,3 +1032,8 @@ button.btn-secondary:hover {
 .tpl-ink .tpl-content th { background: #1e293b; color: #f1f5f9; font-size: 0.75rem; letter-spacing: 0.06em; border-bottom: 1px solid #334155; }
 .tpl-ink .tpl-content td { border-top: 1px solid #1e293b; color: #cbd5e1; }
 .tpl-ink .tpl-content hr { border-top: 1px solid #1e293b; }
+
+@media (max-width: 640px) {
+  .tpl-ink .tpl-content { font-size: 20px; }
+  .tpl-ink .tpl-content h3 { font-size: 1.8rem; }
+}
