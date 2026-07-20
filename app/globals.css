@@ -347,7 +347,7 @@ button.btn-secondary:hover {
 
 .toc-title {
   font-family: var(--font-poppins), sans-serif;
-  font-size: 18px;
+  font-size: 20px;
   font-weight: 700;
   color: #171717;
   margin-bottom: 8px;
@@ -359,7 +359,7 @@ button.btn-secondary:hover {
 }
 
 .toc-description {
-  font-size: 14px;
+  font-size: 15px;
   color: #666;
   line-height: 1.6;
   margin-bottom: 10px;
@@ -468,6 +468,10 @@ button.btn-secondary:hover {
   }
 
   .toc-title {
+    font-size: 18px;
+  }
+
+  .toc-description {
     font-size: 16px;
   }
 }
