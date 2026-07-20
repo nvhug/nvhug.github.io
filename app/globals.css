@@ -759,6 +759,11 @@ button.btn-secondary:hover {
 .tpl-parchment .tpl-content td { border-top: 1px solid #e5e0d5; }
 .tpl-parchment .tpl-content hr { border-top: 1px solid #e5e0d5; }
 
+@media (max-width: 640px) {
+  .tpl-parchment .tpl-content { font-size: 19px; }
+  .tpl-parchment .tpl-content h2 { font-size: 2rem; }
+}
+
 /* ══════════════════════════════════════════
    MEDIUM — Typography & reading experience
    Serif body, author card, publication feel
