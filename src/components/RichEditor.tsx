@@ -182,7 +182,7 @@ export default function RichEditor({
 
   return (
     <div ref={wrapperRef} className="relative w-full rounded-lg border border-slate-700">
-      <div ref={containerRef} className="overflow-hidden rounded-lg" />
+      <div ref={containerRef} className="overflow-hidden rounded-lg [&_.ql-editor]:min-h-150" />
 
       {tablePicker && (
         <div

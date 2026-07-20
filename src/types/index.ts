@@ -5,6 +5,7 @@ export interface Post {
   content: string
   excerpt: string
   published: boolean
+  template?: string
   created_at: string
   updated_at: string
   tags?: Tag[]
@@ -112,6 +113,14 @@ export interface DailyFood {
   notes?: string
   created_at: string
   updated_at: string
+}
+
+export interface WeightLog {
+  id: string
+  date: string
+  weight: number
+  notes?: string
+  created_at: string
 }
 
 export interface Meal {
