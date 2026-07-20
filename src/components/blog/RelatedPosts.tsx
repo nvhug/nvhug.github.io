@@ -3,32 +3,36 @@
 import Link from 'next/link'
 import { Post } from '@/types'
 import { formatDate } from '@/lib/utils'
+import { ArrowUpRight } from 'lucide-react'
 
 export function RelatedPosts({ posts }: { posts: Post[] }) {
   if (posts.length === 0) return null
 
   return (
     <section className="border-t border-zinc-100 bg-white">
-      <div className="mx-auto w-full max-w-3xl px-4 py-10 sm:px-6">
-        <p className="mb-5 text-[11px] font-semibold uppercase tracking-[0.2em] text-zinc-400">
-          Bài viết khác
-        </p>
-        <div className="grid gap-3 sm:grid-cols-3">
-          {posts.map((post) => (
+      <div className="py-10">
+        <div className="mx-auto max-w-3xl px-4 sm:px-6">
+          <p className="mb-5 text-[11px] font-semibold uppercase tracking-[0.2em] text-zinc-400">
+            Bài viết khác
+          </p>
+        </div>
+        <div className="flex gap-3 overflow-x-auto px-4 pb-3 sm:px-6 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] scrollbar-none">
+          {posts.map((post, i) => (
             <Link
               key={post.id}
               href={`/blog/${post.slug}`}
-              className="group rounded-xl border border-zinc-100 p-4 transition-colors hover:border-zinc-200 hover:bg-zinc-50"
+              className="group relative flex-none w-52 shrink-0 rounded-2xl border border-zinc-100 bg-zinc-50/60 p-4 transition-all duration-200 hover:border-zinc-200 hover:bg-white hover:shadow-sm"
             >
-              <time className="text-[11px] text-zinc-400">{formatDate(post.created_at)}</time>
-              <h3 className="mt-1.5 line-clamp-2 text-sm font-semibold leading-snug text-zinc-900 group-hover:text-zinc-700">
+              <span className="font-mono text-[10px] tracking-wider text-zinc-300">
+                {String(i + 1).padStart(2, '0')}
+              </span>
+              <h3 className="mt-2 line-clamp-3 text-sm font-semibold leading-snug text-zinc-800 group-hover:text-zinc-600">
                 {post.title}
               </h3>
-              {post.excerpt && (
-                <p className="mt-1.5 line-clamp-2 text-xs leading-relaxed text-zinc-500">
-                  {post.excerpt}
-                </p>
-              )}
+              <div className="mt-3 flex items-center justify-between">
+                <time className="text-[11px] text-zinc-400">{formatDate(post.created_at)}</time>
+                <ArrowUpRight className="h-3.5 w-3.5 text-zinc-300 transition-all duration-200 group-hover:text-zinc-500 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+              </div>
             </Link>
           ))}
         </div>

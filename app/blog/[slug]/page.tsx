@@ -85,9 +85,11 @@ export default function BlogPost({ params }: { params: Promise<{ slug: string }>
             .select('post_id')
             .in('tag_id', tagIds)
             .neq('post_id', data.id)
-            .limit(6)
+            .limit(30)
 
-          const ids = [...new Set((taggedPosts ?? []).map((r: { post_id: string }) => r.post_id))].slice(0, 3)
+          const ids = [...new Set((taggedPosts ?? []).map((r: { post_id: string }) => r.post_id))]
+            .sort(() => Math.random() - 0.5)
+            .slice(0, 10)
 
           if (ids.length > 0) {
             const { data: posts } = await supabase
@@ -99,16 +101,16 @@ export default function BlogPost({ params }: { params: Promise<{ slug: string }>
           }
         }
 
-        if (related.length < 3) {
+        if (related.length < 10) {
           const exclude = [data.id, ...related.map((p) => p.id)]
           const { data: recent } = await supabase
             .from('posts')
             .select('id, title, slug, excerpt, created_at')
             .eq('published', true)
             .not('id', 'in', `(${exclude.join(',')})`)
-            .order('created_at', { ascending: false })
-            .limit(3 - related.length)
-          related = [...related, ...((recent as Post[]) ?? [])]
+            .limit(50)
+          const shuffled = ((recent as Post[]) ?? []).sort(() => Math.random() - 0.5)
+          related = [...related, ...shuffled].slice(0, 10)
         }
 
         setRelatedPosts(related)
