@@ -73,7 +73,7 @@ nav {
 .logo {
   font-family: var(--font-poppins), sans-serif;
   font-size: 24px;
-  font-weight: 600;
+  font-weight: 700;
   text-decoration: none;
   color: #171717;
   transition: color 0.3s ease;
@@ -108,7 +108,7 @@ nav a:hover {
 .container h5,
 .container h6 {
   font-family: var(--font-poppins), sans-serif;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .container h1 {
@@ -699,7 +699,7 @@ button.btn-secondary:hover {
 .tpl-parchment .tpl-content h2,
 .tpl-parchment .tpl-content h3 {
   font-family: var(--font-poppins), sans-serif;
-  font-weight: 600;
+  font-weight: 700;
   color: #18181b;
   letter-spacing: -0.02em;
 }
@@ -1004,7 +1004,7 @@ button.btn-secondary:hover {
 }
 
 .tpl-ink .tpl-content h3 { font-size: 1.125rem; color: #e2e8f0; }
-.tpl-ink .tpl-content a { color: #fb923c; font-weight: 500; }
+.tpl-ink .tpl-content a { color: #fb923c; font-weight: 400; }
 
 /* Blockquote with large decorative glyph */
 .tpl-ink .tpl-content blockquote {
