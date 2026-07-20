@@ -71,7 +71,7 @@ nav {
 }
 
 .logo {
-  font-family: 'Poppins', sans-serif;
+  font-family: var(--font-poppins), sans-serif;
   font-size: 24px;
   font-weight: 600;
   text-decoration: none;
@@ -107,7 +107,7 @@ nav a:hover {
 .container h4,
 .container h5,
 .container h6 {
-  font-family: 'Poppins', sans-serif;
+  font-family: var(--font-poppins), sans-serif;
   font-weight: 600;
 }
 
@@ -330,7 +330,7 @@ button.btn-secondary:hover {
 }
 
 .toc-number {
-  font-family: 'Poppins', sans-serif;
+  font-family: var(--font-poppins), sans-serif;
   font-size: 48px;
   font-weight: 700;
   color: #171717;
@@ -346,7 +346,7 @@ button.btn-secondary:hover {
 }
 
 .toc-title {
-  font-family: 'Poppins', sans-serif;
+  font-family: var(--font-poppins), sans-serif;
   font-size: 18px;
   font-weight: 700;
   color: #171717;
@@ -694,7 +694,7 @@ button.btn-secondary:hover {
 .tpl-parchment .tpl-content h1,
 .tpl-parchment .tpl-content h2,
 .tpl-parchment .tpl-content h3 {
-  font-family: 'Poppins', sans-serif;
+  font-family: var(--font-poppins), sans-serif;
   font-weight: 600;
   color: #18181b;
   letter-spacing: -0.02em;
@@ -718,7 +718,7 @@ button.btn-secondary:hover {
 /* Drop cap on first paragraph */
 .tpl-parchment .tpl-content > div > p:first-of-type::first-letter {
   float: left;
-  font-family: 'Poppins', sans-serif;
+  font-family: var(--font-poppins), sans-serif;
   font-size: 4rem;
   font-weight: 700;
   line-height: 0.82;
@@ -953,6 +953,10 @@ button.btn-secondary:hover {
    INK — dark editorial magazine
    Auto-numbered h2 · orange accents · bold
    ══════════════════════════════════════════ */
+
+.tpl-ink {
+  font-family: var(--font-poppins), sans-serif;
+}
 
 .tpl-ink .tpl-content {
   font-size: 17px;
