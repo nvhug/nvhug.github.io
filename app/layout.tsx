@@ -8,8 +8,8 @@ import { SpeedInsights } from "@vercel/speed-insights/next";
 
 const geist = Geist({subsets:['latin','latin-ext'],variable:'--font-sans'});
 const playfair = Playfair_Display({subsets:['latin','vietnamese'],variable:'--font-playfair',style:['normal','italic']});
-const monda = Monda({subsets:['latin','vietnamese'],variable:'--font-monda',weight:['400','700']});
-const poppins = Poppins({subsets:['latin','latin-ext'],variable:'--font-poppins',weight:['400','700']});
+const monda = Monda({subsets:['latin','vietnamese'],variable:'--font-poppins',weight:['400','700']});
+const poppins = Poppins({subsets:['latin','latin-ext'],variable:'--font-poppins-fallback',weight:['400','700']});
 
 export const viewport: Viewport = {
   width: "device-width",

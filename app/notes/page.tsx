@@ -32,6 +32,7 @@ import { TagInput } from '@/components/ui/tag-input'
 import { CalorieTracker } from '@/components/CalorieTracker'
 import { CalorieAnalytics } from '@/components/CalorieAnalytics'
 import { NotesAnalytics } from '@/components/NotesAnalytics'
+import { NotesAIInsights } from '@/components/NotesAIInsights'
 import { MealScheduleTracker } from '@/components/MealScheduleTracker'
 import { WeightTracker } from '@/components/WeightTracker'
 
@@ -2490,6 +2491,13 @@ export default function NotesPage() {
             <div className="p-4">
               <CalorieAnalytics />
             </div>
+          </section>
+          <section className="overflow-hidden rounded-2xl border border-violet-200 bg-[linear-gradient(130deg,#f5f3ff_0%,#ffffff_100%)] shadow-[0_4px_20px_-8px_rgba(139,92,246,0.2)]">
+            <div className="flex items-center gap-2 border-b border-violet-100 px-4 py-3">
+              <span className="text-xl">🤖</span>
+              <span className="text-xs font-semibold uppercase tracking-[0.2em] text-violet-600">AI Insights</span>
+            </div>
+            <NotesAIInsights notes={notes} habits={pinnedNotes} />
           </section>
         </div>
         )}
