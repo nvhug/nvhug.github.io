@@ -4,6 +4,7 @@ import * as React from 'react'
 import {
   ArrowUpRight,
   FileText,
+  LayoutTemplate,
   LogOut,
   Tag,
   User,
@@ -24,8 +25,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 
@@ -41,6 +40,12 @@ const menuItems = [
     description: 'Organize topics',
     icon: Tag,
     href: '/admin/tags',
+  },
+  {
+    title: 'Templates',
+    description: 'Appearance & layout',
+    icon: LayoutTemplate,
+    href: '/admin/templates',
   },
 ]
 
@@ -124,14 +129,9 @@ export function AdminTopBar() {
             <span className="hidden md:inline">Account</span>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="border border-emerald-100 bg-white text-zinc-900">
-            <DropdownMenuLabel>My Account</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem>
-              <Link href="/admin/settings">Settings</Link>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleLogout}>
               <LogOut className="h-4 w-4" />
+              Logout
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

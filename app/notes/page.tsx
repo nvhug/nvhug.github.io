@@ -33,9 +33,10 @@ import { CalorieTracker } from '@/components/CalorieTracker'
 import { CalorieAnalytics } from '@/components/CalorieAnalytics'
 import { NotesAnalytics } from '@/components/NotesAnalytics'
 import { MealScheduleTracker } from '@/components/MealScheduleTracker'
+import { WeightTracker } from '@/components/WeightTracker'
 
 type TypeFilter = 'all' | 'good' | 'bad'
-type TabType = 'notes' | 'todos' | 'goals' | 'calo' | 'meals' | 'health' | 'stats'
+type TabType = 'notes' | 'todos' | 'goals' | 'calo' | 'meals' | 'health' | 'stats' | 'weight'
 
 function todayDate() {
   return new Date().toISOString().slice(0, 10)
@@ -97,7 +98,7 @@ export default function NotesPage() {
 
   useEffect(() => {
     const hash = window.location.hash.slice(1) as TabType
-    const validTabs: TabType[] = ['notes', 'todos', 'goals', 'calo', 'meals', 'health', 'stats']
+    const validTabs: TabType[] = ['notes', 'todos', 'goals', 'calo', 'meals', 'health', 'stats', 'weight']
     if (hash && validTabs.includes(hash)) {
       setCurrentTab(hash)
     }
@@ -146,6 +147,24 @@ export default function NotesPage() {
   const [dragOverItemId, setDragOverItemId] = useState<string | null>(null)
   const [editingGoalId, setEditingGoalId] = useState<string | null>(null)
   const [editingGoalDraft, setEditingGoalDraft] = useState<GoalDraft | null>(null)
+
+  // Count consecutive days from today (or yesterday) that have at least one note
+  const notesStreak = useMemo(() => {
+    const dates = new Set(notes.map((n) => n.note_date))
+    let streak = 0
+    const cursor = new Date()
+    cursor.setHours(0, 0, 0, 0)
+    // If no note today, start check from yesterday
+    const todayStr = cursor.toISOString().slice(0, 10)
+    if (!dates.has(todayStr)) cursor.setDate(cursor.getDate() - 1)
+    while (true) {
+      const d = cursor.toISOString().slice(0, 10)
+      if (!dates.has(d)) break
+      streak++
+      cursor.setDate(cursor.getDate() - 1)
+    }
+    return streak
+  }, [notes])
 
   const [editingHabitId, setEditingHabitId] = useState<string | null>(null)
   const [editingHabitDraft, setEditingHabitDraft] = useState('')
@@ -896,8 +915,21 @@ export default function NotesPage() {
     [notes, todos]
   )
 
+  const [searchQuery, setSearchQuery] = useState('')
+
+  // Strip Vietnamese diacritics so "an" matches "ăn", "ân", etc.
+  function normalize(s: string) {
+    return s.normalize('NFD').replace(/\p{Mn}/gu, '').toLowerCase()
+  }
+
   const filteredNotes = notes.filter((note) => {
     if (typeFilter !== 'all' && note.type !== typeFilter) return false
+    if (searchQuery.trim()) {
+      const q = normalize(searchQuery)
+      const matchContent = normalize(note.content).includes(q)
+      const matchTag = (note.tags ?? []).some((t) => normalize(t).includes(q))
+      if (!matchContent && !matchTag) return false
+    }
     return true
   })
 
@@ -974,95 +1006,108 @@ export default function NotesPage() {
           </div>
         </section>
 
-        <div className="flex flex-wrap gap-1 border-b border-emerald-200 sm:gap-2">
+        <div className="flex overflow-x-auto border-b border-emerald-200 scrollbar-none">
           <button
             onClick={() => handleTabChange('notes')}
-            className={`px-2 py-2 text-xs font-medium transition-colors sm:px-4 sm:py-3 sm:text-sm ${
+            className={`px-2.5 py-2 text-xs font-medium whitespace-nowrap transition-colors ${
               currentTab === 'notes'
                 ? 'border-b-2 border-emerald-600 text-emerald-600'
                 : 'text-zinc-600 hover:text-zinc-900'
             }`}
           >
-            <span className="flex items-center gap-1 sm:gap-2">
-              <NotebookPen className="h-4 w-4 sm:h-5 sm:w-5" />
+            <span className="flex items-center gap-1">
+              <NotebookPen className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">Notes</span>
             </span>
           </button>
           <button
             onClick={() => handleTabChange('todos')}
-            className={`px-2 py-2 text-xs font-medium transition-colors sm:px-4 sm:py-3 sm:text-sm ${
+            className={`px-2.5 py-2 text-xs font-medium whitespace-nowrap transition-colors ${
               currentTab === 'todos'
                 ? 'border-b-2 border-emerald-600 text-emerald-600'
                 : 'text-zinc-600 hover:text-zinc-900'
             }`}
           >
-            <span className="flex items-center gap-1 sm:gap-2">
-              <ListTodo className="h-4 w-4 sm:h-5 sm:w-5" />
+            <span className="flex items-center gap-1">
+              <ListTodo className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">Todos</span>
             </span>
           </button>
           <button
             onClick={() => handleTabChange('goals')}
-            className={`px-2 py-2 text-xs font-medium transition-colors sm:px-4 sm:py-3 sm:text-sm ${
+            className={`px-2.5 py-2 text-xs font-medium whitespace-nowrap transition-colors ${
               currentTab === 'goals'
                 ? 'border-b-2 border-emerald-600 text-emerald-600'
                 : 'text-zinc-600 hover:text-zinc-900'
             }`}
           >
-            <span className="flex items-center gap-1 sm:gap-2">
-              <Target className="h-4 w-4 sm:h-5 sm:w-5" />
+            <span className="flex items-center gap-1">
+              <Target className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">Mục tiêu</span>
             </span>
           </button>
           <button
             onClick={() => handleTabChange('calo')}
-            className={`px-2 py-2 text-xs font-medium transition-colors sm:px-4 sm:py-3 sm:text-sm ${
+            className={`px-2.5 py-2 text-xs font-medium whitespace-nowrap transition-colors ${
               currentTab === 'calo'
                 ? 'border-b-2 border-emerald-600 text-emerald-600'
                 : 'text-zinc-600 hover:text-zinc-900'
             }`}
           >
-            <span className="flex items-center gap-1 sm:gap-2">
-              <span className="text-sm sm:text-base">🔥</span>
+            <span className="flex items-center gap-1">
+              <span className="text-sm">🔥</span>
               <span className="hidden sm:inline">Calo</span>
             </span>
           </button>
           <button
             onClick={() => handleTabChange('meals')}
-            className={`px-2 py-2 text-xs font-medium transition-colors sm:px-4 sm:py-3 sm:text-sm ${
+            className={`px-2.5 py-2 text-xs font-medium whitespace-nowrap transition-colors ${
               currentTab === 'meals'
                 ? 'border-b-2 border-emerald-600 text-emerald-600'
                 : 'text-zinc-600 hover:text-zinc-900'
             }`}
           >
-            <span className="flex items-center gap-1 sm:gap-2">
-              <span className="text-sm sm:text-base">🍽️</span>
+            <span className="flex items-center gap-1">
+              <span className="text-sm">🍽️</span>
               <span className="hidden sm:inline">Meal Plan</span>
             </span>
           </button>
           <button
+            onClick={() => handleTabChange('weight')}
+            className={`px-2.5 py-2 text-xs font-medium whitespace-nowrap transition-colors ${
+              currentTab === 'weight'
+                ? 'border-b-2 border-emerald-600 text-emerald-600'
+                : 'text-zinc-600 hover:text-zinc-900'
+            }`}
+          >
+            <span className="flex items-center gap-1">
+              <span className="text-sm">⚖️</span>
+              <span className="hidden sm:inline">Cân nặng</span>
+            </span>
+          </button>
+          <button
             onClick={() => handleTabChange('health')}
-            className={`px-2 py-2 text-xs font-medium transition-colors sm:px-4 sm:py-3 sm:text-sm ${
+            className={`px-2.5 py-2 text-xs font-medium whitespace-nowrap transition-colors ${
               currentTab === 'health'
                 ? 'border-b-2 border-emerald-600 text-emerald-600'
                 : 'text-zinc-600 hover:text-zinc-900'
             }`}
           >
-            <span className="flex items-center gap-1 sm:gap-2">
-              <span className="text-sm sm:text-base">💪</span>
+            <span className="flex items-center gap-1">
+              <span className="text-sm">💪</span>
               <span className="hidden sm:inline">Sức Khỏe</span>
             </span>
           </button>
           <button
             onClick={() => handleTabChange('stats')}
-            className={`px-2 py-2 text-xs font-medium transition-colors sm:px-4 sm:py-3 sm:text-sm ${
+            className={`px-2.5 py-2 text-xs font-medium whitespace-nowrap transition-colors ${
               currentTab === 'stats'
                 ? 'border-b-2 border-emerald-600 text-emerald-600'
                 : 'text-zinc-600 hover:text-zinc-900'
             }`}
           >
-            <span className="flex items-center gap-1 sm:gap-2">
-              <span className="text-sm sm:text-base">📊</span>
+            <span className="flex items-center gap-1">
+              <span className="text-sm">📊</span>
               <span className="hidden sm:inline">Thống kê</span>
             </span>
           </button>
@@ -1074,6 +1119,11 @@ export default function NotesPage() {
           <div className="flex items-center gap-2 border-b border-emerald-100 px-4 py-3">
             <Pin className="h-3.5 w-3.5 text-emerald-600" />
             <span className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-600">Thói quen hằng ngày</span>
+            {notesStreak > 0 && (
+              <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-xs font-semibold text-amber-600">
+                🔥 {notesStreak} ngày
+              </span>
+            )}
           </div>
           <div className="px-4 py-3 space-y-2">
             {pinnedNotes.length === 0 && !savingPinned && (
@@ -1356,6 +1406,16 @@ export default function NotesPage() {
             )}
           </div>
 
+          <div className="border-b border-emerald-100 px-4 py-2.5">
+            <input
+              type="search"
+              placeholder="Tìm kiếm notes, tags..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full rounded-lg border border-emerald-200 bg-white px-3 py-1.5 text-sm text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-emerald-400"
+            />
+          </div>
+
           <div className="flex flex-wrap items-center gap-2 border-b border-emerald-100 px-4 py-3.5">
             {typeTabs.map((tab) => {
               const isSelected = typeFilter === tab.key
@@ -1401,7 +1461,9 @@ export default function NotesPage() {
           {loading ? (
             <div className="py-16 text-center text-sm text-zinc-500">Đang tải...</div>
           ) : noteGroups.length === 0 ? (
-            <div className="py-16 text-center text-sm text-zinc-500">Chưa có note nào.</div>
+            <div className="py-16 text-center text-sm text-zinc-500">
+              {searchQuery.trim() ? `Không tìm thấy kết quả cho "${searchQuery}"` : 'Chưa có note nào.'}
+            </div>
           ) : (
             <div className="divide-y divide-emerald-50">
               {noteGroups.map((group, gi) => (
@@ -2395,6 +2457,18 @@ export default function NotesPage() {
                 ))}
               </div>
             )}
+          </div>
+        </section>
+        )}
+
+        {currentTab === 'weight' && (
+        <section className="overflow-hidden rounded-2xl border border-emerald-200 bg-[linear-gradient(130deg,#f0fdf4_0%,#ffffff_100%)] shadow-[0_4px_20px_-8px_rgba(16,185,129,0.25)]">
+          <div className="flex items-center gap-2 border-b border-emerald-100 px-4 py-3">
+            <span className="text-xl">⚖️</span>
+            <span className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-600">Theo dõi cân nặng</span>
+          </div>
+          <div className="p-4">
+            <WeightTracker />
           </div>
         </section>
         )}
