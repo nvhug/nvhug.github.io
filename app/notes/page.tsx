@@ -39,6 +39,14 @@ import { WeightTracker } from '@/components/WeightTracker'
 type TypeFilter = 'all' | 'good' | 'bad'
 type TabType = 'notes' | 'todos' | 'goals' | 'calo' | 'meals' | 'health' | 'stats' | 'weight'
 
+const VALID_TABS: TabType[] = ['notes', 'todos', 'goals', 'calo', 'meals', 'health', 'stats', 'weight']
+
+function getInitialTab(): TabType {
+  if (typeof window === 'undefined') return 'notes'
+  const hash = window.location.hash.slice(1) as TabType
+  return VALID_TABS.includes(hash) ? hash : 'notes'
+}
+
 function todayDate() {
   return new Date().toISOString().slice(0, 10)
 }
@@ -85,6 +93,23 @@ function stripWorkHourlyTimes(times: string[]) {
   return times.filter((t) => !WORK_HOURLY_NOTIFY_TIMES.includes(t))
 }
 
+function getGoalItemTypeLabel(itemType: string) {
+  switch (itemType) {
+    case 'routine':
+      return 'Thói quen'
+    case 'meal':
+      return 'Ăn'
+    case 'lesson':
+      return 'Bài học'
+    case 'exercise':
+      return 'Bài tập'
+    case 'other':
+      return 'Khác'
+    default:
+      return itemType
+  }
+}
+
 const textareaClass =
   'w-full resize-y rounded-lg border border-emerald-200 bg-white px-2.5 py-2 text-sm text-zinc-900 outline-none placeholder:text-zinc-500 focus-visible:border-emerald-400'
 
@@ -95,15 +120,7 @@ type GoalDraft = Omit<Goal, 'id' | 'created_at'>
 type GoalItemDraft = Omit<GoalItem, 'id' | 'goal_id' | 'created_at' | 'updated_at'>
 
 export default function NotesPage() {
-  const [currentTab, setCurrentTab] = useState<TabType>('notes')
-
-  useEffect(() => {
-    const hash = window.location.hash.slice(1) as TabType
-    const validTabs: TabType[] = ['notes', 'todos', 'goals', 'calo', 'meals', 'health', 'stats', 'weight']
-    if (hash && validTabs.includes(hash)) {
-      setCurrentTab(hash)
-    }
-  }, [])
+  const [currentTab, setCurrentTab] = useState<TabType>(getInitialTab)
 
   const handleTabChange = (tab: TabType) => {
     setCurrentTab(tab)
@@ -441,7 +458,7 @@ export default function NotesPage() {
 
   async function addGoalItem(goal: Goal) {
     const draft = goalItemDraft[goal.id]
-    if (!draft || !draft.content.trim()) return
+    if (!draft || !draft.content?.trim()) return
 
     setSavingGoalItem(true)
     try {
@@ -2260,7 +2277,7 @@ export default function NotesPage() {
                                         onChange={(e) => setEditingGoalItemDraft((prev) => prev ? { ...prev, item_type: e.target.value } : null)}
                                         className="h-7 rounded-md border border-emerald-200 bg-white px-2 text-xs font-semibold text-emerald-700 outline-none focus:border-emerald-400"
                                       >
-                                        <option value="routine">Routine</option>
+                                        <option value="routine">Thói quen</option>
                                         <option value="meal">Ăn</option>
                                         <option value="lesson">Bài học</option>
                                         <option value="exercise">Bài tập</option>
@@ -2335,7 +2352,7 @@ export default function NotesPage() {
                                     </p>
                                     <div className="flex gap-1.5 flex-wrap items-center mt-1">
                                       <span className="text-sm px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 inline-block">
-                                        {item.item_type}
+                                        {getGoalItemTypeLabel(item.item_type)}
                                       </span>
                                       {item.is_completed && (
                                         <span className="text-sm px-1.5 py-0.5 rounded bg-emerald-500 text-white inline-block">
@@ -2401,11 +2418,15 @@ export default function NotesPage() {
                             value={goalItemDraft[goal.id]?.item_type || 'routine'}
                             onChange={(e) => setGoalItemDraft((prev) => ({
                               ...prev,
-                              [goal.id]: { ...prev[goal.id], item_type: e.target.value }
+                              [goal.id]: {
+                                content: prev[goal.id]?.content || '',
+                                item_type: e.target.value,
+                                metadata: prev[goal.id]?.metadata || {},
+                              }
                             }))}
                             className="h-8 rounded-md border border-emerald-200 bg-white px-2 text-xs font-semibold text-emerald-700 outline-none focus:border-emerald-400"
                           >
-                            <option value="routine">Routine</option>
+                            <option value="routine">Thói quen</option>
                             <option value="meal">Ăn</option>
                             <option value="lesson">Bài học</option>
                             <option value="exercise">Bài tập</option>
@@ -2413,7 +2434,7 @@ export default function NotesPage() {
                           </select>
                           <button
                             type="submit"
-                            disabled={savingGoalItem || !goalItemDraft[goal.id]?.content.trim()}
+                            disabled={savingGoalItem || !goalItemDraft[goal.id]?.content?.trim()}
                             className="inline-flex items-center gap-1 rounded-lg border border-emerald-300 bg-emerald-50 px-2 py-1.5 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-100 disabled:opacity-40"
                           >
                             <Plus className="h-3.5 w-3.5" />
