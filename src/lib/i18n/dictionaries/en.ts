@@ -26,6 +26,7 @@ export const en: Dictionary = {
     profile: 'Profile',
     logout: 'Logout',
     accountLabel: 'Account',
+    menuLabel: 'Menu',
   },
 
   footer: {

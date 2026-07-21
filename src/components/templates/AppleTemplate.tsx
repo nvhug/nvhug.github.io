@@ -17,7 +17,7 @@ export function AppleTemplate({
 
       {/* Hero header — Apple's large title treatment */}
       <div className="bg-[#f5f5f7] pt-20 pb-14">
-        <div className="mx-auto w-full max-w-[820px] px-8">
+        <div className="mx-auto w-full max-w-[820px] px-5 sm:px-8">
           <Link href={backHref} className="text-sm font-medium text-[#0071e3] transition-opacity hover:opacity-70">
             ← Back
           </Link>
@@ -52,7 +52,7 @@ export function AppleTemplate({
       </div>
 
       {/* Article body — lots of breathing room */}
-      <div className="mx-auto flex w-full max-w-5xl items-start gap-8 px-8 pt-12">
+      <div className="mx-auto flex w-full max-w-5xl items-start gap-8 px-5 pt-12 sm:px-8">
         <section className="min-w-0 flex-1">
           <div id="article-content" className="tpl-content">
             <div dangerouslySetInnerHTML={{ __html: processedContent }} />

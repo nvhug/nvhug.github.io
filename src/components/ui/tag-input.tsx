@@ -74,7 +74,7 @@ export function TagInput({ value, onChange, suggestions = [], placeholder: place
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); removeTag(tag) }}
-              className="rounded-full p-0.5 hover:bg-emerald-200 transition-colors"
+              className="-m-1 rounded-full p-1.5 hover:bg-emerald-200 transition-colors sm:m-0 sm:p-0.5"
             >
               <X className="h-3 w-3" />
             </button>

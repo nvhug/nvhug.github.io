@@ -1058,94 +1058,94 @@ export default function NotesPage() {
           </div>
         </section>
 
-        <div className="flex border-b border-emerald-200">
+        <div className="flex overflow-x-auto border-b border-emerald-200">
           <button
             onClick={() => handleTabChange('notes')}
-            className={`flex-1 flex flex-col items-center justify-center gap-1 px-1 py-3 text-sm font-medium transition-colors ${
+            className={`shrink-0 flex flex-col items-center justify-center gap-1 px-3 py-3 text-sm font-medium transition-colors sm:flex-1 ${
               currentTab === 'notes'
                 ? 'border-b-2 border-emerald-600 text-emerald-600'
                 : 'text-zinc-600 hover:text-zinc-900'
             }`}
           >
             <NotebookPen className="h-4 w-4" />
-            <span className="text-center leading-tight">{t('notes.tabs.notes')}</span>
+            <span className="whitespace-nowrap text-center leading-tight">{t('notes.tabs.notes')}</span>
           </button>
           <button
             onClick={() => handleTabChange('todos')}
-            className={`flex-1 flex flex-col items-center justify-center gap-1 px-1 py-3 text-sm font-medium transition-colors ${
+            className={`shrink-0 flex flex-col items-center justify-center gap-1 px-3 py-3 text-sm font-medium transition-colors sm:flex-1 ${
               currentTab === 'todos'
                 ? 'border-b-2 border-emerald-600 text-emerald-600'
                 : 'text-zinc-600 hover:text-zinc-900'
             }`}
           >
             <ListTodo className="h-4 w-4" />
-            <span className="text-center leading-tight">{t('notes.tabs.todos')}</span>
+            <span className="whitespace-nowrap text-center leading-tight">{t('notes.tabs.todos')}</span>
           </button>
           <button
             onClick={() => handleTabChange('goals')}
-            className={`flex-1 flex flex-col items-center justify-center gap-1 px-1 py-3 text-sm font-medium transition-colors ${
+            className={`shrink-0 flex flex-col items-center justify-center gap-1 px-3 py-3 text-sm font-medium transition-colors sm:flex-1 ${
               currentTab === 'goals'
                 ? 'border-b-2 border-emerald-600 text-emerald-600'
                 : 'text-zinc-600 hover:text-zinc-900'
             }`}
           >
             <Target className="h-4 w-4" />
-            <span className="text-center leading-tight">{t('notes.tabs.goals')}</span>
+            <span className="whitespace-nowrap text-center leading-tight">{t('notes.tabs.goals')}</span>
           </button>
           <button
             onClick={() => handleTabChange('calo')}
-            className={`flex-1 flex flex-col items-center justify-center gap-1 px-1 py-3 text-sm font-medium transition-colors ${
+            className={`shrink-0 flex flex-col items-center justify-center gap-1 px-3 py-3 text-sm font-medium transition-colors sm:flex-1 ${
               currentTab === 'calo'
                 ? 'border-b-2 border-emerald-600 text-emerald-600'
                 : 'text-zinc-600 hover:text-zinc-900'
             }`}
           >
             <span className="text-base">🔥</span>
-            <span className="text-center leading-tight">{t('notes.tabs.calo')}</span>
+            <span className="whitespace-nowrap text-center leading-tight">{t('notes.tabs.calo')}</span>
           </button>
           <button
             onClick={() => handleTabChange('meals')}
-            className={`flex-1 flex flex-col items-center justify-center gap-1 px-1 py-3 text-sm font-medium transition-colors ${
+            className={`shrink-0 flex flex-col items-center justify-center gap-1 px-3 py-3 text-sm font-medium transition-colors sm:flex-1 ${
               currentTab === 'meals'
                 ? 'border-b-2 border-emerald-600 text-emerald-600'
                 : 'text-zinc-600 hover:text-zinc-900'
             }`}
           >
             <span className="text-base">🍽️</span>
-            <span className="text-center leading-tight">{t('notes.tabs.meals')}</span>
+            <span className="whitespace-nowrap text-center leading-tight">{t('notes.tabs.meals')}</span>
           </button>
           <button
             onClick={() => handleTabChange('weight')}
-            className={`flex-1 flex flex-col items-center justify-center gap-1 px-1 py-3 text-sm font-medium transition-colors ${
+            className={`shrink-0 flex flex-col items-center justify-center gap-1 px-3 py-3 text-sm font-medium transition-colors sm:flex-1 ${
               currentTab === 'weight'
                 ? 'border-b-2 border-emerald-600 text-emerald-600'
                 : 'text-zinc-600 hover:text-zinc-900'
             }`}
           >
             <span className="text-base">⚖️</span>
-            <span className="text-center leading-tight">{t('notes.tabs.weight')}</span>
+            <span className="whitespace-nowrap text-center leading-tight">{t('notes.tabs.weight')}</span>
           </button>
           <button
             onClick={() => handleTabChange('health')}
-            className={`flex-1 flex flex-col items-center justify-center gap-1 px-1 py-3 text-sm font-medium transition-colors ${
+            className={`shrink-0 flex flex-col items-center justify-center gap-1 px-3 py-3 text-sm font-medium transition-colors sm:flex-1 ${
               currentTab === 'health'
                 ? 'border-b-2 border-emerald-600 text-emerald-600'
                 : 'text-zinc-600 hover:text-zinc-900'
             }`}
           >
             <span className="text-base">💪</span>
-            <span className="text-center leading-tight">{t('notes.tabs.health')}</span>
+            <span className="whitespace-nowrap text-center leading-tight">{t('notes.tabs.health')}</span>
           </button>
           <button
             onClick={() => handleTabChange('stats')}
-            className={`flex-1 flex flex-col items-center justify-center gap-1 px-1 py-3 text-sm font-medium transition-colors ${
+            className={`shrink-0 flex flex-col items-center justify-center gap-1 px-3 py-3 text-sm font-medium transition-colors sm:flex-1 ${
               currentTab === 'stats'
                 ? 'border-b-2 border-emerald-600 text-emerald-600'
                 : 'text-zinc-600 hover:text-zinc-900'
             }`}
           >
             <span className="text-base">📊</span>
-            <span className="text-center leading-tight">{t('notes.tabs.stats')}</span>
+            <span className="whitespace-nowrap text-center leading-tight">{t('notes.tabs.stats')}</span>
           </button>
         </div>
 
@@ -1381,7 +1381,7 @@ export default function NotesPage() {
                       step="10"
                       value={draft.completion_percentage}
                       onChange={(e) => updateDraft({ completion_percentage: Number(e.target.value) })}
-                      className="w-24 sm:w-48"
+                      className="w-32 sm:w-48"
                     />
                     <span className="w-8 text-right text-xs font-medium text-zinc-600">{draft.completion_percentage}%</span>
                     <label className="inline-flex cursor-pointer items-center gap-1.5 text-xs text-zinc-500 select-none">
@@ -1564,7 +1564,7 @@ export default function NotesPage() {
                                     step="10"
                                     value={editingDraft.completion_percentage}
                                     onChange={(e) => updateEditingDraft({ completion_percentage: Number(e.target.value) })}
-                                    className="w-24 sm:w-48"
+                                    className="w-32 sm:w-48"
                                   />
                                   <span className="w-8 text-right text-xs font-medium text-zinc-600">
                                     {editingDraft.completion_percentage}%

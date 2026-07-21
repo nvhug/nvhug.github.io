@@ -97,7 +97,7 @@ export default function HomeClient({
                     onClick={(e) => { e.preventDefault(); e.stopPropagation(); getRandomQuote() }}
                     aria-label={t('home.nextQuote')}
                     title={t('home.nextQuote')}
-                    className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-emerald-200 bg-white text-emerald-600 transition-colors hover:bg-emerald-50 hover:text-emerald-700"
+                    className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-emerald-200 bg-white text-emerald-600 transition-colors hover:bg-emerald-50 hover:text-emerald-700 sm:h-8 sm:w-8"
                   >
                     <ArrowRight className="h-3.5 w-3.5" />
                   </button>
@@ -192,7 +192,7 @@ export default function HomeClient({
                   {t('home.previous')}
                 </button>
 
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1.5 sm:gap-1">
                   {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
                     <button
                       key={page}
@@ -200,7 +200,7 @@ export default function HomeClient({
                         setCurrentPage(page)
                         window.scrollTo({ top: 0, behavior: 'smooth' })
                       }}
-                      className={`h-9 w-9 rounded-lg border font-medium transition-colors ${
+                      className={`h-10 w-10 sm:h-9 sm:w-9 rounded-lg border font-medium transition-colors ${
                         currentPage === page
                           ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
                           : 'border-emerald-100 text-zinc-600 hover:bg-emerald-50 hover:text-zinc-900'

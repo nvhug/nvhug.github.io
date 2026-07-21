@@ -384,7 +384,7 @@ export function BugReportButton() {
               <button
                 type="button"
                 onClick={handleClose}
-                className="flex h-7 w-7 items-center justify-center rounded-lg text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600"
+                className="flex h-10 w-10 items-center justify-center rounded-lg text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600 sm:h-7 sm:w-7"
               >
                 <X className="h-4 w-4" />
               </button>

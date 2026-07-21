@@ -24,6 +24,7 @@ export const vi = {
     profile: 'Hồ sơ',
     logout: 'Đăng xuất',
     accountLabel: 'Tài khoản',
+    menuLabel: 'Menu',
   },
 
   footer: {
