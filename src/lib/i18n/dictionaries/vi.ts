@@ -27,7 +27,7 @@ export const vi = {
   },
 
   footer: {
-    copyright: '© 2026 nvhug. Viết về code, ý tưởng và những điều học được mỗi ngày.',
+    copyright: '© 2026 nvhug. Chia sẻ ý tưởng và những điều học được mỗi ngày.',
   },
 
   home: {
@@ -600,6 +600,30 @@ export const vi = {
       tagsHeading: 'Thẻ',
       noTags: 'Chưa có thẻ nào.',
     },
+  },
+
+  bugReport: {
+    buttonLabel: 'Báo lỗi / Góp ý',
+    modalTitle: 'Báo cáo lỗi hoặc cần cải tiến tính năng?',
+    typeBug: 'Báo lỗi',
+    typeFeature: 'Góp ý tính năng',
+    descriptionLabel: 'Nội dung',
+    descriptionPlaceholderBug: 'Mô tả lỗi bạn gặp phải...',
+    descriptionPlaceholderFeature: 'Mô tả tính năng hoặc cải tiến bạn mong muốn...',
+    imageLabel: 'Ảnh chụp màn hình (không bắt buộc, tối đa 3MB)',
+    imageRemove: 'Xoá ảnh',
+    captchaLabel: 'Kéo để hoàn thành khối ghép',
+    captchaVerifiedLabel: 'Đã xác minh',
+    captchaRefreshLabel: 'Đổi câu hỏi khác',
+    submit: 'Gửi',
+    submitting: 'Đang gửi...',
+    successMessage: 'Đã gửi báo cáo, cảm ơn bạn!',
+    errorGeneric: 'Gửi báo cáo thất bại, vui lòng thử lại.',
+    errorDescriptionRequired: 'Vui lòng nhập nội dung.',
+    errorDescriptionTooShort: 'Nội dung quá ngắn hoặc không hợp lệ, vui lòng mô tả chi tiết hơn (ít nhất 10 ký tự có ý nghĩa).',
+    errorImageType: 'File đính kèm phải là hình ảnh.',
+    errorImageSize: 'Ảnh vượt quá 3MB.',
+    errorCaptcha: 'Vui lòng kéo hoàn thành khối ghép để xác nhận bạn không phải robot.',
   },
 }
 

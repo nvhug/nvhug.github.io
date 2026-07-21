@@ -43,7 +43,7 @@ export function FloatingTemplateSwitch({ postId, current }: Props) {
   }
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-2">
+    <div className="fixed bottom-6 right-20 z-50 flex flex-col items-end gap-2">
       {open && (
         <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-xl">
           {TEMPLATES.map((tpl) => {
