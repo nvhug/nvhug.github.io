@@ -109,6 +109,40 @@ function fmtDate(iso: string) {
 }
 
 const STRIP_HTML = /<[^>]*>/g
+const ANALYZE_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000
+
+function getCooldownInfo(lastAnalyzedAt?: string | null) {
+  if (!lastAnalyzedAt) {
+    return { isBlocked: false, remainingMs: 0 }
+  }
+
+  const last = new Date(lastAnalyzedAt).getTime()
+  if (Number.isNaN(last)) {
+    return { isBlocked: false, remainingMs: 0 }
+  }
+
+  const remainingMs = last + ANALYZE_COOLDOWN_MS - Date.now()
+  return {
+    isBlocked: remainingMs > 0,
+    remainingMs: Math.max(0, remainingMs),
+  }
+}
+
+function formatRemainingCooldown(ms: number) {
+  const totalHours = Math.ceil(ms / (60 * 60 * 1000))
+  const days = Math.floor(totalHours / 24)
+  const hours = totalHours % 24
+
+  if (days <= 0) {
+    return `${hours} giờ`
+  }
+
+  if (hours === 0) {
+    return `${days} ngày`
+  }
+
+  return `${days} ngày ${hours} giờ`
+}
 
 function verdictBadge(verdict: string) {
   if (/Đúng|Đủ/.test(verdict))    return 'bg-emerald-100 text-emerald-700'
@@ -148,7 +182,7 @@ function rowToInsight(row: {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note[] }) {
-  const periodOptions = useMemo(generatePeriodOptions, [])
+  const periodOptions = useMemo(() => generatePeriodOptions(), [])
 
   const [selectedIdx,  setSelectedIdx]  = useState(0)
   const [history,      setHistory]      = useState<AIInsights[]>([])
@@ -172,6 +206,9 @@ export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note
 
   const viewed          = history[viewIndex] ?? null
   const selectedPeriod  = periodOptions[selectedIdx]
+  const latestAnalysis  = history[0] ?? null
+  const cooldown        = getCooldownInfo(latestAnalysis?.analyzedAt)
+  const cooldownLabel   = cooldown.isBlocked ? formatRemainingCooldown(cooldown.remainingMs) : ''
 
   // Notes filtered to the selected period (client-side)
   const filteredNotes = useMemo(
@@ -180,6 +217,11 @@ export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note
   )
 
   async function analyze() {
+    if (cooldown.isBlocked) {
+      setError(`Bạn chỉ có thể phân tích 1 lần mỗi tuần. Vui lòng thử lại sau ${cooldownLabel}.`)
+      return
+    }
+
     setLoading(true)
     setError(null)
     try {
@@ -242,7 +284,7 @@ export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note
         {/* Analyze button */}
         <button
           onClick={analyze}
-          disabled={loading || fetching || filteredNotes.length === 0}
+          disabled={loading || fetching || filteredNotes.length === 0 || cooldown.isBlocked}
           className="flex items-center gap-2 rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-violet-700 disabled:opacity-60"
         >
           {loading
@@ -251,6 +293,12 @@ export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note
           {loading ? 'Đang phân tích...' : 'Phân tích AI'}
         </button>
       </div>
+
+      {cooldown.isBlocked && (
+        <p className="text-xs text-zinc-500">
+          Đã phân tích gần nhất lúc {latestAnalysis?.analyzedAt ? formatDateTime(latestAnalysis.analyzedAt) : '--'}. Có thể phân tích lại sau {cooldownLabel}.
+        </p>
+      )}
 
       {/* Empty period warning */}
       {filteredNotes.length === 0 && !loading && !fetching && (
