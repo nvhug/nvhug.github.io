@@ -127,6 +127,8 @@ export default function NotesPage() {
   const [todoFilter, setTodoFilter] = useState<'all' | 'pending' | 'done'>('all')
   const [deleteTodo, setDeleteTodo] = useState<Todo | null>(null)
   const [deletingTodo, setDeletingTodo] = useState(false)
+  const [editingTodoId, setEditingTodoId] = useState<string | null>(null)
+  const [editingTodoDraft, setEditingTodoDraft] = useState('')
 
   const [healthPosts, setHealthPosts] = useState<Post[]>([])
 
@@ -345,6 +347,19 @@ export default function NotesPage() {
 
       if (error) throw error
       setTodos((prev) => prev.map((t) => (t.id === todo.id ? { ...t, is_done: !t.is_done } : t)))
+    } catch {
+      toast.error('Không thể cập nhật.')
+    }
+  }
+
+  async function saveEditingTodo(id: string) {
+    const content = editingTodoDraft.trim()
+    if (!content) return
+    try {
+      const { error } = await supabase.from('todos').update({ content }).eq('id', id)
+      if (error) throw error
+      setTodos((prev) => prev.map((t) => (t.id === id ? { ...t, content } : t)))
+      setEditingTodoId(null)
     } catch {
       toast.error('Không thể cập nhật.')
     }
@@ -1007,110 +1022,94 @@ export default function NotesPage() {
           </div>
         </section>
 
-        <div className="flex overflow-x-auto border-b border-emerald-200 scrollbar-none">
+        <div className="flex border-b border-emerald-200">
           <button
             onClick={() => handleTabChange('notes')}
-            className={`px-2.5 py-2 text-xs font-medium whitespace-nowrap transition-colors ${
+            className={`flex-1 flex flex-col items-center justify-center gap-1 px-1 py-3 text-sm font-medium transition-colors ${
               currentTab === 'notes'
                 ? 'border-b-2 border-emerald-600 text-emerald-600'
                 : 'text-zinc-600 hover:text-zinc-900'
             }`}
           >
-            <span className="flex items-center gap-1">
-              <NotebookPen className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Notes</span>
-            </span>
+            <NotebookPen className="h-4 w-4" />
+            <span className="text-center leading-tight">Notes</span>
           </button>
           <button
             onClick={() => handleTabChange('todos')}
-            className={`px-2.5 py-2 text-xs font-medium whitespace-nowrap transition-colors ${
+            className={`flex-1 flex flex-col items-center justify-center gap-1 px-1 py-3 text-sm font-medium transition-colors ${
               currentTab === 'todos'
                 ? 'border-b-2 border-emerald-600 text-emerald-600'
                 : 'text-zinc-600 hover:text-zinc-900'
             }`}
           >
-            <span className="flex items-center gap-1">
-              <ListTodo className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Todos</span>
-            </span>
+            <ListTodo className="h-4 w-4" />
+            <span className="text-center leading-tight">Todos</span>
           </button>
           <button
             onClick={() => handleTabChange('goals')}
-            className={`px-2.5 py-2 text-xs font-medium whitespace-nowrap transition-colors ${
+            className={`flex-1 flex flex-col items-center justify-center gap-1 px-1 py-3 text-sm font-medium transition-colors ${
               currentTab === 'goals'
                 ? 'border-b-2 border-emerald-600 text-emerald-600'
                 : 'text-zinc-600 hover:text-zinc-900'
             }`}
           >
-            <span className="flex items-center gap-1">
-              <Target className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Mục tiêu</span>
-            </span>
+            <Target className="h-4 w-4" />
+            <span className="text-center leading-tight">Mục tiêu</span>
           </button>
           <button
             onClick={() => handleTabChange('calo')}
-            className={`px-2.5 py-2 text-xs font-medium whitespace-nowrap transition-colors ${
+            className={`flex-1 flex flex-col items-center justify-center gap-1 px-1 py-3 text-sm font-medium transition-colors ${
               currentTab === 'calo'
                 ? 'border-b-2 border-emerald-600 text-emerald-600'
                 : 'text-zinc-600 hover:text-zinc-900'
             }`}
           >
-            <span className="flex items-center gap-1">
-              <span className="text-sm">🔥</span>
-              <span className="hidden sm:inline">Calo</span>
-            </span>
+            <span className="text-base">🔥</span>
+            <span className="text-center leading-tight">Calo</span>
           </button>
           <button
             onClick={() => handleTabChange('meals')}
-            className={`px-2.5 py-2 text-xs font-medium whitespace-nowrap transition-colors ${
+            className={`flex-1 flex flex-col items-center justify-center gap-1 px-1 py-3 text-sm font-medium transition-colors ${
               currentTab === 'meals'
                 ? 'border-b-2 border-emerald-600 text-emerald-600'
                 : 'text-zinc-600 hover:text-zinc-900'
             }`}
           >
-            <span className="flex items-center gap-1">
-              <span className="text-sm">🍽️</span>
-              <span className="hidden sm:inline">Meal Plan</span>
-            </span>
+            <span className="text-base">🍽️</span>
+            <span className="text-center leading-tight">Meal Plan</span>
           </button>
           <button
             onClick={() => handleTabChange('weight')}
-            className={`px-2.5 py-2 text-xs font-medium whitespace-nowrap transition-colors ${
+            className={`flex-1 flex flex-col items-center justify-center gap-1 px-1 py-3 text-sm font-medium transition-colors ${
               currentTab === 'weight'
                 ? 'border-b-2 border-emerald-600 text-emerald-600'
                 : 'text-zinc-600 hover:text-zinc-900'
             }`}
           >
-            <span className="flex items-center gap-1">
-              <span className="text-sm">⚖️</span>
-              <span className="hidden sm:inline">Cân nặng</span>
-            </span>
+            <span className="text-base">⚖️</span>
+            <span className="text-center leading-tight">Cân nặng</span>
           </button>
           <button
             onClick={() => handleTabChange('health')}
-            className={`px-2.5 py-2 text-xs font-medium whitespace-nowrap transition-colors ${
+            className={`flex-1 flex flex-col items-center justify-center gap-1 px-1 py-3 text-sm font-medium transition-colors ${
               currentTab === 'health'
                 ? 'border-b-2 border-emerald-600 text-emerald-600'
                 : 'text-zinc-600 hover:text-zinc-900'
             }`}
           >
-            <span className="flex items-center gap-1">
-              <span className="text-sm">💪</span>
-              <span className="hidden sm:inline">Sức Khỏe</span>
-            </span>
+            <span className="text-base">💪</span>
+            <span className="text-center leading-tight">Sức Khỏe</span>
           </button>
           <button
             onClick={() => handleTabChange('stats')}
-            className={`px-2.5 py-2 text-xs font-medium whitespace-nowrap transition-colors ${
+            className={`flex-1 flex flex-col items-center justify-center gap-1 px-1 py-3 text-sm font-medium transition-colors ${
               currentTab === 'stats'
                 ? 'border-b-2 border-emerald-600 text-emerald-600'
                 : 'text-zinc-600 hover:text-zinc-900'
             }`}
           >
-            <span className="flex items-center gap-1">
-              <span className="text-sm">📊</span>
-              <span className="hidden sm:inline">Thống kê</span>
-            </span>
+            <span className="text-base">📊</span>
+            <span className="text-center leading-tight">Thống kê</span>
           </button>
         </div>
 
@@ -1776,21 +1775,56 @@ export default function NotesPage() {
                         <Circle className="h-5 w-5" />
                       )}
                     </button>
-                    <span
-                      className={`flex-1 text-sm ${
-                        todo.is_done ? 'line-through text-zinc-400' : 'text-zinc-900'
-                      }`}
-                    >
-                      {todo.content}
-                    </span>
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      onClick={() => setDeleteTodo(todo)}
-                      className="text-rose-300 hover:bg-rose-500/15"
-                    >
-                      <Trash2 />
-                    </Button>
+                    {editingTodoId === todo.id ? (
+                      <input
+                        autoFocus
+                        value={editingTodoDraft}
+                        onChange={(e) => setEditingTodoDraft(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') void saveEditingTodo(todo.id)
+                          if (e.key === 'Escape') setEditingTodoId(null)
+                        }}
+                        className="flex-1 rounded border border-emerald-300 px-2 py-0.5 text-sm text-zinc-900 outline-none focus:border-emerald-500"
+                      />
+                    ) : (
+                      <span
+                        onDoubleClick={() => { setEditingTodoId(todo.id); setEditingTodoDraft(todo.content) }}
+                        className={`flex-1 cursor-text text-sm ${
+                          todo.is_done ? 'line-through text-zinc-400' : 'text-zinc-900'
+                        }`}
+                      >
+                        {todo.content}
+                      </span>
+                    )}
+                    {editingTodoId === todo.id ? (
+                      <>
+                        <Button variant="ghost" size="icon-sm" onClick={() => void saveEditingTodo(todo.id)} className="text-emerald-600 hover:bg-emerald-500/15">
+                          <Check />
+                        </Button>
+                        <Button variant="ghost" size="icon-sm" onClick={() => setEditingTodoId(null)} className="text-zinc-400 hover:bg-zinc-100">
+                          <X />
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          onClick={() => { setEditingTodoId(todo.id); setEditingTodoDraft(todo.content) }}
+                          className="text-zinc-300 hover:bg-zinc-100 hover:text-zinc-600"
+                        >
+                          <Pencil />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          onClick={() => setDeleteTodo(todo)}
+                          className="text-rose-300 hover:bg-rose-500/15"
+                        >
+                          <Trash2 />
+                        </Button>
+                      </>
+                    )}
                   </div>
                 ))}
 
@@ -2060,13 +2094,13 @@ export default function NotesPage() {
                         ) : (
                           <div className="space-y-3">
                             <div className="flex items-center gap-2 flex-wrap">
-                              <h3 className="font-medium text-sm text-zinc-900">{goal.title}</h3>
-                              <span className="text-xs px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700 font-medium">{goal.type}</span>
+                              <h3 className="font-medium text-base text-zinc-900">{goal.title}</h3>
+                              <span className="text-sm px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700 font-medium">{goal.type}</span>
                             </div>
 
                             {/* Timeline */}
                             {(goal.start_date || goal.target_date) && (
-                              <div className="text-xs text-zinc-600 space-y-1">
+                              <div className="text-sm text-zinc-600 space-y-1">
                                 <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3">
                                   {goal.start_date && (
                                     <span>📅 <span className="text-zinc-700 font-medium">{new Date(goal.start_date).toLocaleDateString('vi-VN')}</span></span>
@@ -2083,22 +2117,22 @@ export default function NotesPage() {
                                   const elapsedDays = Math.ceil((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
                                   const remainingDays = Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
                                   return (
-                                    <div className="text-xs text-zinc-600">⏱️ <span className="font-medium text-zinc-700">{Math.max(0, elapsedDays)}/{totalDays}</span> ngày | Còn: <span className="font-medium text-zinc-700">{Math.max(0, remainingDays)}</span></div>
+                                    <div className="text-sm text-zinc-600">⏱️ <span className="font-medium text-zinc-700">{Math.max(0, elapsedDays)}/{totalDays}</span> ngày | Còn: <span className="font-medium text-zinc-700">{Math.max(0, remainingDays)}</span></div>
                                   )
                                 })()}
                               </div>
                             )}
 
                             {goal.description && (
-                              <p className="text-xs text-zinc-600 whitespace-pre-wrap">{goal.description}</p>
+                              <p className="text-sm text-zinc-600 whitespace-pre-wrap">{goal.description}</p>
                             )}
 
                             {/* Progress Bar */}
                             {goal.completion_percentage !== undefined && (
                               <div>
                                 <div className="flex items-center justify-between mb-1.5">
-                                  <span className="text-xs font-medium text-zinc-700">Tiến độ</span>
-                                  <span className="text-xs font-semibold text-emerald-600">{goal.completion_percentage}%</span>
+                                  <span className="text-sm font-medium text-zinc-700">Tiến độ</span>
+                                  <span className="text-sm font-semibold text-emerald-600">{goal.completion_percentage}%</span>
                                 </div>
                                 <div className="w-full bg-emerald-100 rounded-full h-2 overflow-hidden shadow-inner">
                                   <div
@@ -2148,7 +2182,7 @@ export default function NotesPage() {
 
                     <button
                       onClick={() => setExpandedGoal(expandedGoal === goal.id ? null : goal.id)}
-                      className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-emerald-600 hover:text-emerald-700"
+                      className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-emerald-600 hover:text-emerald-700"
                     >
                       {expandedGoal === goal.id ? (
                         <>
@@ -2293,30 +2327,30 @@ export default function NotesPage() {
                                 ) : (
                                   <>
                                     <p
-                                      className={`text-xs px-1 py-0.5 rounded ${
+                                      className={`text-sm px-1 py-0.5 rounded ${
                                         item.is_completed ? 'line-through text-zinc-400' : 'text-zinc-900'
                                       }`}
                                     >
                                       {item.content}
                                     </p>
                                     <div className="flex gap-1.5 flex-wrap items-center mt-1">
-                                      <span className="text-xs px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 inline-block">
+                                      <span className="text-sm px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 inline-block">
                                         {item.item_type}
                                       </span>
                                       {item.is_completed && (
-                                        <span className="text-xs px-1.5 py-0.5 rounded bg-emerald-500 text-white inline-block">
+                                        <span className="text-sm px-1.5 py-0.5 rounded bg-emerald-500 text-white inline-block">
                                           ✓ Hoàn thành
                                         </span>
                                       )}
                                     </div>
                                     {item.result && (
                                       <div className="mt-1.5 p-1.5 rounded-md bg-blue-50 border border-blue-100">
-                                        <p className="text-xs font-medium text-blue-900">📝 Kết quả:</p>
-                                        <p className="text-xs text-blue-800 whitespace-pre-wrap mt-0.5">{item.result}</p>
+                                        <p className="text-sm font-medium text-blue-900">📝 Kết quả:</p>
+                                        <p className="text-sm text-blue-800 whitespace-pre-wrap mt-0.5">{item.result}</p>
                                       </div>
                                     )}
                                     {item.metadata && Object.keys(item.metadata).length > 0 && (
-                                      <p className="text-xs text-zinc-600 mt-1">
+                                      <p className="text-sm text-zinc-600 mt-1">
                                         {Object.entries(item.metadata).map(([k, v]) => `${k}: ${v}`).join(', ')}
                                       </p>
                                     )}
@@ -2346,7 +2380,7 @@ export default function NotesPage() {
                             </div>
                           ))}
                           {(goalItems[goal.id] || []).length === 0 && (
-                            <p className="text-xs text-zinc-400 italic">Chưa có chi tiết nào.</p>
+                            <p className="text-sm text-zinc-400 italic">Chưa có chi tiết nào.</p>
                           )}
                         </div>
                         <form

@@ -235,7 +235,7 @@ export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note
         </select>
 
         {/* Note count hint */}
-        <span className="text-xs text-zinc-400">
+        <span className="text-sm text-zinc-400">
           {filteredNotes.length} notes
         </span>
 
@@ -285,10 +285,10 @@ export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note
           {/* Period badge */}
           {viewed.period && (
             <div className="flex items-center gap-2">
-              <span className="rounded-full bg-violet-100 px-3 py-1 text-xs font-medium text-violet-700">
+              <span className="rounded-full bg-violet-100 px-3 py-1 text-sm font-medium text-violet-700">
                 {viewed.period.label}
               </span>
-              <span className="text-xs text-zinc-400">
+              <span className="text-sm text-zinc-400">
                 {fmtDate(viewed.period.from)} → {fmtDate(viewed.period.to)}
               </span>
             </div>
@@ -296,7 +296,7 @@ export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note
 
           {/* Summary */}
           <div className="rounded-xl border border-violet-100 bg-violet-50 p-4">
-            <p className="text-sm leading-relaxed text-violet-900">{viewed.summary}</p>
+            <p className="text-base leading-relaxed text-violet-900">{viewed.summary}</p>
           </div>
 
           {/* Domain cards */}
@@ -307,21 +307,21 @@ export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note
                 <div className="mb-2 flex items-center justify-between gap-1">
                   <div className="flex items-center gap-1.5">
                     <Scale className="h-3.5 w-3.5 text-indigo-600" />
-                    <h4 className="text-xs font-semibold uppercase tracking-wide text-indigo-600">Cân nặng</h4>
+                    <h4 className="text-sm font-semibold uppercase tracking-wide text-indigo-600">Cân nặng</h4>
                   </div>
-                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium leading-tight ${verdictBadge(viewed.weight.verdict)}`}>
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium leading-tight ${verdictBadge(viewed.weight.verdict)}`}>
                     {viewed.weight.verdict}
                   </span>
                 </div>
                 <ul className="mb-2.5 space-y-1.5">
                   {viewed.weight.points.map((p, i) => (
-                    <li key={i} className="flex items-start gap-1.5 text-xs text-indigo-800">
+                    <li key={i} className="flex items-start gap-1.5 text-sm text-indigo-800">
                       <ChevronRight className="mt-0.5 h-3 w-3 shrink-0 text-indigo-400" />{p}
                     </li>
                   ))}
                 </ul>
                 {viewed.weight.next_target && (
-                  <div className="rounded-lg bg-indigo-100/70 px-2.5 py-1.5 text-xs text-indigo-700">
+                  <div className="rounded-lg bg-indigo-100/70 px-2.5 py-1.5 text-sm text-indigo-700">
                     <span className="font-medium">Mục tiêu: </span>{viewed.weight.next_target}
                   </div>
                 )}
@@ -334,27 +334,27 @@ export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note
                 <div className="mb-2 flex items-center justify-between gap-1">
                   <div className="flex items-center gap-1.5">
                     <Utensils className="h-3.5 w-3.5 text-amber-600" />
-                    <h4 className="text-xs font-semibold uppercase tracking-wide text-amber-600">Dinh dưỡng</h4>
+                    <h4 className="text-sm font-semibold uppercase tracking-wide text-amber-600">Dinh dưỡng</h4>
                   </div>
-                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium leading-tight ${verdictBadge(viewed.nutrition.verdict)}`}>
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium leading-tight ${verdictBadge(viewed.nutrition.verdict)}`}>
                     {viewed.nutrition.verdict}
                   </span>
                 </div>
                 <ul className="mb-2.5 space-y-1.5">
                   {viewed.nutrition.points.map((p, i) => (
-                    <li key={i} className="flex items-start gap-1.5 text-xs text-amber-800">
+                    <li key={i} className="flex items-start gap-1.5 text-sm text-amber-800">
                       <ChevronRight className="mt-0.5 h-3 w-3 shrink-0 text-amber-400" />{p}
                     </li>
                   ))}
                 </ul>
                 <div className="space-y-1">
                   {viewed.nutrition.worst_day && (
-                    <p className="text-xs text-amber-700">
+                    <p className="text-sm text-amber-700">
                       <span className="font-medium">Ngày yếu: </span>{viewed.nutrition.worst_day}
                     </p>
                   )}
                   {viewed.nutrition.skip_habit && (
-                    <p className="text-xs text-amber-700">
+                    <p className="text-sm text-amber-700">
                       <span className="font-medium">Bỏ bữa: </span>{viewed.nutrition.skip_habit}
                     </p>
                   )}
@@ -367,17 +367,17 @@ export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note
               <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-3.5">
                 <div className="mb-2 flex items-center gap-1.5">
                   <BookOpen className="h-3.5 w-3.5 text-emerald-600" />
-                  <h4 className="text-xs font-semibold uppercase tracking-wide text-emerald-600">Ghi chú & Habit</h4>
+                  <h4 className="text-sm font-semibold uppercase tracking-wide text-emerald-600">Ghi chú & Habit</h4>
                 </div>
                 <ul className="mb-2.5 space-y-1.5">
                   {viewed.notes_habits.points.map((p, i) => (
-                    <li key={i} className="flex items-start gap-1.5 text-xs text-emerald-800">
+                    <li key={i} className="flex items-start gap-1.5 text-sm text-emerald-800">
                       <ChevronRight className="mt-0.5 h-3 w-3 shrink-0 text-emerald-400" />{p}
                     </li>
                   ))}
                 </ul>
                 {viewed.notes_habits.habit_gap && (
-                  <div className="rounded-lg bg-emerald-100/70 px-2.5 py-1.5 text-xs text-emerald-700">
+                  <div className="rounded-lg bg-emerald-100/70 px-2.5 py-1.5 text-sm text-emerald-700">
                     <span className="font-medium">Habit gap: </span>{viewed.notes_habits.habit_gap}
                   </div>
                 )}
@@ -389,15 +389,15 @@ export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note
           <div className="rounded-xl border border-blue-100 bg-blue-50 p-4">
             <div className="mb-1.5 flex items-center gap-1.5">
               <Lightbulb className="h-3.5 w-3.5 text-blue-600" />
-              <h4 className="text-xs font-semibold uppercase tracking-wide text-blue-600">Gợi ý</h4>
+              <h4 className="text-sm font-semibold uppercase tracking-wide text-blue-600">Gợi ý</h4>
             </div>
-            <p className="text-sm font-medium text-blue-900">{viewed.pattern}</p>
-            <p className="mt-2 text-sm text-blue-700">{viewed.recommendation}</p>
+            <p className="text-base font-medium text-blue-900">{viewed.pattern}</p>
+            <p className="mt-2 text-base text-blue-700">{viewed.recommendation}</p>
           </div>
 
           {/* Token + timestamp footer */}
           {viewed.tokenUsage && (
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-zinc-100 bg-zinc-50 px-3 py-2 text-xs text-zinc-500">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-zinc-100 bg-zinc-50 px-3 py-2 text-sm text-zinc-500">
               <span className="font-medium text-zinc-700">
                 🪙 {fmtN(viewed.tokenUsage.total)} tokens
               </span>
@@ -416,7 +416,7 @@ export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note
         <div className="rounded-xl border border-zinc-100">
           <button
             onClick={() => setShowHistory(v => !v)}
-            className="flex w-full items-center justify-between px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-zinc-500 hover:text-zinc-700"
+            className="flex w-full items-center justify-between px-4 py-2.5 text-sm font-semibold uppercase tracking-wide text-zinc-500 hover:text-zinc-700"
           >
             <div className="flex items-center gap-1.5">
               <History className="h-3.5 w-3.5" />
@@ -431,7 +431,7 @@ export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note
                 <button
                   key={item.id ?? idx}
                   onClick={() => { setViewIndex(idx); setShowHistory(false) }}
-                  className={`flex w-full items-center gap-3 px-4 py-2.5 text-left text-xs transition hover:bg-zinc-50 ${
+                  className={`flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition hover:bg-zinc-50 ${
                     idx === viewIndex ? 'bg-violet-50' : ''
                   } ${idx < history.length - 1 ? 'border-b border-zinc-50' : ''}`}
                 >
