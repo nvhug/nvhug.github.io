@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { createBrowserClient } from '@supabase/ssr'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -12,13 +13,19 @@ function getSupabaseClient() {
   }
 
   if (!supabaseClient) {
-    supabaseClient = createClient(supabaseUrl, supabaseAnonKey)
+    // Browser: createBrowserClient reads session from cookies → sends JWT in requests
+    // This makes RLS auth.uid() work correctly for each logged-in user
+    // Server: createClient with anon key (used by API routes)
+    if (typeof window !== 'undefined') {
+      supabaseClient = createBrowserClient(supabaseUrl, supabaseAnonKey)
+    } else {
+      supabaseClient = createClient(supabaseUrl, supabaseAnonKey)
+    }
   }
 
   return supabaseClient
 }
 
-// For backward compatibility with existing code
 export const supabase = {
   from: (table: string) => {
     const client = getSupabaseClient()
