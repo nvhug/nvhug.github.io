@@ -57,7 +57,7 @@ export function AdminSidebar() {
     .find((item) => pathname === item.href || pathname.startsWith(item.href + '/'))?.href
 
   return (
-    <Sidebar collapsible="none" className="border-r border-emerald-100 bg-white/90 backdrop-blur">
+    <Sidebar collapsible="offcanvas" className="border-r border-emerald-100 bg-white/90 backdrop-blur">
       <SidebarHeader className="border-b border-emerald-100 px-4 py-3">
         <Link href="/" className="group inline-flex items-center gap-1.5 text-sm font-medium text-zinc-500 transition-colors hover:text-emerald-600">
           <ArrowUpRight className="h-3.5 w-3.5 rotate-225" />

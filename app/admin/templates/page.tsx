@@ -209,7 +209,7 @@ export default function TemplatesPage() {
   }
 
   return (
-    <div className="space-y-8 p-4 sm:p-6">
+    <div className="space-y-6 p-2 sm:p-5">
       <div>
         <h1 className="font-poppins text-2xl font-semibold text-zinc-900">Templates</h1>
         <p className="mt-1 text-sm text-zinc-500">Choose the display layout for each blog post.</p>
@@ -245,7 +245,7 @@ export default function TemplatesPage() {
 
       {/* Posts table */}
       <div className="rounded-2xl border border-zinc-200 bg-white overflow-hidden">
-        <div className="border-b border-zinc-100 px-5 py-3.5">
+        <div className="border-b border-zinc-100 px-3 py-2.5">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-400">
             Posts — assign template
           </p>
@@ -260,7 +260,7 @@ export default function TemplatesPage() {
             {posts.map((post) => {
               const currentTemplate = post.template || 'parchment'
               return (
-                <div key={post.id} className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                <div key={post.id} className="flex flex-col gap-2 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium ${post.published ? 'bg-emerald-100 text-emerald-700' : 'bg-zinc-100 text-zinc-500'}`}>
@@ -277,7 +277,7 @@ export default function TemplatesPage() {
                     <p className="mt-0.5 text-xs text-zinc-400">{formatDate(post.created_at)}</p>
                   </div>
 
-                  <div className="flex shrink-0 gap-1.5">
+                  <div className="flex flex-wrap gap-1.5">
                     {TEMPLATES.map((tpl) => {
                       const isActive = currentTemplate === tpl.id
                       const isSaving = saving === post.id
