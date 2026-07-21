@@ -1,17 +1,11 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { Clock, CheckCircle2, Circle, Plus, Trash2, X, Edit2, Check } from 'lucide-react'
+import { Clock, CheckCircle2, Circle, Plus, Trash2, X, Check, Pencil } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
+import { getSupabaseBrowserClient } from '@/lib/supabase-browser'
 import { Meal } from '@/types'
-import { Button } from '@/components/ui/button'
-
-const DAILY_CALORIE_GOAL = 2400
-
-function todayDate() {
-  return new Date().toISOString().slice(0, 10)
-}
 
 const DEFAULT_MEALS = [
   { time: '07:00', name: 'Bữa sáng', target_calories: 520, foods: ['Cơm trắng: 150g', 'Trứng luộc: 2 quả', 'Sữa nóng: 150ml', 'Mật ong: 1.5 thìa'] },
@@ -28,14 +22,18 @@ type EditForm = {
   foods: string
 }
 
+const EMPTY_FORM: EditForm = { time: '', name: '', target_calories: '', foods: '' }
+
 export function MealScheduleTracker() {
   const [meals, setMeals] = useState<Meal[]>([])
-  const [selectedDate, setSelectedDate] = useState(todayDate())
+  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10))
   const [loading, setLoading] = useState(true)
   const isSettingUpRef = useRef(false)
-  const [saving, setSaving] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [editForm, setEditForm] = useState<EditForm>({ time: '', name: '', target_calories: '', foods: '' })
+  const [editForm, setEditForm] = useState<EditForm>(EMPTY_FORM)
+  const [addingNew, setAddingNew] = useState(false)
+  const [newForm, setNewForm] = useState<EditForm>(EMPTY_FORM)
+  const [savingNew, setSavingNew] = useState(false)
 
   async function fetchMeals() {
     try {
@@ -47,7 +45,6 @@ export function MealScheduleTracker() {
 
       if (error) throw error
 
-      // Deduplicate by meal_type, keep the first occurrence
       const seen = new Set<string>()
       const deduped = (data || []).filter((m: Meal) => {
         if (seen.has(m.meal_type)) return false
@@ -79,6 +76,8 @@ export function MealScheduleTracker() {
 
   async function setupDefaultMeals() {
     try {
+      const { data: { user } } = await getSupabaseBrowserClient().auth.getUser()
+
       const mealsToInsert = DEFAULT_MEALS.map((meal, idx) => ({
         date: selectedDate,
         meal_type: ['breakfast', 'mid_morning', 'lunch', 'afternoon', 'dinner'][idx],
@@ -87,12 +86,12 @@ export function MealScheduleTracker() {
         target_calories: meal.target_calories,
         foods: meal.foods,
         is_completed: false,
+        ...(user ? { user_id: user.id } : {}),
       }))
 
       const { error } = await supabase.from('meals').insert(mealsToInsert)
       if (error) throw error
 
-      // Fetch the newly created meals
       const { data: newData } = await supabase
         .from('meals')
         .select('*')
@@ -103,7 +102,6 @@ export function MealScheduleTracker() {
       setLoading(false)
     } catch (error) {
       console.error('Error setting up meals:', error)
-      toast.error('Không thể tạo lịch ăn.')
       setLoading(false)
     }
   }
@@ -144,6 +142,7 @@ export function MealScheduleTracker() {
   }
 
   function startEdit(meal: Meal) {
+    setAddingNew(false)
     setEditingId(meal.id)
     setEditForm({
       time: meal.time,
@@ -182,11 +181,45 @@ export function MealScheduleTracker() {
     }
   }
 
+  async function addMeal() {
+    const calories = parseInt(newForm.target_calories, 10)
+    if (!newForm.name.trim() || !newForm.time || isNaN(calories)) {
+      toast.error('Vui lòng điền đầy đủ thông tin.')
+      return
+    }
+    setSavingNew(true)
+    try {
+      const foods = newForm.foods.split('\n').map((f) => f.trim()).filter(Boolean)
+      const { data: { user } } = await getSupabaseBrowserClient().auth.getUser()
+      const slug = newForm.name.trim().toLowerCase().replace(/\s+/g, '_').slice(0, 20)
+      const mealType = `custom_${slug}_${Math.random().toString(36).slice(2, 7)}`
+
+      const { error } = await supabase.from('meals').insert({
+        date: selectedDate,
+        meal_type: mealType,
+        time: newForm.time,
+        name: newForm.name.trim(),
+        target_calories: calories,
+        foods,
+        is_completed: false,
+        ...(user ? { user_id: user.id } : {}),
+      })
+      if (error) throw error
+
+      setAddingNew(false)
+      setNewForm(EMPTY_FORM)
+      void fetchMeals()
+      toast.success('Đã thêm bữa ăn.')
+    } catch {
+      toast.error('Không thể thêm bữa ăn.')
+    } finally {
+      setSavingNew(false)
+    }
+  }
+
   const totalCalories = meals.reduce((sum, m) => sum + m.target_calories, 0)
   const completedCount = meals.filter((m) => m.is_completed).length
-  const completedCalories = meals
-    .filter((m) => m.is_completed)
-    .reduce((sum, m) => sum + m.target_calories, 0)
+  const completedCalories = meals.filter((m) => m.is_completed).reduce((sum, m) => sum + m.target_calories, 0)
   const completionPercent = meals.length > 0 ? Math.round((completedCount / meals.length) * 100) : 0
 
   return (
@@ -214,10 +247,9 @@ export function MealScheduleTracker() {
             <span className="font-semibold text-zinc-900">{completedCount} / {meals.length} bữa</span>
           </div>
 
-          {/* Progress Bar */}
           <div className="h-2.5 sm:h-3 overflow-hidden rounded-full border border-emerald-200 bg-emerald-100 shadow-inner">
             <div
-              className="h-full bg-gradient-to-r from-emerald-500 to-emerald-600 transition-all duration-300"
+              className="h-full bg-linear-to-r from-emerald-500 to-emerald-600 transition-all duration-300"
               style={{ width: `${Math.min(completionPercent, 100)}%` }}
             />
           </div>
@@ -237,14 +269,30 @@ export function MealScheduleTracker() {
 
       {/* Meals List */}
       <div className="rounded-xl border border-emerald-200 bg-white p-3 sm:p-4">
-        <div className="mb-3">
+        <div className="mb-3 flex items-center justify-between">
           <h3 className="font-semibold text-zinc-900">Danh sách bữa ăn</h3>
+          <button
+            type="button"
+            onClick={() => { setAddingNew(true); setEditingId(null) }}
+            className="flex items-center gap-1 rounded-lg border border-emerald-200 px-2.5 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-50 transition-colors"
+          >
+            <Plus className="h-3.5 w-3.5" /> Thêm bữa
+          </button>
         </div>
 
         {loading ? (
           <p className="text-xs text-zinc-400">Đang tải...</p>
-        ) : meals.length === 0 ? (
-          <p className="text-xs text-zinc-400 italic">Chưa có bữa ăn nào.</p>
+        ) : meals.length === 0 && !addingNew ? (
+          <div className="flex flex-col items-center gap-3 py-6 text-center">
+            <p className="text-sm text-zinc-400">Chưa có bữa ăn nào cho ngày này.</p>
+            <button
+              type="button"
+              onClick={() => setAddingNew(true)}
+              className="flex items-center gap-1.5 rounded-lg bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-100 transition-colors"
+            >
+              <Plus className="h-4 w-4" /> Thêm bữa ăn đầu tiên
+            </button>
+          </div>
         ) : (
           <div className="space-y-2">
             {meals.map((meal) => (
@@ -307,10 +355,7 @@ export function MealScheduleTracker() {
                   </div>
                 ) : (
                   <div className="flex flex-col sm:flex-row sm:items-start gap-2 sm:gap-3">
-                    <button
-                      onClick={() => toggleMealComplete(meal)}
-                      className="shrink-0 mt-0.5"
-                    >
+                    <button onClick={() => toggleMealComplete(meal)} className="shrink-0 mt-0.5">
                       {meal.is_completed ? (
                         <CheckCircle2 className="h-5 w-5 text-emerald-600" />
                       ) : (
@@ -332,23 +377,85 @@ export function MealScheduleTracker() {
 
                       <div className="ml-0 sm:ml-6 space-y-0.5">
                         {meal.foods.map((food, idx) => (
-                          <p key={idx} className="text-xs text-zinc-600">
-                            • {food}
-                          </p>
+                          <p key={idx} className="text-xs text-zinc-600">• {food}</p>
                         ))}
                       </div>
                     </div>
 
-                    <button
-                      onClick={() => deleteMeal(meal.id)}
-                      className="shrink-0 rounded p-1 text-zinc-300 opacity-60 hover:text-rose-600 hover:opacity-100 transition-all"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                    <div className="flex shrink-0 items-center gap-0.5">
+                      <button
+                        onClick={() => startEdit(meal)}
+                        className="rounded p-1 text-zinc-300 opacity-60 hover:text-emerald-600 hover:opacity-100 transition-all"
+                        title="Chỉnh sửa"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => deleteMeal(meal.id)}
+                        className="rounded p-1 text-zinc-300 opacity-60 hover:text-rose-600 hover:opacity-100 transition-all"
+                        title="Xoá"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Add new meal form */}
+        {addingNew && (
+          <div className="mt-3 rounded-lg border border-emerald-400 bg-emerald-50 p-2 sm:p-3 shadow-md ring-1 ring-emerald-300">
+            <p className="mb-2 text-xs font-medium text-emerald-700">Bữa ăn mới</p>
+            <div className="space-y-2">
+              <div className="flex flex-wrap gap-2">
+                <input
+                  type="time"
+                  value={newForm.time}
+                  onChange={(e) => setNewForm((f) => ({ ...f, time: e.target.value }))}
+                  className="rounded border border-emerald-300 px-2 py-1 text-xs w-24 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                />
+                <input
+                  type="text"
+                  value={newForm.name}
+                  onChange={(e) => setNewForm((f) => ({ ...f, name: e.target.value }))}
+                  className="rounded border border-emerald-300 px-2 py-1 text-xs flex-1 min-w-28 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                  placeholder="Tên bữa ăn"
+                  autoFocus
+                />
+                <input
+                  type="number"
+                  value={newForm.target_calories}
+                  onChange={(e) => setNewForm((f) => ({ ...f, target_calories: e.target.value }))}
+                  className="rounded border border-emerald-300 px-2 py-1 text-xs w-20 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                  placeholder="kcal"
+                />
+              </div>
+              <textarea
+                value={newForm.foods}
+                onChange={(e) => setNewForm((f) => ({ ...f, foods: e.target.value }))}
+                rows={3}
+                className="w-full rounded border border-emerald-300 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-400 resize-none"
+                placeholder="Mỗi dòng một món ăn (tùy chọn)..."
+              />
+              <div className="flex justify-end gap-2">
+                <button
+                  onClick={() => { setAddingNew(false); setNewForm(EMPTY_FORM) }}
+                  className="flex items-center gap-1 rounded px-2 py-1 text-xs text-zinc-500 hover:bg-zinc-100 transition-colors"
+                >
+                  <X className="h-3.5 w-3.5" /> Hủy
+                </button>
+                <button
+                  onClick={addMeal}
+                  disabled={savingNew}
+                  className="flex items-center gap-1 rounded bg-emerald-500 px-2.5 py-1 text-xs font-medium text-white hover:bg-emerald-600 transition-colors disabled:opacity-50"
+                >
+                  <Check className="h-3.5 w-3.5" /> {savingNew ? 'Đang lưu...' : 'Thêm'}
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>

@@ -6,6 +6,7 @@ export interface Post {
   excerpt: string
   published: boolean
   template?: string
+  user_id?: string
   created_at: string
   updated_at: string
   tags?: Tag[]
@@ -14,6 +15,7 @@ export interface Post {
 export interface Tag {
   id: string
   name: string
+  user_id?: string
 }
 
 export interface PostTag {

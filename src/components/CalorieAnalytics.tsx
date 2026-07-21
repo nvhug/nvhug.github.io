@@ -2,8 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-
-const DAILY_GOAL = 2400
+import { useCalorieGoal } from '@/lib/useCalorieGoal'
 const BAR_W = 22
 const SLOT = 30
 const TOP_PAD = 8
@@ -30,6 +29,7 @@ function fmtKcal(val: number): string {
 type DayData = { date: string; calories: number }
 
 export function CalorieAnalytics() {
+  const { goal: DAILY_GOAL } = useCalorieGoal()
   const [allDays, setAllDays] = useState<DayData[]>([])
   const [loading, setLoading] = useState(true)
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null)

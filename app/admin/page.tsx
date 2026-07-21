@@ -21,6 +21,7 @@ import { formatDate } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+import { ConfirmModal } from '@/components/ui/confirm-modal'
 
 type StatusFilter = 'all' | 'published' | 'draft'
 type PostRow = Post & { post_tags: { tags: Tag | null }[] }
@@ -32,6 +33,8 @@ export default function AdminPostsPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [tagFilter, setTagFilter] = useState('all')
   const [busyId, setBusyId] = useState<string | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<Post | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
   async function fetchPosts(withLoading = true) {
     if (withLoading) {
@@ -85,18 +88,18 @@ export default function AdminPostsPage() {
     }
   }
 
-  async function handleDelete(post: Post) {
-    if (!confirm(`Delete "${post.title}"? This cannot be undone.`)) return
-
-    setBusyId(post.id)
+  async function confirmDelete() {
+    if (!deleteTarget) return
+    setDeleting(true)
     try {
-      const { error } = await supabase.from('posts').delete().eq('id', post.id)
+      const { error } = await supabase.from('posts').delete().eq('id', deleteTarget.id)
       if (error) throw error
-      setPosts((prev) => prev.filter((p) => p.id !== post.id))
+      setPosts((prev) => prev.filter((p) => p.id !== deleteTarget.id))
+      setDeleteTarget(null)
     } catch (error) {
       console.error('Error deleting post:', error)
     } finally {
-      setBusyId(null)
+      setDeleting(false)
     }
   }
 
@@ -162,6 +165,7 @@ export default function AdminPostsPage() {
   ]
 
   return (
+    <>
     <div className="space-y-5">
       <section className="overflow-hidden rounded-2xl border border-emerald-200 bg-[linear-gradient(130deg,#ffffff_0%,#f7fef9_45%,#ecfdf5_100%)] p-6 shadow-[0_30px_60px_-45px_rgba(16,185,129,0.45)]">
         <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
@@ -348,7 +352,7 @@ export default function AdminPostsPage() {
                           variant="ghost"
                           size="icon-sm"
                           disabled={busyId === post.id}
-                          onClick={() => handleDelete(post)}
+                          onClick={() => setDeleteTarget(post)}
                           title="Delete"
                           className="text-rose-300 hover:bg-rose-500/15"
                         >
@@ -364,5 +368,14 @@ export default function AdminPostsPage() {
         )}
       </section>
     </div>
+
+    <ConfirmModal
+      open={!!deleteTarget}
+      itemContent={deleteTarget?.title}
+      loading={deleting}
+      onConfirm={() => void confirmDelete()}
+      onCancel={() => setDeleteTarget(null)}
+    />
+    </>
   )
 }

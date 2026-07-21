@@ -10,6 +10,7 @@ import { Post, Tag } from '@/types'
 import { generateSlug, truncateHtml } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { ConfirmModal } from '@/components/ui/confirm-modal'
 import RichEditor from '@/components/RichEditor'
 
 // Block-level tags Quill uses to represent each line/paragraph.
@@ -64,12 +65,14 @@ export interface PostFormValues {
 interface PostFormProps {
   mode: 'create' | 'edit'
   initialPost?: Post
+  autotagName?: string
   submitting: boolean
   onSubmit: (values: PostFormValues) => Promise<void>
   onDelete?: () => Promise<void>
 }
 
-export default function PostForm({ mode, initialPost, submitting, onSubmit, onDelete }: PostFormProps) {
+export default function PostForm({ mode, initialPost, autotagName, submitting, onSubmit, onDelete }: PostFormProps) {
+
   const [title, setTitle] = useState(initialPost?.title ?? '')
   const [slug, setSlug] = useState(initialPost?.slug ?? '')
   const [slugTouched, setSlugTouched] = useState(mode === 'edit')
@@ -81,16 +84,38 @@ export default function PostForm({ mode, initialPost, submitting, onSubmit, onDe
   const [newTagName, setNewTagName] = useState('')
   const [creatingTag, setCreatingTag] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [confirmOpen, setConfirmOpen] = useState(false)
 
+  // Re-run when autotagName arrives after mount (e.g. search params
+  // resolving post-hydration) so the auto-selected tag is still applied.
   useEffect(() => {
     fetchTags()
-  }, [])
+  }, [autotagName])
 
   async function fetchTags() {
     try {
       const { data, error } = await supabase.from('tags').select('*').order('name')
       if (error) throw error
-      setTags(data || [])
+      let loadedTags: Tag[] = data || []
+      setTags(loadedTags)
+      if (autotagName) {
+        let match = loadedTags.find((t) => t.name === autotagName)
+        if (!match) {
+          // Tag doesn't exist yet for this user — create it automatically
+          const { data: created, error: createError } = await supabase
+            .from('tags')
+            .insert([{ name: autotagName }])
+            .select()
+            .single()
+          if (createError) console.error('Error auto-creating tag:', createError)
+          if (created) {
+            match = created as Tag
+            loadedTags = [...loadedTags, match]
+            setTags(loadedTags)
+          }
+        }
+        if (match) setTagIds((prev) => (prev.includes(match!.id) ? prev : [...prev, match!.id]))
+      }
     } catch (error) {
       console.error('Error fetching tags:', error)
     }
@@ -159,18 +184,19 @@ export default function PostForm({ mode, initialPost, submitting, onSubmit, onDe
     })
   }
 
-  async function handleDelete() {
+  async function confirmDelete() {
     if (!onDelete) return
-    if (!confirm('Delete this post? This cannot be undone.')) return
     setDeleting(true)
     try {
       await onDelete()
     } finally {
       setDeleting(false)
+      setConfirmOpen(false)
     }
   }
 
   return (
+    <>
     <form onSubmit={handleSubmit} className="space-y-6">
       <section className="overflow-hidden rounded-2xl border border-emerald-200 bg-[linear-gradient(130deg,#ffffff_0%,#f7fef9_45%,#ecfdf5_100%)] p-6 shadow-[0_30px_60px_-45px_rgba(16,185,129,0.45)]">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -204,7 +230,7 @@ export default function PostForm({ mode, initialPost, submitting, onSubmit, onDe
                 type="button"
                 variant="ghost"
                 disabled={deleting}
-                onClick={handleDelete}
+                onClick={() => setConfirmOpen(true)}
                 className="rounded-lg text-rose-300 hover:bg-rose-500/15"
               >
                 <Trash2 />
@@ -346,5 +372,14 @@ export default function PostForm({ mode, initialPost, submitting, onSubmit, onDe
         </aside>
       </div>
     </form>
+
+    <ConfirmModal
+      open={confirmOpen}
+      itemContent={initialPost?.title}
+      loading={deleting}
+      onConfirm={() => void confirmDelete()}
+      onCancel={() => setConfirmOpen(false)}
+    />
+    </>
   )
 }
