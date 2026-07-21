@@ -1,61 +1,36 @@
 import { createClient } from '@supabase/supabase-js'
-import { createBrowserClient } from '@supabase/ssr'
+import { getSupabaseBrowserClient } from './supabase-browser'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
-let supabaseClient: any = null
-
-function getSupabaseClient() {
-  if (!supabaseUrl || !supabaseAnonKey) {
-    console.warn('Supabase env vars not set')
-    return null
+// Server-side singleton (API routes, server components — no session)
+let serverClient: ReturnType<typeof createClient> | null = null
+function getServerClient() {
+  if (!serverClient) {
+    serverClient = createClient(supabaseUrl, supabaseAnonKey)
   }
+  return serverClient
+}
 
-  if (!supabaseClient) {
-    // Browser: createBrowserClient reads session from cookies → sends JWT in requests
-    // This makes RLS auth.uid() work correctly for each logged-in user
-    // Server: createClient with anon key (used by API routes)
-    if (typeof window !== 'undefined') {
-      supabaseClient = createBrowserClient(supabaseUrl, supabaseAnonKey)
-    } else {
-      supabaseClient = createClient(supabaseUrl, supabaseAnonKey)
-    }
+// Single entry point — browser uses the shared session-aware singleton,
+// server uses the anon client.
+function getClient() {
+  if (typeof window !== 'undefined') {
+    return getSupabaseBrowserClient() // same instance as RootLayoutClient → session is shared
   }
-
-  return supabaseClient
+  return getServerClient()
 }
 
 export const supabase = {
-  from: (table: string) => {
-    const client = getSupabaseClient()
-    if (!client) {
-      throw new Error('Supabase not initialized. Check NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY')
-    }
-    return client.from(table)
-  },
-  storage: (bucket: string) => {
-    const client = getSupabaseClient()
-    if (!client) {
-      throw new Error('Supabase not initialized. Check NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY')
-    }
-    return client.storage.from(bucket)
-  },
+  from: (table: string) => getClient().from(table),
+  storage: (bucket: string) => getClient().storage.from(bucket),
 }
 
 export async function initializeDatabase() {
   try {
-    const client = getSupabaseClient()
-    if (!client) return
-
-    const { error: postsError } = await client
-      .from('posts')
-      .select('id')
-      .limit(1)
-
-    if (postsError?.code === 'PGRST116') {
-      console.log('Creating tables...')
-    }
+    const { error } = await getClient().from('posts').select('id').limit(1)
+    if (error?.code === 'PGRST116') console.log('Creating tables...')
   } catch (error) {
     console.error('Database initialization error:', error)
   }
