@@ -7,6 +7,7 @@ export const dynamic = 'force-dynamic'
 const CALORIE_TARGET = 2400
 const WEIGHT_START   = 61
 const WEIGHT_TARGET  = 75
+const ANALYZE_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000
 
 const USER_PROFILE = `- Giới tính: Nam, 34 tuổi
 - Mục tiêu: Tăng cân từ ${WEIGHT_START}kg lên ${WEIGHT_TARGET}kg (lean bulk)
@@ -282,6 +283,35 @@ export async function POST(request: Request) {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   )
+
+  const { data: latestAnalysis } = await db
+    .from('ai_analysis_history')
+    .select('created_at')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (latestAnalysis?.created_at) {
+    const lastAnalyzeAt = new Date(latestAnalysis.created_at).getTime()
+    const remainingMs = lastAnalyzeAt + ANALYZE_COOLDOWN_MS - Date.now()
+
+    if (remainingMs > 0) {
+      const retryAfterSeconds = Math.ceil(remainingMs / 1000)
+      return NextResponse.json(
+        {
+          error: 'Bạn chỉ có thể phân tích AI 1 lần mỗi 7 ngày.',
+          retryAfterSeconds,
+          nextAnalyzeAt: new Date(lastAnalyzeAt + ANALYZE_COOLDOWN_MS).toISOString(),
+        },
+        {
+          status: 429,
+          headers: {
+            'Retry-After': String(retryAfterSeconds),
+          },
+        }
+      )
+    }
+  }
 
   const [weightRes, foodRes, mealRes] = await Promise.all([
     db.from('weight_logs')
