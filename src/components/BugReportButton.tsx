@@ -362,7 +362,7 @@ export function BugReportButton() {
         type="button"
         onClick={handleOpen}
         aria-label={t('bugReport.buttonLabel')}
-        className="fixed bottom-5 right-5 z-40 flex h-11 w-11 items-center justify-center rounded-full bg-emerald-600 text-white shadow-lg shadow-emerald-900/20 transition-colors hover:bg-emerald-500"
+        className="fixed bottom-5 right-5 z-40 hidden h-11 w-11 items-center justify-center rounded-full bg-emerald-600 text-white shadow-lg shadow-emerald-900/20 transition-colors hover:bg-emerald-500 sm:flex"
       >
         <Bug className="h-5 w-5" />
       </button>

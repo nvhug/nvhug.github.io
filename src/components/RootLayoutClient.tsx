@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { LogOut, Settings, User as UserIcon } from 'lucide-react'
 import { Toaster } from 'sonner'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { getSupabaseBrowserClient } from '@/lib/supabase-browser'
 import { useLanguage } from '@/lib/i18n/language-context'
 import { LanguageSwitch } from '@/components/LanguageSwitch'
@@ -16,68 +16,94 @@ function AccountMenu({ user, onLogout }: { user: User; onLogout: () => void }) {
   const { t } = useLanguage()
   const letter = getAvatarLetter(user)
   const label = getAvatarLabel(user)
+  const [open, setOpen] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    function handleOutside(e: MouseEvent | TouchEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleOutside)
+    document.addEventListener('touchstart', handleOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleOutside)
+      document.removeEventListener('touchstart', handleOutside)
+    }
+  }, [open])
 
   return (
-    <div className="group relative ml-2">
+    <div ref={containerRef} className="relative ml-2">
       {/* Avatar trigger */}
       <button
         type="button"
-        className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full bg-emerald-500 text-sm font-semibold text-white select-none ring-2 ring-transparent transition-all group-hover:ring-white group-hover:ring-offset-1"
+        onClick={() => setOpen((v) => !v)}
+        className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full bg-emerald-500 text-sm font-semibold text-white select-none ring-2 ring-transparent transition-all hover:ring-white hover:ring-offset-1"
         aria-label={t('header.accountLabel')}
+        aria-expanded={open}
       >
         {letter}
       </button>
 
-      {/* Dropdown — visible on group hover, with pointer-events gap bridged by pt-2 */}
-      <div className="invisible absolute right-0 top-full z-50 pt-2 opacity-0 transition-all duration-150 group-hover:visible group-hover:opacity-100">
-        <div className="w-52 overflow-hidden rounded-xl border border-zinc-100 bg-white shadow-lg shadow-zinc-200/60">
+      {/* Dropdown — toggled by click/tap so it works on touch devices */}
+      {open && (
+        <div className="absolute right-0 top-full z-50 pt-2">
+          <div className="w-52 overflow-hidden rounded-xl border border-zinc-100 bg-white shadow-lg shadow-zinc-200/60">
 
-          {/* User info */}
-          <div className="border-b border-zinc-100 px-4 py-3">
-            <div className="flex items-center gap-2.5">
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-sm font-semibold text-white">
-                {letter}
-              </div>
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium text-zinc-900">{label}</p>
-                {user.email && label !== user.email && (
-                  <p className="truncate text-xs text-zinc-500">{user.email}</p>
-                )}
+            {/* User info */}
+            <div className="border-b border-zinc-100 px-4 py-3">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-sm font-semibold text-white">
+                  {letter}
+                </div>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-zinc-900">{label}</p>
+                  {user.email && label !== user.email && (
+                    <p className="truncate text-xs text-zinc-500">{user.email}</p>
+                  )}
+                </div>
               </div>
             </div>
+
+            {/* Menu items */}
+            <div className="p-1">
+              <Link
+                href="/admin"
+                onClick={() => setOpen(false)}
+                className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-zinc-700 transition-colors hover:bg-zinc-50 hover:text-zinc-900"
+              >
+                <Settings className="h-4 w-4 shrink-0 text-zinc-400" />
+                {t('header.admin')}
+              </Link>
+              <Link
+                href="/profile"
+                onClick={() => setOpen(false)}
+                className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-zinc-700 transition-colors hover:bg-zinc-50 hover:text-zinc-900"
+              >
+                <UserIcon className="h-4 w-4 shrink-0 text-zinc-400" />
+                {t('header.profile')}
+              </Link>
+
+              <div className="my-1 h-px bg-zinc-100" />
+
+              <button
+                type="button"
+                onClick={() => {
+                  setOpen(false)
+                  onLogout()
+                }}
+                className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-rose-600 transition-colors hover:bg-rose-50"
+              >
+                <LogOut className="h-4 w-4 shrink-0" />
+                {t('header.logout')}
+              </button>
+            </div>
+
           </div>
-
-          {/* Menu items */}
-          <div className="p-1">
-            <Link
-              href="/admin"
-              className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-zinc-700 transition-colors hover:bg-zinc-50 hover:text-zinc-900"
-            >
-              <Settings className="h-4 w-4 shrink-0 text-zinc-400" />
-              {t('header.admin')}
-            </Link>
-            <Link
-              href="/profile"
-              className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-zinc-700 transition-colors hover:bg-zinc-50 hover:text-zinc-900"
-            >
-              <UserIcon className="h-4 w-4 shrink-0 text-zinc-400" />
-              {t('header.profile')}
-            </Link>
-
-            <div className="my-1 h-px bg-zinc-100" />
-
-            <button
-              type="button"
-              onClick={onLogout}
-              className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-rose-600 transition-colors hover:bg-rose-50"
-            >
-              <LogOut className="h-4 w-4 shrink-0" />
-              {t('header.logout')}
-            </button>
-          </div>
-
         </div>
-      </div>
+      )}
     </div>
   )
 }
@@ -117,7 +143,7 @@ export function RootLayoutClient({ children }: { children: React.ReactNode }) {
   return (
     <>
       {!hideSiteChrome && (
-        <header className="fixed inset-x-0 top-0 z-50 border-b border-emerald-100/80 bg-white/88 backdrop-blur-md">
+        <header className="site-header fixed inset-x-0 top-0 z-50 border-b border-emerald-100/80 bg-white/88 backdrop-blur-md">
           <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-3 sm:px-6">
             <Link href="/" className="hidden font-poppins text-xl font-semibold tracking-tight text-zinc-900 sm:block">
               nvhug
