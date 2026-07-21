@@ -8,6 +8,8 @@ import { useCalorieGoal } from '@/lib/useCalorieGoal'
 import { FoodTemplate, DailyFood } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { useLanguage } from '@/lib/i18n/language-context'
+import { getIntlLocale } from '@/lib/i18n/locale'
 
 function todayDate() {
   return new Date().toISOString().slice(0, 10)
@@ -19,6 +21,7 @@ function currentTimeStr() {
 }
 
 export function CalorieTracker() {
+  const { t, lang } = useLanguage()
   const [foodTemplates, setFoodTemplates] = useState<FoodTemplate[]>([])
   const [dailyFoods, setDailyFoods] = useState<DailyFood[]>([])
   const [selectedDate, setSelectedDate] = useState(todayDate())
@@ -52,7 +55,7 @@ export function CalorieTracker() {
       setFoodTemplates((data || []) as FoodTemplate[])
     } catch (error) {
       console.error('Error fetching food templates:', error)
-      toast.error('Không thể tải danh sách thực phẩm.')
+      toast.error(t('calorieTracker.loadFoodsError'))
     }
   }
 
@@ -89,12 +92,12 @@ export function CalorieTracker() {
   async function addFood() {
     if (useCustom) {
       if (!customFoodName.trim() || !customCalories.trim()) {
-        toast.error('Vui lòng nhập tên thực phẩm và calo.')
+        toast.error(t('calorieTracker.enterNameCalories'))
         return
       }
     } else {
       if (!selectedFoodId || !quantity) {
-        toast.error('Vui lòng chọn thực phẩm và số lượng.')
+        toast.error(t('calorieTracker.selectFoodQty'))
         return
       }
     }
@@ -133,9 +136,9 @@ export function CalorieTracker() {
       setCustomCalories('')
       setCustomTime(currentTimeStr())
       setUseCustom(false)
-      toast.success('Thêm thực phẩm thành công.')
+      toast.success(t('calorieTracker.addSuccess'))
     } catch {
-      toast.error('Không thể thêm thực phẩm.')
+      toast.error(t('calorieTracker.addError'))
     } finally {
       setSaving(false)
     }
@@ -146,9 +149,9 @@ export function CalorieTracker() {
       const { error } = await supabase.from('daily_foods').delete().eq('id', id)
       if (error) throw error
       await fetchDailyFoods()
-      toast.success('Đã xoá.')
+      toast.success(t('calorieTracker.deleted'))
     } catch {
-      toast.error('Không thể xoá.')
+      toast.error(t('calorieTracker.deleteError'))
     }
   }
 
@@ -177,9 +180,9 @@ export function CalorieTracker() {
       await fetchDailyFoods()
       setEditingId(null)
       setEditingData(null)
-      toast.success('Cập nhật thành công.')
+      toast.success(t('calorieTracker.updateSuccess'))
     } catch {
-      toast.error('Không thể cập nhật.')
+      toast.error(t('calorieTracker.updateError'))
     } finally {
       setSaving(false)
     }
@@ -199,7 +202,7 @@ export function CalorieTracker() {
       {/* Calorie Summary */}
       <div className="rounded-xl border border-emerald-200 bg-white p-4">
         <div className="mb-3 flex items-center justify-between">
-          <h3 className="font-semibold text-zinc-900">Calo hôm nay ({selectedDate})</h3>
+          <h3 className="font-semibold text-zinc-900">{t('calorieTracker.todayHeading', { date: selectedDate })}</h3>
           <input
             type="date"
             value={selectedDate}
@@ -210,7 +213,7 @@ export function CalorieTracker() {
 
         <div className="space-y-2">
           <div className="flex items-center justify-between text-sm">
-            <span className="text-zinc-600">Tổng calo</span>
+            <span className="text-zinc-600">{t('calorieTracker.totalCalories')}</span>
             <span className="font-semibold text-zinc-900">
               {Math.round(totalCalories)} /{' '}
               {editingGoal ? (
@@ -231,7 +234,7 @@ export function CalorieTracker() {
                   type="button"
                   onClick={() => { setGoalDraft(String(calorieGoal)); setEditingGoal(true) }}
                   className="underline decoration-dashed underline-offset-2 hover:text-emerald-600 transition-colors"
-                  title="Chỉnh mục tiêu"
+                  title={t('calorieTracker.editGoalTitle')}
                 >
                   {calorieGoal}
                 </button>
@@ -253,9 +256,9 @@ export function CalorieTracker() {
           <div className="flex items-center justify-between text-xs text-zinc-500">
             <span>{progressPercent}%</span>
             {remainingCalories > 0 ? (
-              <span className="text-emerald-600">Còn {Math.round(remainingCalories)} kcal</span>
+              <span className="text-emerald-600">{t('calorieTracker.remainingKcal', { n: Math.round(remainingCalories) })}</span>
             ) : (
-              <span className="text-amber-600">Vượt {Math.round(Math.abs(remainingCalories))} kcal</span>
+              <span className="text-amber-600">{t('calorieTracker.overKcal', { n: Math.round(Math.abs(remainingCalories)) })}</span>
             )}
           </div>
         </div>
@@ -273,7 +276,7 @@ export function CalorieTracker() {
                 : 'border border-emerald-200 text-emerald-700 hover:bg-emerald-50'
             }`}
           >
-            Tùy chỉnh
+            {t('calorieTracker.custom')}
           </button>
           <button
             type="button"
@@ -284,7 +287,7 @@ export function CalorieTracker() {
                 : 'border border-emerald-200 text-emerald-700 hover:bg-emerald-50'
             }`}
           >
-            Danh sách
+            {t('calorieTracker.list')}
           </button>
         </div>
 
@@ -294,7 +297,7 @@ export function CalorieTracker() {
               type="text"
               value={customFoodName}
               onChange={(e) => setCustomFoodName(e.target.value)}
-              placeholder="Tên thực phẩm (ví dụ: bánh mì nướng)"
+              placeholder={t('calorieTracker.foodNamePlaceholder')}
               className="w-full rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-emerald-400"
             />
             <div className="flex gap-2">
@@ -302,7 +305,7 @@ export function CalorieTracker() {
                 type="number"
                 value={customCalories}
                 onChange={(e) => setCustomCalories(e.target.value)}
-                placeholder="Calo"
+                placeholder={t('calorieTracker.caloriesPlaceholder')}
                 className="w-24 rounded-lg border border-emerald-200 bg-white px-2 py-1.5 text-sm text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-emerald-400"
               />
               <div className="flex items-center gap-1.5 rounded-lg border border-emerald-200 px-2 py-1.5 w-fit">
@@ -322,7 +325,7 @@ export function CalorieTracker() {
               className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-500 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-emerald-600 disabled:opacity-50"
             >
               <Plus className="h-3.5 w-3.5" />
-              Thêm
+              {t('common.add')}
             </button>
           </div>
         ) : (
@@ -332,7 +335,7 @@ export function CalorieTracker() {
               onChange={(e) => setSelectedFoodId(e.target.value)}
               className="w-full rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-emerald-400"
             >
-              <option value="">Chọn thực phẩm...</option>
+              <option value="">{t('calorieTracker.chooseFoodOption')}</option>
               {foodTemplates.map((food) => (
                 <option key={food.id} value={food.id}>
                   {food.name} ({food.calories_per_unit} kcal/{food.unit})
@@ -354,7 +357,7 @@ export function CalorieTracker() {
                 type="number"
                 value={quantity}
                 onChange={(e) => setQuantity(e.target.value)}
-                placeholder="Số lượng"
+                placeholder={t('calorieTracker.quantityPlaceholder')}
                 min="0.1"
                 step="0.1"
                 className="w-24 rounded-lg border border-emerald-200 bg-white px-2 py-1.5 text-sm text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-emerald-400"
@@ -371,7 +374,7 @@ export function CalorieTracker() {
               className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-500 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-emerald-600 disabled:opacity-50"
             >
               <Plus className="h-3.5 w-3.5" />
-              Thêm
+              {t('common.add')}
             </button>
           </div>
         )}
@@ -379,12 +382,12 @@ export function CalorieTracker() {
 
       {/* Daily Foods List */}
       <div className="rounded-xl border border-emerald-200 bg-white p-4">
-        <h3 className="mb-3 font-semibold text-zinc-900">Danh sách thực phẩm trong ngày</h3>
+        <h3 className="mb-3 font-semibold text-zinc-900">{t('calorieTracker.foodListHeading')}</h3>
 
         {loading ? (
-          <p className="text-xs text-zinc-400">Đang tải...</p>
+          <p className="text-xs text-zinc-400">{t('common.loading')}</p>
         ) : dailyFoods.length === 0 ? (
-          <p className="text-xs text-zinc-400 italic">Chưa có thực phẩm nào.</p>
+          <p className="text-xs text-zinc-400 italic">{t('calorieTracker.emptyFoods')}</p>
         ) : (
           <div className="space-y-2">
             {dailyFoods.map((food) => {
@@ -408,7 +411,7 @@ export function CalorieTracker() {
                         value={editingData?.custom_food_name ?? ''}
                         onChange={(e) => setEditingData({ ...editingData, custom_food_name: e.target.value })}
                         className="rounded border border-emerald-300 px-2 py-1 text-sm text-zinc-900 focus:outline-none focus:ring-1 focus:ring-emerald-400"
-                        placeholder="Tên thực phẩm"
+                        placeholder={t('calorieTracker.editFoodNamePlaceholder')}
                       />
                       <div className="flex items-center gap-2">
                         <input
@@ -425,14 +428,14 @@ export function CalorieTracker() {
                             onClick={() => { setEditingId(null); setEditingData(null) }}
                             className="flex items-center gap-1 rounded px-2 py-1 text-xs text-zinc-500 hover:bg-white transition-colors"
                           >
-                            <X className="h-3.5 w-3.5" /> Hủy
+                            <X className="h-3.5 w-3.5" /> {t('common.cancel')}
                           </button>
                           <button
                             onClick={() => updateFood(food)}
                             disabled={saving}
                             className="flex items-center gap-1 rounded bg-emerald-500 px-2.5 py-1 text-xs font-medium text-white hover:bg-emerald-600 transition-colors disabled:opacity-50"
                           >
-                            <Check className="h-3.5 w-3.5" /> Lưu
+                            <Check className="h-3.5 w-3.5" /> {t('common.save')}
                           </button>
                         </div>
                       </div>
@@ -461,7 +464,7 @@ export function CalorieTracker() {
                       <div className="flex items-center gap-2">
                         <span className="flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-medium text-emerald-600">
                           <Clock className="h-3 w-3" />
-                          {new Date(food.created_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                          {new Date(food.created_at).toLocaleTimeString(getIntlLocale(lang), { hour: '2-digit', minute: '2-digit' })}
                         </span>
                         <p className="text-xs text-zinc-500">
                           {template && !food.custom_food_name ? `${food.quantity} ${template.unit} • ` : ''}{Math.round(food.total_calories * 10) / 10} kcal

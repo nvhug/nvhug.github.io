@@ -8,6 +8,9 @@ import {
 } from 'lucide-react'
 import { Note } from '@/types'
 import { supabase } from '@/lib/supabase'
+import { useLanguage } from '@/lib/i18n/language-context'
+import { getIntlLocale } from '@/lib/i18n/locale'
+import type { Lang } from '@/lib/i18n/language-context'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -50,7 +53,7 @@ interface AIInsights {
 
 // ─── Period options ───────────────────────────────────────────────────────────
 
-function generatePeriodOptions(): PeriodOption[] {
+function generatePeriodOptions(t: (key: string, vars?: Record<string, string | number>) => string): PeriodOption[] {
   const now   = new Date()
   const year  = now.getFullYear()
   const month = now.getMonth() // 0-based
@@ -66,7 +69,7 @@ function generatePeriodOptions(): PeriodOption[] {
     const lastDay = new Date(y, m, 0).getDate()
     opts.push({
       group: 'month',
-      label: `Tháng ${m}/${y}`,
+      label: t('notesAIInsights.monthLabel', { m, y }),
       from:  `${y}-${mm}-01`,
       to:    `${y}-${mm}-${lastDay}`,
     })
@@ -83,7 +86,7 @@ function generatePeriodOptions(): PeriodOption[] {
     const lastDay = new Date(y, endM, 0).getDate()
     opts.push({
       group: 'quarter',
-      label: `Q${q}/${y}`,
+      label: t('notesAIInsights.quarterLabel', { q, y }),
       from:  `${y}-${String(startM).padStart(2, '0')}-01`,
       to:    `${y}-${String(endM).padStart(2, '0')}-${lastDay}`,
     })
@@ -94,14 +97,14 @@ function generatePeriodOptions(): PeriodOption[] {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function formatDateTime(iso: string) {
-  return new Date(iso).toLocaleString('vi-VN', {
+function formatDateTime(iso: string, lang: Lang) {
+  return new Date(iso).toLocaleString(getIntlLocale(lang), {
     hour: '2-digit', minute: '2-digit',
     day: '2-digit', month: '2-digit', year: 'numeric',
   })
 }
 
-function fmtN(n: number) { return n.toLocaleString('vi-VN') }
+function fmtN(n: number, lang: Lang) { return n.toLocaleString(getIntlLocale(lang)) }
 
 function fmtDate(iso: string) {
   const [y, m, d] = iso.split('-')
@@ -128,26 +131,26 @@ function getCooldownInfo(lastAnalyzedAt?: string | null) {
   }
 }
 
-function formatRemainingCooldown(ms: number) {
+function formatRemainingCooldown(ms: number, t: (key: string, vars?: Record<string, string | number>) => string) {
   const totalHours = Math.ceil(ms / (60 * 60 * 1000))
   const days = Math.floor(totalHours / 24)
   const hours = totalHours % 24
 
   if (days <= 0) {
-    return `${hours} giờ`
+    return t('notesAIInsights.hoursRemaining', { h: hours })
   }
 
   if (hours === 0) {
-    return `${days} ngày`
+    return t('notesAIInsights.daysRemaining', { d: days })
   }
 
-  return `${days} ngày ${hours} giờ`
+  return t('notesAIInsights.daysHoursRemaining', { d: days, h: hours })
 }
 
 function verdictBadge(verdict: string) {
-  if (/Đúng|Đủ/.test(verdict))    return 'bg-emerald-100 text-emerald-700'
-  if (/Chậm|Thiếu/.test(verdict)) return 'bg-amber-100 text-amber-700'
-  if (/Nhanh|Dư/.test(verdict))   return 'bg-sky-100 text-sky-700'
+  if (/Đúng|Đủ|On track|Sufficient/i.test(verdict))    return 'bg-emerald-100 text-emerald-700'
+  if (/Chậm|Thiếu|Too slow|deficit/i.test(verdict)) return 'bg-amber-100 text-amber-700'
+  if (/Nhanh|Dư|Too fast|surplus/i.test(verdict))   return 'bg-sky-100 text-sky-700'
   return 'bg-zinc-100 text-zinc-500'
 }
 
@@ -182,7 +185,9 @@ function rowToInsight(row: {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note[] }) {
-  const periodOptions = useMemo(() => generatePeriodOptions(), [])
+  const { t, lang } = useLanguage()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const periodOptions = useMemo(() => generatePeriodOptions(t), [lang])
 
   const [selectedIdx,  setSelectedIdx]  = useState(0)
   const [history,      setHistory]      = useState<AIInsights[]>([])
@@ -208,7 +213,7 @@ export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note
   const selectedPeriod  = periodOptions[selectedIdx]
   const latestAnalysis  = history[0] ?? null
   const cooldown        = getCooldownInfo(latestAnalysis?.analyzedAt)
-  const cooldownLabel   = cooldown.isBlocked ? formatRemainingCooldown(cooldown.remainingMs) : ''
+  const cooldownLabel   = cooldown.isBlocked ? formatRemainingCooldown(cooldown.remainingMs, t) : ''
 
   // Notes filtered to the selected period (client-side)
   const filteredNotes = useMemo(
@@ -218,7 +223,7 @@ export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note
 
   async function analyze() {
     if (cooldown.isBlocked) {
-      setError(`Bạn chỉ có thể phân tích 1 lần mỗi tuần. Vui lòng thử lại sau ${cooldownLabel}.`)
+      setError(t('notesAIInsights.cooldownError', { cooldown: cooldownLabel }))
       return
     }
 
@@ -232,17 +237,18 @@ export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note
           notes:   filteredNotes.map(n => ({ ...n, content: n.content.replace(STRIP_HTML, '').slice(0, 200) })),
           habits:  habits.map(h => ({ ...h, content: h.content.replace(STRIP_HTML, '').slice(0, 100) })),
           period:  selectedPeriod,
+          lang,
         }),
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error ?? 'Phân tích thất bại')
+      if (!res.ok) throw new Error(data.error ?? t('notesAIInsights.analyzeFailed'))
 
       const result: AIInsights = data
       setHistory(prev => [result, ...prev].slice(0, 10))
       setViewIndex(0)
       setShowHistory(false)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Có lỗi khi phân tích. Vui lòng thử lại.')
+      setError(e instanceof Error ? e.message : t('notesAIInsights.analyzeError'))
     } finally {
       setLoading(false)
     }
@@ -262,13 +268,13 @@ export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note
           disabled={loading}
           className="flex-1 rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-700 focus:border-violet-400 focus:outline-none focus:ring-1 focus:ring-violet-400 disabled:opacity-60"
         >
-          <optgroup label="Theo tháng">
+          <optgroup label={t('notesAIInsights.byMonth')}>
             {months.map(o => {
               const idx = periodOptions.indexOf(o)
               return <option key={idx} value={idx}>{o.label}</option>
             })}
           </optgroup>
-          <optgroup label="Theo quý">
+          <optgroup label={t('notesAIInsights.byQuarter')}>
             {quarters.map(o => {
               const idx = periodOptions.indexOf(o)
               return <option key={idx} value={idx}>{o.label}</option>
@@ -278,7 +284,7 @@ export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note
 
         {/* Note count hint */}
         <span className="text-sm text-zinc-400">
-          {filteredNotes.length} notes
+          {t('notesAIInsights.notesCount', { n: filteredNotes.length })}
         </span>
 
         {/* Analyze button */}
@@ -290,20 +296,23 @@ export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note
           {loading
             ? <RefreshCw className="h-4 w-4 animate-spin" />
             : <Sparkles className="h-4 w-4" />}
-          {loading ? 'Đang phân tích...' : 'Phân tích AI'}
+          {loading ? t('notesAIInsights.analyzing') : t('notesAIInsights.analyzeAI')}
         </button>
       </div>
 
       {cooldown.isBlocked && (
         <p className="text-xs text-zinc-500">
-          Đã phân tích gần nhất lúc {latestAnalysis?.analyzedAt ? formatDateTime(latestAnalysis.analyzedAt) : '--'}. Có thể phân tích lại sau {cooldownLabel}.
+          {t('notesAIInsights.lastAnalyzed', {
+            time: latestAnalysis?.analyzedAt ? formatDateTime(latestAnalysis.analyzedAt, lang) : '--',
+            cooldown: cooldownLabel,
+          })}
         </p>
       )}
 
       {/* Empty period warning */}
       {filteredNotes.length === 0 && !loading && !fetching && (
         <p className="text-center text-sm text-zinc-400">
-          Không có dữ liệu ghi chú cho {selectedPeriod.label}.
+          {t('notesAIInsights.noDataForPeriod', { period: selectedPeriod.label })}
         </p>
       )}
 
@@ -355,7 +364,7 @@ export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note
                 <div className="mb-2 flex items-center justify-between gap-1">
                   <div className="flex items-center gap-1.5">
                     <Scale className="h-3.5 w-3.5 text-indigo-600" />
-                    <h4 className="text-sm font-semibold uppercase tracking-wide text-indigo-600">Cân nặng</h4>
+                    <h4 className="text-sm font-semibold uppercase tracking-wide text-indigo-600">{t('notesAIInsights.weightCard')}</h4>
                   </div>
                   <span className={`rounded-full px-2 py-0.5 text-xs font-medium leading-tight ${verdictBadge(viewed.weight.verdict)}`}>
                     {viewed.weight.verdict}
@@ -370,7 +379,7 @@ export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note
                 </ul>
                 {viewed.weight.next_target && (
                   <div className="rounded-lg bg-indigo-100/70 px-2.5 py-1.5 text-sm text-indigo-700">
-                    <span className="font-medium">Mục tiêu: </span>{viewed.weight.next_target}
+                    <span className="font-medium">{t('notesAIInsights.targetLabel')}</span>{viewed.weight.next_target}
                   </div>
                 )}
               </div>
@@ -382,7 +391,7 @@ export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note
                 <div className="mb-2 flex items-center justify-between gap-1">
                   <div className="flex items-center gap-1.5">
                     <Utensils className="h-3.5 w-3.5 text-amber-600" />
-                    <h4 className="text-sm font-semibold uppercase tracking-wide text-amber-600">Dinh dưỡng</h4>
+                    <h4 className="text-sm font-semibold uppercase tracking-wide text-amber-600">{t('notesAIInsights.nutritionCard')}</h4>
                   </div>
                   <span className={`rounded-full px-2 py-0.5 text-xs font-medium leading-tight ${verdictBadge(viewed.nutrition.verdict)}`}>
                     {viewed.nutrition.verdict}
@@ -398,12 +407,12 @@ export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note
                 <div className="space-y-1">
                   {viewed.nutrition.worst_day && (
                     <p className="text-sm text-amber-700">
-                      <span className="font-medium">Ngày yếu: </span>{viewed.nutrition.worst_day}
+                      <span className="font-medium">{t('notesAIInsights.worstDayLabel')}</span>{viewed.nutrition.worst_day}
                     </p>
                   )}
                   {viewed.nutrition.skip_habit && (
                     <p className="text-sm text-amber-700">
-                      <span className="font-medium">Bỏ bữa: </span>{viewed.nutrition.skip_habit}
+                      <span className="font-medium">{t('notesAIInsights.skipHabitLabel')}</span>{viewed.nutrition.skip_habit}
                     </p>
                   )}
                 </div>
@@ -415,7 +424,7 @@ export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note
               <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-3.5">
                 <div className="mb-2 flex items-center gap-1.5">
                   <BookOpen className="h-3.5 w-3.5 text-emerald-600" />
-                  <h4 className="text-sm font-semibold uppercase tracking-wide text-emerald-600">Ghi chú & Habit</h4>
+                  <h4 className="text-sm font-semibold uppercase tracking-wide text-emerald-600">{t('notesAIInsights.notesHabitsCard')}</h4>
                 </div>
                 <ul className="mb-2.5 space-y-1.5">
                   {viewed.notes_habits.points.map((p, i) => (
@@ -426,7 +435,7 @@ export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note
                 </ul>
                 {viewed.notes_habits.habit_gap && (
                   <div className="rounded-lg bg-emerald-100/70 px-2.5 py-1.5 text-sm text-emerald-700">
-                    <span className="font-medium">Habit gap: </span>{viewed.notes_habits.habit_gap}
+                    <span className="font-medium">{t('notesAIInsights.habitGapLabel')}</span>{viewed.notes_habits.habit_gap}
                   </div>
                 )}
               </div>
@@ -437,7 +446,7 @@ export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note
           <div className="rounded-xl border border-blue-100 bg-blue-50 p-4">
             <div className="mb-1.5 flex items-center gap-1.5">
               <Lightbulb className="h-3.5 w-3.5 text-blue-600" />
-              <h4 className="text-sm font-semibold uppercase tracking-wide text-blue-600">Gợi ý</h4>
+              <h4 className="text-sm font-semibold uppercase tracking-wide text-blue-600">{t('notesAIInsights.recommendationCard')}</h4>
             </div>
             <p className="text-base font-medium text-blue-900">{viewed.pattern}</p>
             <p className="mt-2 text-base text-blue-700">{viewed.recommendation}</p>
@@ -447,13 +456,13 @@ export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note
           {viewed.tokenUsage && (
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-zinc-100 bg-zinc-50 px-3 py-2 text-sm text-zinc-500">
               <span className="font-medium text-zinc-700">
-                🪙 {fmtN(viewed.tokenUsage.total)} tokens
+                {t('notesAIInsights.tokensLabel', { n: fmtN(viewed.tokenUsage.total, lang) })}
               </span>
               <span className="text-zinc-300">|</span>
-              <span>input {fmtN(viewed.tokenUsage.prompt)}</span>
+              <span>{t('notesAIInsights.inputTokens', { n: fmtN(viewed.tokenUsage.prompt, lang) })}</span>
               <span>·</span>
-              <span>output {fmtN(viewed.tokenUsage.completion)}</span>
-              <span className="ml-auto text-zinc-400">{formatDateTime(viewed.analyzedAt)}</span>
+              <span>{t('notesAIInsights.outputTokens', { n: fmtN(viewed.tokenUsage.completion, lang) })}</span>
+              <span className="ml-auto text-zinc-400">{formatDateTime(viewed.analyzedAt, lang)}</span>
             </div>
           )}
         </div>
@@ -468,7 +477,7 @@ export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note
           >
             <div className="flex items-center gap-1.5">
               <History className="h-3.5 w-3.5" />
-              Lịch sử phân tích ({history.length})
+              {t('notesAIInsights.historyHeading', { n: history.length })}
             </div>
             {showHistory ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
           </button>
@@ -494,13 +503,13 @@ export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note
                     <span className="w-24 shrink-0 text-zinc-400">—</span>
                   )}
 
-                  <span className="flex-1 text-zinc-400">{formatDateTime(item.analyzedAt)}</span>
+                  <span className="flex-1 text-zinc-400">{formatDateTime(item.analyzedAt, lang)}</span>
 
                   {item.tokenUsage && (
-                    <span className="text-zinc-400">🪙 {fmtN(item.tokenUsage.total)}</span>
+                    <span className="text-zinc-400">🪙 {fmtN(item.tokenUsage.total, lang)}</span>
                   )}
                   {idx === viewIndex && (
-                    <span className="rounded bg-violet-100 px-1.5 py-0.5 text-violet-600">đang xem</span>
+                    <span className="rounded bg-violet-100 px-1.5 py-0.5 text-violet-600">{t('notesAIInsights.currentlyViewing')}</span>
                   )}
                 </button>
               ))}

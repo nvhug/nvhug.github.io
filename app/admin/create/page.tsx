@@ -5,8 +5,10 @@ import { useRouter, useSearchParams } from 'next/navigation'
 
 import { supabase } from '@/lib/supabase'
 import PostForm, { PostFormValues } from '@/components/PostForm'
+import { useLanguage } from '@/lib/i18n/language-context'
 
 function CreatePostContent() {
+  const { t } = useLanguage()
   const router = useRouter()
   const searchParams = useSearchParams()
   const autotagName = searchParams.get('autotag') ?? undefined
@@ -51,7 +53,7 @@ function CreatePostContent() {
       router.push('/admin')
     } catch (error) {
       console.error('Error creating post:', error)
-      alert('Failed to create post. Please check the console for details.')
+      alert(t('admin.posts.createError'))
     } finally {
       setSubmitting(false)
     }

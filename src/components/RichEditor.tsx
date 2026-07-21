@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type Quill from 'quill'
 import 'quill/dist/quill.snow.css'
 import { uploadPostImage } from '@/lib/storage'
+import { useLanguage } from '@/lib/i18n/language-context'
 
 const TABLE_ROWS = 6
 const TABLE_COLS = 8
@@ -14,7 +15,7 @@ interface RichEditorProps {
   placeholder?: string
 }
 
-function imageHandler(quill: Quill) {
+function imageHandler(quill: Quill, uploadingLabel: string, uploadFailedMessage: string) {
   const input = document.createElement('input')
   input.setAttribute('type', 'file')
   input.setAttribute('accept', 'image/*')
@@ -25,17 +26,17 @@ function imageHandler(quill: Quill) {
     if (!file) return
 
     const range = quill.getSelection(true)
-    quill.insertText(range.index, 'Uploading image...', 'italic', true)
+    quill.insertText(range.index, uploadingLabel, 'italic', true)
 
     try {
       const url = await uploadPostImage(file)
-      quill.deleteText(range.index, 'Uploading image...'.length)
+      quill.deleteText(range.index, uploadingLabel.length)
       quill.insertEmbed(range.index, 'image', url, 'user')
       quill.setSelection(range.index + 1, 0)
     } catch (error) {
       console.error('Image upload failed:', error)
-      quill.deleteText(range.index, 'Uploading image...'.length)
-      alert('Tải ảnh lên thất bại. Vui lòng thử lại.')
+      quill.deleteText(range.index, uploadingLabel.length)
+      alert(uploadFailedMessage)
     }
   }
 }
@@ -56,8 +57,10 @@ function buildTableHtml(rows: number, cols: number): string {
 export default function RichEditor({
   value,
   onChange,
-  placeholder = 'Start typing...',
+  placeholder: placeholderProp,
 }: RichEditorProps) {
+  const { t } = useLanguage()
+  const placeholder = placeholderProp ?? t('richEditor.defaultPlaceholder')
   const containerRef = useRef<HTMLDivElement>(null)
   const wrapperRef = useRef<HTMLDivElement>(null)
   const quillRef = useRef<Quill | null>(null)
@@ -115,7 +118,7 @@ export default function RichEditor({
               ['clean'],
             ],
             handlers: {
-              image: () => imageHandler(quill),
+              image: () => imageHandler(quill, t('richEditor.uploadingImage'), t('richEditor.uploadFailed')),
             },
           },
           clipboard: {
@@ -137,7 +140,7 @@ export default function RichEditor({
       const btn = document.createElement('button')
       btn.type = 'button'
       btn.className = 'ql-table-insert'
-      btn.title = 'Insert Table'
+      btn.title = t('richEditor.insertTable')
       btn.innerHTML = `<svg viewBox="0 0 18 18" width="16" height="16">
         <rect class="ql-stroke" x="2" y="3" width="14" height="12"/>
         <line class="ql-stroke" x1="6" x2="6" y1="3" y2="15"/>
@@ -190,7 +193,7 @@ export default function RichEditor({
           style={{ top: pickerPos.top, left: pickerPos.left }}
         >
           <p className="mb-1.5 text-center text-xs text-slate-400">
-            {hovered.rows} × {hovered.cols} table
+            {t('richEditor.tableSizeLabel', { rows: hovered.rows, cols: hovered.cols })}
           </p>
           <div
             className="grid gap-0.5"

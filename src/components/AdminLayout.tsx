@@ -27,30 +27,33 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-
-const menuItems = [
-  {
-    title: 'Posts',
-    description: 'Manage articles',
-    icon: FileText,
-    href: '/admin',
-  },
-  {
-    title: 'Tags',
-    description: 'Organize topics',
-    icon: Tag,
-    href: '/admin/tags',
-  },
-  {
-    title: 'Templates',
-    description: 'Appearance & layout',
-    icon: LayoutTemplate,
-    href: '/admin/templates',
-  },
-]
+import { LanguageSwitch } from '@/components/LanguageSwitch'
+import { useLanguage } from '@/lib/i18n/language-context'
 
 export function AdminSidebar() {
+  const { t } = useLanguage()
   const pathname = usePathname()
+
+  const menuItems = [
+    {
+      title: t('admin.sidebar.postsTitle'),
+      description: t('admin.sidebar.postsDesc'),
+      icon: FileText,
+      href: '/admin',
+    },
+    {
+      title: t('admin.sidebar.tagsTitle'),
+      description: t('admin.sidebar.tagsDesc'),
+      icon: Tag,
+      href: '/admin/tags',
+    },
+    {
+      title: t('admin.sidebar.templatesTitle'),
+      description: t('admin.sidebar.templatesDesc'),
+      icon: LayoutTemplate,
+      href: '/admin/templates',
+    },
+  ]
 
   const activeHref = [...menuItems]
     .sort((a, b) => b.href.length - a.href.length)
@@ -61,7 +64,7 @@ export function AdminSidebar() {
       <SidebarHeader className="border-b border-emerald-100 px-4 py-3">
         <Link href="/" className="group inline-flex items-center gap-1.5 text-sm font-medium text-zinc-500 transition-colors hover:text-emerald-600">
           <ArrowUpRight className="h-3.5 w-3.5 rotate-225" />
-          Home
+          {t('header.navHome')}
         </Link>
       </SidebarHeader>
       <SidebarContent className="px-3 py-4">
@@ -101,6 +104,8 @@ export function AdminSidebar() {
 }
 
 export function AdminTopBar() {
+  const { t } = useLanguage()
+
   async function handleLogout() {
     await fetch('/api/logout', { method: 'POST' })
     window.location.href = '/login'
@@ -112,29 +117,33 @@ export function AdminTopBar() {
         <div className="flex items-center gap-2">
           <SidebarTrigger className="rounded-lg border border-emerald-200 bg-white text-zinc-700 hover:bg-emerald-50 hover:text-zinc-900" />
           <div>
-            <h1 className="font-poppins text-lg font-semibold leading-tight text-zinc-900 md:text-xl">Admin</h1>
-            <p className="text-xs text-zinc-500">Content publishing workspace</p>
+            <h1 className="font-poppins text-lg font-semibold leading-tight text-zinc-900 md:text-xl">{t('header.admin')}</h1>
+            <p className="text-xs text-zinc-500">{t('admin.topbar.subtitle')}</p>
           </div>
         </div>
 
         <div className="hidden rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 md:block">
-          Live editing enabled
+          {t('admin.topbar.liveEditing')}
         </div>
 
-        <DropdownMenu>
-          <DropdownMenuTrigger className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-white px-2.5 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-emerald-50 hover:text-zinc-900">
-            <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-linear-to-r from-emerald-500 to-emerald-600 text-white">
-              <User className="h-4 w-4" />
-            </span>
-            <span className="hidden md:inline">Account</span>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="border border-emerald-100 bg-white text-zinc-900">
-            <DropdownMenuItem onClick={handleLogout}>
-              <LogOut className="h-4 w-4" />
-              Logout
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <div className="flex items-center gap-2">
+          <LanguageSwitch />
+
+          <DropdownMenu>
+            <DropdownMenuTrigger className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-white px-2.5 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-emerald-50 hover:text-zinc-900">
+              <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-linear-to-r from-emerald-500 to-emerald-600 text-white">
+                <User className="h-4 w-4" />
+              </span>
+              <span className="hidden md:inline">{t('header.accountLabel')}</span>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="border border-emerald-100 bg-white text-zinc-900">
+              <DropdownMenuItem onClick={handleLogout}>
+                <LogOut className="h-4 w-4" />
+                {t('header.logout')}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
     </div>
   )

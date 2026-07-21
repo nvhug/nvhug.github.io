@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { LayoutTemplate, Check } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
+import { useLanguage } from '@/lib/i18n/language-context'
 
 const TEMPLATES = [
   { id: 'parchment', label: 'Parchment' },
@@ -21,6 +22,7 @@ interface Props {
 }
 
 export function FloatingTemplateSwitch({ postId, current }: Props) {
+  const { t } = useLanguage()
   const [open, setOpen] = useState(false)
   const [saving, setSaving] = useState(false)
 
@@ -32,10 +34,10 @@ export function FloatingTemplateSwitch({ postId, current }: Props) {
       .update({ template: templateId })
       .eq('id', postId)
     if (error) {
-      toast.error('Cập nhật thất bại')
+      toast.error(t('floatingTemplateSwitch.updateFailed'))
       setSaving(false)
     } else {
-      toast.success(`Template: ${templateId}`)
+      toast.success(t('floatingTemplateSwitch.templateApplied', { id: templateId }))
       window.location.reload()
     }
   }
@@ -65,7 +67,7 @@ export function FloatingTemplateSwitch({ postId, current }: Props) {
 
       <button
         onClick={() => setOpen((o) => !o)}
-        title="Change template"
+        title={t('floatingTemplateSwitch.changeTemplate')}
         className="flex h-9 w-9 items-center justify-center rounded-full bg-zinc-900/80 text-white shadow-lg backdrop-blur transition-colors hover:bg-zinc-900"
       >
         <LayoutTemplate className="h-4 w-4" />

@@ -4,8 +4,10 @@ import Link from 'next/link'
 import { Post } from '@/types'
 import { formatDate } from '@/lib/utils'
 import { ArrowUpRight } from 'lucide-react'
+import { useLanguage } from '@/lib/i18n/language-context'
 
 export function RelatedPosts({ posts }: { posts: Post[] }) {
+  const { t } = useLanguage()
   if (posts.length === 0) return null
 
   return (
@@ -13,7 +15,7 @@ export function RelatedPosts({ posts }: { posts: Post[] }) {
       <div className="py-10">
         <div className="mx-auto max-w-3xl px-4 sm:px-6">
           <p className="mb-5 text-[11px] font-semibold uppercase tracking-[0.2em] text-zinc-400">
-            Bài viết khác
+            {t('relatedPosts.heading')}
           </p>
         </div>
 

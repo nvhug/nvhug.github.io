@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { getSupabaseBrowserClient } from '@/lib/supabase-browser'
+import { useLanguage } from '@/lib/i18n/language-context'
 
 // ── Icons ────────────────────────────────────────────────────
 
@@ -28,6 +29,7 @@ function FacebookIcon() {
 // ── Step 2: OAuth buttons ─────────────────────────────────────
 
 function OAuthStep({ redirect }: { redirect: string }) {
+  const { t } = useLanguage()
   const [loading, setLoading] = useState<'google' | 'facebook' | null>(null)
   const [error, setError] = useState('')
 
@@ -42,7 +44,7 @@ function OAuthStep({ redirect }: { redirect: string }) {
       },
     })
     if (oauthError) {
-      setError('Đăng nhập thất bại. Vui lòng thử lại.')
+      setError(t('login.oauthError'))
       setLoading(null)
     }
   }
@@ -55,8 +57,8 @@ function OAuthStep({ redirect }: { redirect: string }) {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
           </svg>
         </div>
-        <h2 className="font-poppins text-xl font-semibold text-zinc-900">Chọn tài khoản</h2>
-        <p className="mt-1 text-sm text-zinc-500">Bước 2/2 — Đăng nhập để truy cập</p>
+        <h2 className="font-poppins text-xl font-semibold text-zinc-900">{t('login.oauthHeading')}</h2>
+        <p className="mt-1 text-sm text-zinc-500">{t('login.oauthStep')}</p>
       </div>
 
       <div className="space-y-3">
@@ -67,7 +69,7 @@ function OAuthStep({ redirect }: { redirect: string }) {
           className="inline-flex h-11 w-full items-center justify-center gap-3 rounded-xl border border-zinc-200 bg-white px-4 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60"
         >
           <GoogleIcon />
-          {loading === 'google' ? 'Đang chuyển hướng...' : 'Tiếp tục với Google'}
+          {loading === 'google' ? t('login.redirecting') : t('login.continueWithGoogle')}
         </button>
 
         <button
@@ -77,7 +79,7 @@ function OAuthStep({ redirect }: { redirect: string }) {
           className="inline-flex h-11 w-full items-center justify-center gap-3 rounded-xl border border-zinc-200 bg-white px-4 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60"
         >
           <FacebookIcon />
-          {loading === 'facebook' ? 'Đang chuyển hướng...' : 'Tiếp tục với Facebook'}
+          {loading === 'facebook' ? t('login.redirecting') : t('login.continueWithFacebook')}
         </button>
       </div>
 
@@ -93,6 +95,7 @@ function OAuthStep({ redirect }: { redirect: string }) {
 // ── Step 1: PIN form ──────────────────────────────────────────
 
 function PinStep({ redirect, onSuccess }: { redirect: string; onSuccess: () => void }) {
+  const { t } = useLanguage()
   const [pin, setPin] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -119,7 +122,7 @@ function PinStep({ redirect, onSuccess }: { redirect: string; onSuccess: () => v
 
     inFlightRef.current = false
     setLoading(false)
-    if (!silentError) setError('Sai mã PIN')
+    if (!silentError) setError(t('login.pinError'))
     return false
   }, [onSuccess])
 
@@ -143,8 +146,8 @@ function PinStep({ redirect, onSuccess }: { redirect: string; onSuccess: () => v
   return (
     <div className="space-y-6">
       <div className="text-center">
-        <h1 className="font-poppins text-2xl font-semibold text-zinc-900">Truy cập</h1>
-        <p className="mt-1 text-sm text-zinc-500">Bước 1/2 — Nhập mã PIN để tiếp tục</p>
+        <h1 className="font-poppins text-2xl font-semibold text-zinc-900">{t('login.pinHeading')}</h1>
+        <p className="mt-1 text-sm text-zinc-500">{t('login.pinStep')}</p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-3">
@@ -169,7 +172,7 @@ function PinStep({ redirect, onSuccess }: { redirect: string; onSuccess: () => v
           disabled={!pin.trim() || loading}
           className="inline-flex h-11 w-full items-center justify-center rounded-xl bg-linear-to-r from-emerald-500 to-emerald-600 text-sm font-semibold text-white transition-all hover:from-emerald-400 hover:to-emerald-500 disabled:cursor-not-allowed disabled:opacity-55"
         >
-          {loading ? 'Đang kiểm tra...' : 'Tiếp tục'}
+          {loading ? t('login.checking') : t('login.continue')}
         </button>
       </form>
     </div>

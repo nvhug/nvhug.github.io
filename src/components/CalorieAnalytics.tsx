@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useCalorieGoal } from '@/lib/useCalorieGoal'
+import { useLanguage } from '@/lib/i18n/language-context'
 const BAR_W = 22
 const SLOT = 30
 const TOP_PAD = 8
@@ -29,6 +30,7 @@ function fmtKcal(val: number): string {
 type DayData = { date: string; calories: number }
 
 export function CalorieAnalytics() {
+  const { t } = useLanguage()
   const { goal: DAILY_GOAL } = useCalorieGoal()
   const [allDays, setAllDays] = useState<DayData[]>([])
   const [loading, setLoading] = useState(true)
@@ -71,7 +73,7 @@ export function CalorieAnalytics() {
     }
   }, [allDays])
 
-  if (loading) return <p className="py-4 text-center text-xs text-zinc-400">Đang tải phân tích...</p>
+  if (loading) return <p className="py-4 text-center text-xs text-zinc-400">{t('calorieAnalytics.loadingAnalysis')}</p>
 
   const avgCalories = allDays.length > 0
     ? Math.round(allDays.reduce((s, d) => s + d.calories, 0) / allDays.length)
@@ -95,19 +97,19 @@ export function CalorieAnalytics() {
       {/* Stat cards */}
       <div className="grid grid-cols-3 gap-2 sm:gap-3">
         <div className="rounded-xl border border-emerald-100 bg-white p-3 text-center shadow-[0_1px_4px_0_rgba(16,185,129,0.06)]">
-          <p className="text-xs text-zinc-500">TB / ngày</p>
+          <p className="text-xs text-zinc-500">{t('calorieAnalytics.avgPerDay')}</p>
           <p className="mt-1 text-lg font-semibold leading-none text-emerald-600 sm:text-xl">
             {avgCalories > 0 ? avgCalories.toLocaleString() : '–'}
           </p>
           <p className="mt-0.5 text-xs text-zinc-400">kcal</p>
         </div>
         <div className="rounded-xl border border-emerald-100 bg-white p-3 text-center shadow-[0_1px_4px_0_rgba(16,185,129,0.06)]">
-          <p className="text-xs text-zinc-500">Đạt mục tiêu</p>
+          <p className="text-xs text-zinc-500">{t('calorieAnalytics.goalReached')}</p>
           <p className="mt-1 text-lg font-semibold leading-none text-emerald-600 sm:text-xl">{daysOnGoal}</p>
-          <p className="mt-0.5 text-xs text-zinc-400">/ {allDays.length} ngày</p>
+          <p className="mt-0.5 text-xs text-zinc-400">{t('calorieAnalytics.perDays', { n: allDays.length })}</p>
         </div>
         <div className="rounded-xl border border-orange-100 bg-white p-3 text-center shadow-[0_1px_4px_0_rgba(234,88,12,0.06)]">
-          <p className="text-xs text-zinc-500">Cao nhất</p>
+          <p className="text-xs text-zinc-500">{t('calorieAnalytics.highest')}</p>
           <p className="mt-1 text-lg font-semibold leading-none text-orange-500 sm:text-xl">
             {bestDay.calories > 0 ? bestDay.calories.toLocaleString() : '–'}
           </p>
@@ -120,11 +122,11 @@ export function CalorieAnalytics() {
       {/* Column chart */}
       <div className="rounded-xl border border-emerald-100 bg-white p-4 shadow-[0_1px_4px_0_rgba(16,185,129,0.06)]">
         <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-zinc-500">
-          Tất cả ngày ghi nhận
+          {t('calorieAnalytics.allDaysRecorded')}
         </p>
 
         {allDays.length === 0 ? (
-          <p className="text-xs italic text-zinc-400">Chưa có dữ liệu.</p>
+          <p className="text-xs italic text-zinc-400">{t('calorieAnalytics.noData')}</p>
         ) : (
           <div className="flex">
             {/* Fixed Y-axis */}
@@ -243,7 +245,7 @@ export function CalorieAnalytics() {
         )}
 
         <p className="mt-2 text-right text-[11px] text-zinc-400">
-          — đường kẻ = mục tiêu {DAILY_GOAL.toLocaleString()} kcal
+          {t('calorieAnalytics.goalLineFootnote', { goal: DAILY_GOAL.toLocaleString() })}
         </p>
       </div>
     </div>
