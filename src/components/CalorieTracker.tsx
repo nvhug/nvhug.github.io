@@ -20,6 +20,11 @@ function currentTimeStr() {
   return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
 }
 
+function timeStrFromISO(iso: string) {
+  const d = new Date(iso)
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+
 export function CalorieTracker() {
   const { t, lang } = useLanguage()
   const [foodTemplates, setFoodTemplates] = useState<FoodTemplate[]>([])
@@ -43,6 +48,7 @@ export function CalorieTracker() {
   // Edit state
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingData, setEditingData] = useState<Partial<DailyFood> | null>(null)
+  const [editingTime, setEditingTime] = useState('')
 
   async function fetchFoodTemplates() {
     try {
@@ -162,6 +168,7 @@ export function CalorieTracker() {
       ...food,
       custom_food_name: food.custom_food_name ?? template?.name ?? '',
     })
+    setEditingTime(timeStrFromISO(food.created_at))
   }
 
   async function updateFood(food: DailyFood) {
@@ -174,6 +181,7 @@ export function CalorieTracker() {
         total_calories: editingData.total_calories,
         quantity: editingData.quantity,
         notes: editingData.notes,
+        created_at: new Date(`${food.date}T${editingTime}:00`).toISOString(),
       }).eq('id', food.id)
 
       if (error) throw error
@@ -423,9 +431,18 @@ export function CalorieTracker() {
                           step="1"
                         />
                         <span className="text-xs text-zinc-600">kcal</span>
+                        <div className="flex items-center gap-1 rounded border border-emerald-300 px-1.5 py-1">
+                          <Clock className="h-3 w-3 text-zinc-400 shrink-0" />
+                          <input
+                            type="time"
+                            value={editingTime}
+                            onChange={(e) => setEditingTime(e.target.value)}
+                            className="text-sm text-zinc-900 outline-none bg-transparent"
+                          />
+                        </div>
                         <div className="ml-auto flex items-center gap-1">
                           <button
-                            onClick={() => { setEditingId(null); setEditingData(null) }}
+                            onClick={() => { setEditingId(null); setEditingData(null); setEditingTime('') }}
                             className="flex items-center gap-1 rounded px-2 py-1 text-xs text-zinc-500 hover:bg-white transition-colors"
                           >
                             <X className="h-3.5 w-3.5" /> {t('common.cancel')}
