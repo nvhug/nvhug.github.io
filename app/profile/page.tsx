@@ -115,14 +115,14 @@ export default function ProfilePage() {
               <>
                 <button
                   onClick={cancelEdit}
-                  className="flex items-center gap-1 rounded-lg border border-zinc-200 bg-white px-2.5 py-1.5 text-xs font-medium text-zinc-600 shadow-sm hover:bg-zinc-50 transition-colors"
+                  className="flex items-center gap-1 rounded-lg border border-zinc-200 bg-white px-2.5 py-2.5 text-xs font-medium text-zinc-600 shadow-sm hover:bg-zinc-50 transition-colors sm:py-1.5"
                 >
                   <X className="h-3.5 w-3.5" /> {t('common.cancel')}
                 </button>
                 <button
                   onClick={() => void saveAll()}
                   disabled={saving}
-                  className="flex items-center gap-1 rounded-lg bg-emerald-500 px-2.5 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-emerald-600 transition-colors disabled:opacity-50"
+                  className="flex items-center gap-1 rounded-lg bg-emerald-500 px-2.5 py-2.5 text-xs font-medium text-white shadow-sm hover:bg-emerald-600 transition-colors disabled:opacity-50 sm:py-1.5"
                 >
                   <Check className="h-3.5 w-3.5" /> {saving ? t('common.saving') : t('common.save')}
                 </button>
@@ -130,7 +130,7 @@ export default function ProfilePage() {
             ) : (
               <button
                 onClick={enterEdit}
-                className="flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-white px-2.5 py-1.5 text-xs font-medium text-zinc-600 shadow-sm hover:bg-emerald-50 hover:text-emerald-700 transition-colors"
+                className="flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-white px-2.5 py-2.5 text-xs font-medium text-zinc-600 shadow-sm hover:bg-emerald-50 hover:text-emerald-700 transition-colors sm:py-1.5"
                 title={t('profile.editTitle')}
               >
                 <Pencil className="h-3.5 w-3.5" />

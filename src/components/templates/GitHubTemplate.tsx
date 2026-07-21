@@ -47,7 +47,7 @@ export function GitHubTemplate({
             </div>
 
             {/* Rendered markdown content */}
-            <div className="px-8 py-8">
+            <div className="px-5 py-8 sm:px-8">
               <div id="article-content" className="tpl-content">
                 <div dangerouslySetInnerHTML={{ __html: processedContent }} />
               </div>

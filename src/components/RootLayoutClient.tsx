@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LogOut, Settings, User as UserIcon } from 'lucide-react'
+import { LogOut, Menu, Settings, User as UserIcon, X } from 'lucide-react'
 import { Toaster } from 'sonner'
 import { useEffect, useRef, useState } from 'react'
 import { getSupabaseBrowserClient } from '@/lib/supabase-browser'
@@ -40,7 +40,7 @@ function AccountMenu({ user, onLogout }: { user: User; onLogout: () => void }) {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full bg-emerald-500 text-sm font-semibold text-white select-none ring-2 ring-transparent transition-all hover:ring-white hover:ring-offset-1"
+        className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-full bg-emerald-500 text-sm font-semibold text-white select-none ring-2 ring-transparent transition-all hover:ring-white hover:ring-offset-1 sm:h-8 sm:w-8"
         aria-label={t('header.accountLabel')}
         aria-expanded={open}
       >
@@ -116,6 +116,8 @@ export function RootLayoutClient({ children }: { children: React.ReactNode }) {
   const hideSiteChrome = isAdmin || isLogin
 
   const [user, setUser] = useState<User | null>(null)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const headerRef = useRef<HTMLElement>(null)
 
   useEffect(() => {
     const supabase = getSupabaseBrowserClient()
@@ -128,6 +130,25 @@ export function RootLayoutClient({ children }: { children: React.ReactNode }) {
     )
     return () => subscription.unsubscribe()
   }, [])
+
+  useEffect(() => {
+    setMobileMenuOpen(false)
+  }, [pathname])
+
+  useEffect(() => {
+    if (!mobileMenuOpen) return
+    function handleOutside(e: MouseEvent | TouchEvent) {
+      if (headerRef.current && !headerRef.current.contains(e.target as Node)) {
+        setMobileMenuOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleOutside)
+    document.addEventListener('touchstart', handleOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleOutside)
+      document.removeEventListener('touchstart', handleOutside)
+    }
+  }, [mobileMenuOpen])
 
   const navItems = [
     { href: '/', label: t('header.navHome') },
@@ -143,29 +164,31 @@ export function RootLayoutClient({ children }: { children: React.ReactNode }) {
   return (
     <>
       {!hideSiteChrome && (
-        <header className="site-header fixed inset-x-0 top-0 z-50 border-b border-emerald-100/80 bg-white/88 backdrop-blur-md">
+        <header ref={headerRef} className="site-header fixed inset-x-0 top-0 z-50 border-b border-emerald-100/80 bg-white/88 backdrop-blur-md">
           <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-3 sm:px-6">
-            <Link href="/" className="hidden font-poppins text-xl font-semibold tracking-tight text-zinc-900 sm:block">
+            <Link href="/" className="font-poppins text-xl font-semibold tracking-tight text-zinc-900">
               nvhug
             </Link>
 
             <div className="flex items-center gap-1">
-              {navItems.map((item) => {
-                const isActive = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href)
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                      isActive
-                        ? 'bg-emerald-100 text-emerald-700'
-                        : 'text-zinc-600 hover:bg-emerald-50 hover:text-zinc-900'
-                    }`}
-                  >
-                    {item.label}
-                  </Link>
-                )
-              })}
+              <div className="hidden items-center gap-1 sm:flex">
+                {navItems.map((item) => {
+                  const isActive = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href)
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                        isActive
+                          ? 'bg-emerald-100 text-emerald-700'
+                          : 'text-zinc-600 hover:bg-emerald-50 hover:text-zinc-900'
+                      }`}
+                    >
+                      {item.label}
+                    </Link>
+                  )
+                })}
+              </div>
 
               <div className="ml-1">
                 <LanguageSwitch />
@@ -177,14 +200,49 @@ export function RootLayoutClient({ children }: { children: React.ReactNode }) {
                 <button
                   type="button"
                   onClick={handleLogout}
-                  className="ml-1 rounded-lg p-1.5 text-zinc-500 transition-colors hover:bg-emerald-50 hover:text-zinc-900"
+                  className="ml-1 flex h-10 w-10 items-center justify-center rounded-lg text-zinc-500 transition-colors hover:bg-emerald-50 hover:text-zinc-900 sm:h-auto sm:w-auto sm:p-1.5"
                   aria-label={t('header.logout')}
                 >
                   <LogOut className="h-4 w-4" />
                 </button>
               )}
+
+              <button
+                type="button"
+                onClick={() => setMobileMenuOpen((v) => !v)}
+                className="ml-1 flex h-10 w-10 items-center justify-center rounded-lg text-zinc-600 transition-colors hover:bg-emerald-50 hover:text-zinc-900 sm:hidden"
+                aria-label={t('header.menuLabel')}
+                aria-expanded={mobileMenuOpen}
+              >
+                {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+              </button>
             </div>
           </div>
+
+          {/* Mobile nav list — toggled by the hamburger icon */}
+          {mobileMenuOpen && (
+            <nav className="border-t border-emerald-100/80 bg-white/95 px-4 py-2 backdrop-blur-md sm:hidden">
+              <div className="mx-auto flex w-full max-w-6xl flex-col gap-1">
+                {navItems.map((item) => {
+                  const isActive = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href)
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      onClick={() => setMobileMenuOpen(false)}
+                      className={`rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+                        isActive
+                          ? 'bg-emerald-100 text-emerald-700'
+                          : 'text-zinc-600 hover:bg-emerald-50 hover:text-zinc-900'
+                      }`}
+                    >
+                      {item.label}
+                    </Link>
+                  )
+                })}
+              </div>
+            </nav>
+          )}
         </header>
       )}
       {children}

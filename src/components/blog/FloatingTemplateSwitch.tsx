@@ -43,7 +43,7 @@ export function FloatingTemplateSwitch({ postId, current }: Props) {
   }
 
   return (
-    <div className="fixed bottom-6 right-20 z-50 flex flex-col items-end gap-2">
+    <div className="fixed bottom-5 right-5 z-50 flex flex-col items-end gap-2 sm:bottom-6 sm:right-20">
       {open && (
         <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-xl">
           {TEMPLATES.map((tpl) => {
@@ -68,7 +68,7 @@ export function FloatingTemplateSwitch({ postId, current }: Props) {
       <button
         onClick={() => setOpen((o) => !o)}
         title={t('floatingTemplateSwitch.changeTemplate')}
-        className="flex h-9 w-9 items-center justify-center rounded-full bg-zinc-900/80 text-white shadow-lg backdrop-blur transition-colors hover:bg-zinc-900"
+        className="flex h-11 w-11 items-center justify-center rounded-full bg-zinc-900/80 text-white shadow-lg backdrop-blur transition-colors hover:bg-zinc-900 sm:h-9 sm:w-9"
       >
         <LayoutTemplate className="h-4 w-4" />
       </button>

@@ -263,7 +263,7 @@ export default function QuotesPage() {
                         placeholder={t('quotes.authorPlaceholder')}
                         className="border-emerald-200 bg-white text-zinc-900"
                       />
-                      <div className="flex justify-end gap-1">
+                      <div className="flex justify-end gap-2 sm:gap-1">
                         <Button
                           variant="ghost"
                           size="icon-sm"
@@ -286,7 +286,7 @@ export default function QuotesPage() {
                           <p className="mt-1 text-xs text-zinc-600">— {quote.author}</p>
                         )}
                       </div>
-                      <div className="flex shrink-0 items-center gap-1">
+                      <div className="flex shrink-0 items-center gap-2 sm:gap-1">
                         <Button
                           variant="ghost"
                           size="icon-sm"
