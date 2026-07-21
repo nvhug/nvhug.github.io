@@ -29,7 +29,7 @@ export const en: Dictionary = {
   },
 
   footer: {
-    copyright: '© 2026 nvhug. Writing about code, ideas, and everyday learning.',
+    copyright: '© 2026 nvhug. Sharing ideas and everyday learning.',
   },
 
   home: {
@@ -602,5 +602,29 @@ export const en: Dictionary = {
       tagsHeading: 'Tags',
       noTags: 'No tags yet.',
     },
+  },
+
+  bugReport: {
+    buttonLabel: 'Report bug / Feedback',
+    modalTitle: 'Report a bug or suggest an improvement?',
+    typeBug: 'Report a bug',
+    typeFeature: 'Feature idea',
+    descriptionLabel: 'Details',
+    descriptionPlaceholderBug: 'Describe the bug you ran into...',
+    descriptionPlaceholderFeature: 'Describe the feature or improvement you would like...',
+    imageLabel: 'Screenshot (optional, max 3MB)',
+    imageRemove: 'Remove image',
+    captchaLabel: 'Drag to complete the puzzle',
+    captchaVerifiedLabel: 'Verified',
+    captchaRefreshLabel: 'Try a different puzzle',
+    submit: 'Send',
+    submitting: 'Sending...',
+    successMessage: 'Report sent, thank you!',
+    errorGeneric: 'Failed to send report, please try again.',
+    errorDescriptionRequired: 'Please enter some details.',
+    errorDescriptionTooShort: 'Description is too short or not meaningful — please add more detail (at least 10 meaningful characters).',
+    errorImageType: 'The attached file must be an image.',
+    errorImageSize: 'Image exceeds 3MB.',
+    errorCaptcha: 'Please complete the puzzle slider to verify you are not a robot.',
   },
 }

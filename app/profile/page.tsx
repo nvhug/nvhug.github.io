@@ -6,6 +6,7 @@ import { Check, Pencil, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { getSupabaseBrowserClient } from '@/lib/supabase-browser'
 import { useLanguage } from '@/lib/i18n/language-context'
+import { getAvatarLetter } from '@/lib/avatar'
 import type { User } from '@supabase/supabase-js'
 
 type ProfileData = {
@@ -95,7 +96,7 @@ export default function ProfilePage() {
   }
 
   const displayName = user?.user_metadata?.full_name as string | undefined
-  const avatarLetter = (displayName?.trim()[0] ?? user?.email?.[0] ?? '?').toUpperCase()
+  const avatarLetter = user ? getAvatarLetter(user) : '?'
   const email = user?.email ?? ''
 
   const inputCls = 'w-full rounded-lg border border-emerald-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:ring-1 focus:ring-emerald-400 resize-none'

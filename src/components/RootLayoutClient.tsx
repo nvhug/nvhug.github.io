@@ -8,43 +8,21 @@ import { useEffect, useState } from 'react'
 import { getSupabaseBrowserClient } from '@/lib/supabase-browser'
 import { useLanguage } from '@/lib/i18n/language-context'
 import { LanguageSwitch } from '@/components/LanguageSwitch'
+import { BugReportButton } from '@/components/BugReportButton'
+import { getAvatarLetter, getAvatarLabel } from '@/lib/avatar'
 import type { User } from '@supabase/supabase-js'
-
-const AVATAR_COLORS = [
-  'bg-rose-500', 'bg-orange-500', 'bg-amber-500', 'bg-lime-600',
-  'bg-emerald-500', 'bg-teal-500', 'bg-cyan-600', 'bg-blue-500',
-  'bg-violet-500', 'bg-purple-500', 'bg-pink-500', 'bg-indigo-500',
-]
-
-function avatarColor(seed: string) {
-  let hash = 0
-  for (let i = 0; i < seed.length; i++) hash = seed.charCodeAt(i) + ((hash << 5) - hash)
-  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length]
-}
-
-function avatarLetter(user: User) {
-  const name = user.user_metadata?.full_name as string | undefined
-  if (name?.trim()) return name.trim()[0].toUpperCase()
-  return (user.email ?? '?')[0].toUpperCase()
-}
-
-function avatarLabel(user: User) {
-  const name = user.user_metadata?.full_name as string | undefined
-  return name?.trim() || user.email || ''
-}
 
 function AccountMenu({ user, onLogout }: { user: User; onLogout: () => void }) {
   const { t } = useLanguage()
-  const letter = avatarLetter(user)
-  const color = avatarColor(user.email ?? user.id)
-  const label = avatarLabel(user)
+  const letter = getAvatarLetter(user)
+  const label = getAvatarLabel(user)
 
   return (
     <div className="group relative ml-2">
       {/* Avatar trigger */}
       <button
         type="button"
-        className={`flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full text-sm font-semibold text-white select-none ring-2 ring-transparent transition-all group-hover:ring-white group-hover:ring-offset-1 ${color}`}
+        className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full bg-emerald-500 text-sm font-semibold text-white select-none ring-2 ring-transparent transition-all group-hover:ring-white group-hover:ring-offset-1"
         aria-label={t('header.accountLabel')}
       >
         {letter}
@@ -57,7 +35,7 @@ function AccountMenu({ user, onLogout }: { user: User; onLogout: () => void }) {
           {/* User info */}
           <div className="border-b border-zinc-100 px-4 py-3">
             <div className="flex items-center gap-2.5">
-              <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold text-white ${color}`}>
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-sm font-semibold text-white">
                 {letter}
               </div>
               <div className="min-w-0">
@@ -185,6 +163,7 @@ export function RootLayoutClient({ children }: { children: React.ReactNode }) {
       )}
       {children}
       <Toaster position="top-right" richColors />
+      <BugReportButton />
       {!hideSiteChrome && (
         <div className="border-t border-emerald-100 bg-white">
           <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-10 sm:px-6">

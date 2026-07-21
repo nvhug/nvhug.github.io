@@ -10,6 +10,22 @@
   .bg-current {
     background-color: #f7f4ed;
   }
+
+  @keyframes slider-hint {
+    0%, 100% { transform: translateX(0); opacity: 0.55; }
+    50% { transform: translateX(5px); opacity: 1; }
+  }
+  .animate-slider-hint {
+    animation: slider-hint 1.3s ease-in-out infinite;
+  }
+
+  @keyframes shimmer-sweep {
+    0% { transform: translateX(-120%); }
+    100% { transform: translateX(320%); }
+  }
+  .animate-shimmer-sweep {
+    animation: shimmer-sweep 2.4s ease-in-out infinite;
+  }
 }
 
 @layer base {
