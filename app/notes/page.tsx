@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import {
   Bell,
   Check,
@@ -24,6 +24,8 @@ import {
 import { toast } from 'sonner'
 
 import { supabase } from '@/lib/supabase'
+import { getSupabaseBrowserClient } from '@/lib/supabase-browser'
+import { useCalorieGoal } from '@/lib/useCalorieGoal'
 import { Note, Todo, Goal, GoalItem, Post } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -40,9 +42,18 @@ type TypeFilter = 'all' | 'good' | 'bad'
 type TabType = 'notes' | 'todos' | 'goals' | 'calo' | 'meals' | 'health' | 'stats' | 'weight'
 
 const VALID_TABS: TabType[] = ['notes', 'todos', 'goals', 'calo', 'meals', 'health', 'stats', 'weight']
+const TAB_CHANGE_EVENT = 'tab-hash-change'
 
-function getInitialTab(): TabType {
-  if (typeof window === 'undefined') return 'notes'
+function subscribeToTabHash(callback: () => void) {
+  window.addEventListener(TAB_CHANGE_EVENT, callback)
+  window.addEventListener('hashchange', callback)
+  return () => {
+    window.removeEventListener(TAB_CHANGE_EVENT, callback)
+    window.removeEventListener('hashchange', callback)
+  }
+}
+
+function getTabFromHash(): TabType {
   const hash = window.location.hash.slice(1) as TabType
   return VALID_TABS.includes(hash) ? hash : 'notes'
 }
@@ -120,11 +131,15 @@ type GoalDraft = Omit<Goal, 'id' | 'created_at'>
 type GoalItemDraft = Omit<GoalItem, 'id' | 'goal_id' | 'created_at' | 'updated_at'>
 
 export default function NotesPage() {
-  const [currentTab, setCurrentTab] = useState<TabType>(getInitialTab)
+  const currentTab = useSyncExternalStore(
+    subscribeToTabHash,
+    getTabFromHash,
+    () => 'notes' as TabType,
+  )
 
   const handleTabChange = (tab: TabType) => {
-    setCurrentTab(tab)
     window.history.pushState(null, '', `#${tab}`)
+    window.dispatchEvent(new Event(TAB_CHANGE_EVENT))
   }
 
   const [notes, setNotes] = useState<Note[]>([])
@@ -137,6 +152,7 @@ export default function NotesPage() {
   const [loading, setLoading] = useState(true)
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
   const [todayCalories, setTodayCalories] = useState(0)
+  const { goal: dailyCalorieGoal } = useCalorieGoal()
 
   const [todos, setTodos] = useState<Todo[]>([])
   const [todoDraft, setTodoDraft] = useState('')
@@ -281,7 +297,6 @@ export default function NotesPage() {
       const { data, error } = await supabase
         .from('posts')
         .select('*, post_tags(tags(id, name))')
-        .eq('published', true)
         .order('created_at', { ascending: false })
 
       if (error) throw error
@@ -653,7 +668,10 @@ export default function NotesPage() {
   }
 
   useEffect(() => {
-    const timer = window.setTimeout(() => {
+    const timer = window.setTimeout(async () => {
+      // Ensure Supabase session is loaded from cookies before any query.
+      // Without this, queries may fire with anon role and bypass RLS isolation.
+      await getSupabaseBrowserClient().auth.getSession()
       void fetchNotes(false)
       void fetchTodos()
       void fetchGoals()
@@ -1034,7 +1052,7 @@ export default function NotesPage() {
             <article className="rounded-xl border border-orange-100 bg-white p-3 shadow-[0_1px_0_0_rgba(234,88,12,0.15)]">
               <p className="text-xs font-medium text-zinc-600">Calo hôm nay</p>
               <p className="mt-2 text-2xl font-semibold leading-none text-orange-600">{Math.round(todayCalories)}</p>
-              <p className="text-xs text-zinc-500">/ 2400 kcal</p>
+              <p className="text-xs text-zinc-500">/ {dailyCalorieGoal} kcal</p>
             </article>
           </div>
         </section>
@@ -1874,7 +1892,7 @@ export default function NotesPage() {
               <Button
                 onClick={() => void addTodo()}
                 disabled={savingTodo || !todoDraft.trim()}
-                className="gap-2"
+                className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
               >
                 <Plus className="h-4 w-4" />
                 Thêm
@@ -2471,8 +2489,7 @@ export default function NotesPage() {
         {currentTab === 'meals' && (
         <section className="overflow-hidden rounded-2xl border border-orange-200 bg-white shadow-[0_4px_20px_-8px_rgba(234,88,12,0.25)]">
           <div className="border-b border-orange-100 px-4 py-3.5">
-            <h3 className="font-semibold text-zinc-900">Lịch Ăn - Tăng Cân</h3>
-            <p className="mt-1 text-xs text-zinc-600">Kế hoạch 5 bữa/ngày để tăng cân 61kg → 75kg. Tự động nhận nhắc nhở qua Teams lúc đúng giờ ăn.</p>
+            <h3 className="font-semibold text-zinc-900">Lịch Ăn</h3>
           </div>
           <div className="p-4">
             <MealScheduleTracker />
@@ -2485,11 +2502,18 @@ export default function NotesPage() {
           <div className="flex items-center gap-2 border-b border-emerald-100 px-4 py-3">
             <span className="text-xl">💪</span>
             <span className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-600">Bài viết sức khỏe</span>
+            <a
+              href={`/admin/create?autotag=${encodeURIComponent('Sức Khỏe')}`}
+              className="ml-auto inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-white px-2 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-50 transition-colors"
+            >
+              <Plus className="h-3 w-3" />
+              Tạo bài
+            </a>
           </div>
 
           <div className="px-4 py-3">
             {healthPosts.length === 0 ? (
-              <div className="text-center py-8 text-zinc-500">Chưa có bài viết nào.</div>
+              <div className="py-6 text-center text-sm text-zinc-500">Chưa có bài viết nào.</div>
             ) : (
               <div className="space-y-3">
                 {healthPosts.map((post) => (

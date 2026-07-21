@@ -1,13 +1,15 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { Suspense, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 
 import { supabase } from '@/lib/supabase'
 import PostForm, { PostFormValues } from '@/components/PostForm'
 
-export default function CreatePostPage() {
+function CreatePostContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const autotagName = searchParams.get('autotag') ?? undefined
   const [submitting, setSubmitting] = useState(false)
 
   async function handleSubmit(values: PostFormValues) {
@@ -57,7 +59,17 @@ export default function CreatePostPage() {
 
   return (
     <div className="mx-auto max-w-6xl">
-      <PostForm mode="create" submitting={submitting} onSubmit={handleSubmit} />
+      <PostForm mode="create" autotagName={autotagName} submitting={submitting} onSubmit={handleSubmit} />
     </div>
+  )
+}
+
+export default function CreatePostPage() {
+  // useSearchParams requires a Suspense boundary; without it the page is
+  // prerendered with empty params and ?autotag is lost on first render.
+  return (
+    <Suspense>
+      <CreatePostContent />
+    </Suspense>
   )
 }

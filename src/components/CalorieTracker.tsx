@@ -4,11 +4,10 @@ import { useEffect, useState } from 'react'
 import { Plus, Trash2, Edit2, X, Check, Clock } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
+import { useCalorieGoal } from '@/lib/useCalorieGoal'
 import { FoodTemplate, DailyFood } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-
-const DAILY_CALORIE_GOAL = 2400
 
 function todayDate() {
   return new Date().toISOString().slice(0, 10)
@@ -33,6 +32,10 @@ export function CalorieTracker() {
   const [useCustom, setUseCustom] = useState(true)
   const [customTime, setCustomTime] = useState(currentTimeStr)
   const [saving, setSaving] = useState(false)
+
+  const { goal: calorieGoal, saveGoal: dbSaveGoal } = useCalorieGoal()
+  const [editingGoal, setEditingGoal] = useState(false)
+  const [goalDraft, setGoalDraft] = useState('')
 
   // Edit state
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -72,6 +75,12 @@ export function CalorieTracker() {
     setLoading(true)
     Promise.all([fetchFoodTemplates()]).finally(() => setLoading(false))
   }, [])
+
+  function saveGoal() {
+    const val = parseInt(goalDraft, 10)
+    if (!isNaN(val) && val > 0) void dbSaveGoal(val)
+    setEditingGoal(false)
+  }
 
   useEffect(() => {
     void fetchDailyFoods()
@@ -177,8 +186,8 @@ export function CalorieTracker() {
   }
 
   const totalCalories = dailyFoods.reduce((sum, food) => sum + (food.total_calories || 0), 0)
-  const progressPercent = Math.round((totalCalories / DAILY_CALORIE_GOAL) * 100)
-  const remainingCalories = DAILY_CALORIE_GOAL - totalCalories
+  const progressPercent = Math.round((totalCalories / calorieGoal) * 100)
+  const remainingCalories = calorieGoal - totalCalories
 
   const selectedTemplate = foodTemplates.find((f) => f.id === selectedFoodId)
   const previewCalories = selectedTemplate && selectedFoodId && !useCustom
@@ -202,7 +211,33 @@ export function CalorieTracker() {
         <div className="space-y-2">
           <div className="flex items-center justify-between text-sm">
             <span className="text-zinc-600">Tổng calo</span>
-            <span className="font-semibold text-zinc-900">{Math.round(totalCalories)} / {DAILY_CALORIE_GOAL} kcal</span>
+            <span className="font-semibold text-zinc-900">
+              {Math.round(totalCalories)} /{' '}
+              {editingGoal ? (
+                <input
+                  type="number"
+                  value={goalDraft}
+                  onChange={(e) => setGoalDraft(e.target.value)}
+                  onBlur={saveGoal}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') saveGoal()
+                    if (e.key === 'Escape') setEditingGoal(false)
+                  }}
+                  autoFocus
+                  className="w-20 rounded border border-emerald-300 px-1 py-0.5 text-sm text-zinc-900 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                />
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => { setGoalDraft(String(calorieGoal)); setEditingGoal(true) }}
+                  className="underline decoration-dashed underline-offset-2 hover:text-emerald-600 transition-colors"
+                  title="Chỉnh mục tiêu"
+                >
+                  {calorieGoal}
+                </button>
+              )}{' '}
+              kcal
+            </span>
           </div>
 
           {/* Progress Bar */}

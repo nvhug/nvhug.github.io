@@ -6,9 +6,7 @@ const PROTECTED_PREFIXES = ['/notes', '/admin', '/quotes']
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
-  const response = NextResponse.next({
-    request: { headers: request.headers },
-  })
+  let supabaseResponse = NextResponse.next({ request })
 
   // Refresh Supabase session on every request (required by @supabase/ssr)
   const supabase = createServerClient(
@@ -18,9 +16,12 @@ export async function proxy(request: NextRequest) {
       cookies: {
         getAll() { return request.cookies.getAll() },
         setAll(cookiesToSet) {
+          // Update request cookies first, then recreate response so server
+          // components receive the refreshed session token in their cookies.
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
+          supabaseResponse = NextResponse.next({ request })
           cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options)
+            supabaseResponse.cookies.set(name, value, options)
           )
         },
       },
@@ -30,7 +31,7 @@ export async function proxy(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
 
   const needsAuth = PROTECTED_PREFIXES.some((prefix) => pathname.startsWith(prefix))
-  if (!needsAuth) return response
+  if (!needsAuth) return supabaseResponse
 
   const pinCookie = request.cookies.get(AUTH_COOKIE_NAME)?.value
   const hasPinCookie = isValidAuthCookie(pinCookie)
@@ -50,7 +51,7 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  return response
+  return supabaseResponse
 }
 
 export const config = {
