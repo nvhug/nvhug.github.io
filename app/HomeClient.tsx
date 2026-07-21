@@ -83,7 +83,7 @@ export default function HomeClient({
                   </div>
                   <Link href="/quotes" className="min-w-0 flex-1">
                     <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-emerald-600">Daily Quote</p>
-                    <blockquote className="whitespace-pre-wrap font-playfair text-lg font-medium leading-relaxed tracking-wide text-stone-600 sm:text-xl">
+                    <blockquote className="whitespace-pre-wrap text-lg font-medium leading-relaxed tracking-wide text-stone-600 sm:text-xl">
                       &ldquo;{currentQuote.content}&rdquo;
                     </blockquote>
                     {currentQuote.author && (
@@ -140,7 +140,7 @@ export default function HomeClient({
                 placeholder="Tìm bài viết..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="h-8 rounded-lg border border-emerald-200 bg-emerald-50/60 px-3 text-sm text-zinc-900 outline-none transition-colors placeholder:text-zinc-400 focus-visible:border-emerald-500"
+                className="h-8 w-full rounded-lg border border-emerald-200 bg-emerald-50/60 px-3 text-sm text-zinc-900 outline-none transition-colors placeholder:text-zinc-400 focus-visible:border-emerald-500 sm:w-auto"
               />
             </div>
             <div className="flex flex-wrap items-center gap-2">

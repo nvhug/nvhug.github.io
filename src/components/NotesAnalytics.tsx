@@ -90,7 +90,7 @@ export function NotesAnalytics({ notes }: Props) {
       {/* Bar chart */}
       <div className="rounded-xl border border-emerald-100 bg-white shadow-sm">
         <div className="flex items-center justify-between border-b border-emerald-50 px-4 py-2.5">
-          <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+          <span className="text-sm font-semibold uppercase tracking-wide text-zinc-500">
             Ghi chép 30 ngày qua
           </span>
           <div className="flex gap-3">
@@ -205,9 +205,9 @@ function Tile({ label, value, sub, color }: {
   const subCls  = color === 'emerald' ? 'text-emerald-400'   : color === 'amber' ? 'text-amber-400'   : 'text-zinc-400'
   return (
     <div className={`rounded-xl border ${border} bg-white p-3 shadow-sm`}>
-      <p className="text-xs text-zinc-500">{label}</p>
+      <p className="text-sm text-zinc-500">{label}</p>
       <p className={`mt-1 text-2xl font-bold ${valCls}`}>{value}</p>
-      <p className={`text-xs ${subCls}`}>{sub}</p>
+      <p className={`text-sm ${subCls}`}>{sub}</p>
     </div>
   )
 }
@@ -216,7 +216,7 @@ function Dot({ color, label }: { color: string; label: string }) {
   return (
     <div className="flex items-center gap-1.5">
       <div className="h-2.5 w-2.5 rounded-sm" style={{ background: color }} />
-      <span className="text-xs text-zinc-500">{label}</span>
+      <span className="text-sm text-zinc-500">{label}</span>
     </div>
   )
 }

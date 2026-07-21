@@ -28,7 +28,7 @@
   body {
     background: #f7f4ed;
     color: #171717;
-    font-family: var(--font-sans), sans-serif;
+    font-family: var(--font-sans), var(--font-poppins), sans-serif;
     line-height: 1.6;
   }
 }
