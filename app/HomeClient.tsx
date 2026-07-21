@@ -6,6 +6,7 @@ import { ArrowRight, Quote as QuoteIcon } from 'lucide-react'
 import TableOfContentsCard from '@/components/TableOfContentsCard'
 import { Post, Quote } from '@/types'
 import { getTagColor } from '@/lib/utils'
+import { useLanguage } from '@/lib/i18n/language-context'
 
 const ITEMS_PER_PAGE = 5
 
@@ -16,6 +17,7 @@ export default function HomeClient({
   initialPosts: Post[]
   initialQuotes: Quote[]
 }) {
+  const { t } = useLanguage()
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedTag, setSelectedTag] = useState('all')
   const [currentPage, setCurrentPage] = useState(1)
@@ -82,7 +84,7 @@ export default function HomeClient({
                     <QuoteIcon className="h-4 w-4" />
                   </div>
                   <Link href="/quotes" className="min-w-0 flex-1">
-                    <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-emerald-600">Daily Quote</p>
+                    <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-emerald-600">{t('home.dailyQuote')}</p>
                     <blockquote className="whitespace-pre-wrap text-lg font-medium leading-relaxed tracking-wide text-stone-600 sm:text-xl">
                       &ldquo;{currentQuote.content}&rdquo;
                     </blockquote>
@@ -93,8 +95,8 @@ export default function HomeClient({
                   <button
                     type="button"
                     onClick={(e) => { e.preventDefault(); e.stopPropagation(); getRandomQuote() }}
-                    aria-label="Quote tiếp theo"
-                    title="Quote tiếp theo"
+                    aria-label={t('home.nextQuote')}
+                    title={t('home.nextQuote')}
                     className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-emerald-200 bg-white text-emerald-600 transition-colors hover:bg-emerald-50 hover:text-emerald-700"
                   >
                     <ArrowRight className="h-3.5 w-3.5" />
@@ -117,7 +119,7 @@ export default function HomeClient({
                       : 'border-emerald-100 text-zinc-600 hover:bg-emerald-50 hover:text-zinc-900'
                   }`}
                 >
-                  All Tags
+                  {t('home.allTags')}
                 </button>
                 {allTags.map((tag) => {
                   const colors = getTagColor(tag.name)
@@ -137,7 +139,7 @@ export default function HomeClient({
               </div>
               <input
                 type="text"
-                placeholder="Tìm bài viết..."
+                placeholder={t('home.searchPlaceholder')}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="h-8 w-full rounded-lg border border-emerald-200 bg-emerald-50/60 px-3 text-sm text-zinc-900 outline-none transition-colors placeholder:text-zinc-400 focus-visible:border-emerald-500 sm:w-auto"
@@ -145,11 +147,11 @@ export default function HomeClient({
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
-                {filteredPosts.length} bài viết
+                {t('home.articleCount', { count: filteredPosts.length })}
               </span>
               {totalPages > 1 && (
                 <span className="rounded-full border border-zinc-200 bg-white px-2.5 py-0.5 text-xs font-medium text-zinc-600">
-                  Trang {currentPage} / {totalPages}
+                  {t('home.pageIndicator', { current: currentPage, total: totalPages })}
                 </span>
               )}
             </div>
@@ -161,11 +163,11 @@ export default function HomeClient({
         {filteredPosts.length === 0 ? (
           <div className="rounded-2xl border border-emerald-100 bg-white p-16 text-center text-sm text-zinc-500">
             <p className="mb-4">
-              {searchTerm ? 'No articles found.' : 'No articles published yet.'}
+              {searchTerm ? t('home.noArticlesFound') : t('home.noArticlesYet')}
             </p>
             {!searchTerm && (
               <Link href="/admin/create" className="font-semibold text-emerald-700 hover:underline">
-                Write your first article →
+                {t('home.writeFirstArticle')}
               </Link>
             )}
           </div>
@@ -187,7 +189,7 @@ export default function HomeClient({
                   disabled={currentPage === 1}
                   className="rounded-lg border border-emerald-200 px-4 py-2 text-sm font-medium text-emerald-700 transition-colors disabled:border-zinc-100 disabled:text-zinc-400 hover:bg-emerald-50 disabled:hover:bg-transparent"
                 >
-                  ← Previous
+                  {t('home.previous')}
                 </button>
 
                 <div className="flex items-center gap-1">
@@ -217,7 +219,7 @@ export default function HomeClient({
                   disabled={currentPage === totalPages}
                   className="rounded-lg border border-emerald-200 px-4 py-2 text-sm font-medium text-emerald-700 transition-colors disabled:border-zinc-100 disabled:text-zinc-400 hover:bg-emerald-50 disabled:hover:bg-transparent"
                 >
-                  Next →
+                  {t('home.next')}
                 </button>
               </div>
             )}

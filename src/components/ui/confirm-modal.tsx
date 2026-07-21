@@ -2,6 +2,7 @@
 
 import { Trash2, X } from 'lucide-react'
 import { Button } from './button'
+import { useLanguage } from '@/lib/i18n/language-context'
 
 type Props = {
   open: boolean
@@ -13,6 +14,7 @@ type Props = {
 }
 
 export function ConfirmModal({ open, itemContent, itemMeta, loading, onConfirm, onCancel }: Props) {
+  const { t } = useLanguage()
   if (!open) return null
 
   return (
@@ -28,7 +30,7 @@ export function ConfirmModal({ open, itemContent, itemMeta, loading, onConfirm, 
             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-100">
               <Trash2 className="h-4 w-4 text-emerald-600" />
             </div>
-            <p className="font-poppins text-sm font-semibold text-zinc-900">Xác nhận xoá</p>
+            <p className="font-poppins text-sm font-semibold text-zinc-900">{t('common.confirmDelete.title')}</p>
           </div>
           <button
             type="button"
@@ -41,7 +43,7 @@ export function ConfirmModal({ open, itemContent, itemMeta, loading, onConfirm, 
 
         {/* Body */}
         <div className="px-5 py-4">
-          <p className="mb-3 text-sm text-zinc-500">Bạn sắp xoá mục này. Hành động không thể hoàn tác.</p>
+          <p className="mb-3 text-sm text-zinc-500">{t('common.confirmDelete.message')}</p>
           {itemContent && (
             <div className="rounded-xl border border-zinc-100 bg-zinc-50 px-4 py-3">
               <p className="line-clamp-3 text-sm text-zinc-800">{itemContent}</p>
@@ -58,14 +60,14 @@ export function ConfirmModal({ open, itemContent, itemMeta, loading, onConfirm, 
             disabled={loading}
             onClick={onCancel}
           >
-            Huỷ
+            {t('common.cancel')}
           </Button>
           <Button
             className="flex-1 bg-emerald-600 text-white hover:bg-emerald-500 focus-visible:ring-emerald-300"
             disabled={loading}
             onClick={onConfirm}
           >
-            {loading ? 'Đang xoá...' : 'Xoá'}
+            {loading ? t('common.deleting') : t('common.delete')}
           </Button>
         </div>
       </div>

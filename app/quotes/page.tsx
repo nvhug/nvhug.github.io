@@ -8,8 +8,10 @@ import { Quote as QuoteType } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ConfirmModal } from '@/components/ui/confirm-modal'
+import { useLanguage } from '@/lib/i18n/language-context'
 
 export default function QuotesPage() {
+  const { t } = useLanguage()
   const [quotes, setQuotes] = useState<QuoteType[]>([])
   const [currentQuote, setCurrentQuote] = useState<QuoteType | null>(null)
   const [loading, setLoading] = useState(true)
@@ -73,7 +75,7 @@ export default function QuotesPage() {
       await fetchQuotes()
     } catch (error) {
       console.error('Error adding quote:', error)
-      toast.error('Không thể thêm quote.')
+      toast.error(t('quotes.addError'))
     } finally {
       setSaving(false)
     }
@@ -88,10 +90,10 @@ export default function QuotesPage() {
       setQuotes((prev) => prev.filter((q) => q.id !== deleteTarget.id))
       if (currentQuote?.id === deleteTarget.id) setCurrentQuote(null)
       setDeleteTarget(null)
-      toast.success('Đã xoá quote.')
+      toast.success(t('quotes.deleteSuccess'))
     } catch (error) {
       console.error('Error deleting quote:', error)
-      toast.error('Không thể xoá quote.')
+      toast.error(t('quotes.deleteError'))
     } finally {
       setDeleting(false)
     }
@@ -124,7 +126,7 @@ export default function QuotesPage() {
       cancelEdit()
     } catch (error) {
       console.error('Error updating quote:', error)
-      toast.error('Không thể cập nhật quote.')
+      toast.error(t('quotes.updateError'))
     } finally {
       setBusyId(null)
     }
@@ -146,9 +148,9 @@ export default function QuotesPage() {
               <Sparkles className="h-5 w-5" />
             </div>
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-emerald-600">Cảm hứng</p>
-              <h2 className="mt-1 font-poppins text-2xl font-semibold leading-tight text-zinc-900">Quotes & Cảm hứng</h2>
-              <p className="mt-1 text-sm text-zinc-600">Những câu nói truyền cảm hứng để bạn động lực mỗi ngày.</p>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-emerald-600">{t('quotes.eyebrow')}</p>
+              <h2 className="mt-1 font-poppins text-2xl font-semibold leading-tight text-zinc-900">{t('quotes.heading')}</h2>
+              <p className="mt-1 text-sm text-zinc-600">{t('quotes.subheading')}</p>
             </div>
           </div>
         </section>
@@ -156,7 +158,7 @@ export default function QuotesPage() {
         {/* Current Quote Display */}
         {loading ? (
           <div className="rounded-2xl border border-emerald-100 bg-white p-12 text-center text-sm text-zinc-500">
-            Đang tải...
+            {t('common.loading')}
           </div>
         ) : currentQuote ? (
           <div className="rounded-2xl border border-emerald-200 bg-white p-8 shadow-[0_20px_42px_-32px_rgba(16,185,129,0.28)]">
@@ -174,39 +176,39 @@ export default function QuotesPage() {
                 onClick={getRandomQuote}
                 className="bg-linear-to-r from-emerald-500 to-emerald-600 text-white hover:from-emerald-400 hover:to-emerald-500"
               >
-                Quote tiếp theo
+                {t('quotes.nextQuote')}
               </Button>
             </div>
           </div>
         ) : (
           <div className="rounded-2xl border border-emerald-100 bg-white p-12 text-center text-sm text-zinc-500">
-            Chưa có quote nào. Hãy thêm một quote!
+            {t('quotes.emptyState')}
           </div>
         )}
 
         {/* Add Quote Form */}
         <section className="rounded-2xl border border-emerald-100 bg-white shadow-[0_30px_60px_-45px_rgba(16,185,129,0.32)]">
           <div className="border-b border-emerald-100 px-6 py-4">
-            <p className="text-sm font-semibold text-zinc-900">Thêm Quote Mới</p>
+            <p className="text-sm font-semibold text-zinc-900">{t('quotes.addNewTitle')}</p>
           </div>
           <div className="space-y-4 p-6">
             <div>
-              <label className="mb-2 block text-xs font-medium text-zinc-600">Nội dung Quote</label>
+              <label className="mb-2 block text-xs font-medium text-zinc-600">{t('quotes.contentLabel')}</label>
               <textarea
                 rows={3}
                 value={newQuote}
                 onChange={(e) => setNewQuote(e.target.value)}
-                placeholder="Hãy viết một quote..."
+                placeholder={t('quotes.contentPlaceholder')}
                 className="w-full resize-y rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none placeholder:text-zinc-500 focus-visible:border-emerald-400"
               />
             </div>
             <div>
-              <label className="mb-2 block text-xs font-medium text-zinc-600">Tác giả (không bắt buộc)</label>
+              <label className="mb-2 block text-xs font-medium text-zinc-600">{t('quotes.authorLabel')}</label>
               <Input
                 type="text"
                 value={newAuthor}
                 onChange={(e) => setNewAuthor(e.target.value)}
-                placeholder="Tác giả hoặc nguồn gốc"
+                placeholder={t('quotes.authorPlaceholder')}
                 className="border-emerald-200 bg-white text-zinc-900"
               />
             </div>
@@ -219,14 +221,14 @@ export default function QuotesPage() {
                 variant="ghost"
                 className="text-zinc-600 hover:bg-emerald-100 hover:text-emerald-700"
               >
-                Huỷ
+                {t('common.cancel')}
               </Button>
               <Button
                 disabled={saving || !newQuote.trim()}
                 onClick={addQuote}
                 className="bg-linear-to-r from-emerald-500 to-emerald-600 text-white hover:from-emerald-400 hover:to-emerald-500"
               >
-                Thêm Quote
+                {t('quotes.addQuote')}
               </Button>
             </div>
           </div>
@@ -236,7 +238,7 @@ export default function QuotesPage() {
         {quotes.length > 0 && (
           <section className="rounded-2xl border border-emerald-100 bg-white shadow-[0_30px_60px_-45px_rgba(16,185,129,0.32)]">
             <div className="border-b border-emerald-100 px-6 py-4">
-              <p className="text-sm font-semibold text-zinc-900">Tất cả Quotes ({quotes.length})</p>
+              <p className="text-sm font-semibold text-zinc-900">{t('quotes.allQuotes', { count: quotes.length })}</p>
             </div>
             <div className="divide-y divide-emerald-50">
               {quotes.map((quote) => (
@@ -258,7 +260,7 @@ export default function QuotesPage() {
                         type="text"
                         value={editingAuthor}
                         onChange={(e) => setEditingAuthor(e.target.value)}
-                        placeholder="Tác giả hoặc nguồn gốc"
+                        placeholder={t('quotes.authorPlaceholder')}
                         className="border-emerald-200 bg-white text-zinc-900"
                       />
                       <div className="flex justify-end gap-1">

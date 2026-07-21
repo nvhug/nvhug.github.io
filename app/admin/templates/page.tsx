@@ -7,12 +7,13 @@ import { Post } from '@/types'
 import { formatDate } from '@/lib/utils'
 import { toast } from 'sonner'
 import { Check } from 'lucide-react'
+import { useLanguage } from '@/lib/i18n/language-context'
 
 const TEMPLATES = [
   {
     id: 'parchment',
     name: 'Parchment',
-    description: 'Warm journal. Rounded card, drop cap, amber accents.',
+    descKey: 'parchment',
     preview: (
       <div className="flex h-28 flex-col gap-1.5 rounded-xl bg-[#f7f4ed] p-3">
         <div className="rounded-lg border border-[#e5e0d5] bg-[#fffdf8] p-2.5">
@@ -30,7 +31,7 @@ const TEMPLATES = [
   {
     id: 'ink',
     name: 'Ink',
-    description: 'Dark editorial. Auto-numbered sections, orange accents.',
+    descKey: 'ink',
     preview: (
       <div className="flex h-28 flex-col gap-1.5 rounded-xl bg-[#0f172a] p-3">
         <div className="h-0.5 w-full rounded bg-gradient-to-r from-orange-500 to-transparent" />
@@ -47,7 +48,7 @@ const TEMPLATES = [
   {
     id: 'medium',
     name: 'Medium',
-    description: 'Serif typography, author card, publication feel.',
+    descKey: 'medium',
     preview: (
       <div className="flex h-28 flex-col gap-1.5 rounded-xl bg-white p-3">
         <div className="mb-1 h-3 w-2/3 rounded bg-[#1a1a1a]" style={{ fontWeight: 700 }} />
@@ -65,7 +66,7 @@ const TEMPLATES = [
   {
     id: 'vercel',
     name: 'Vercel',
-    description: 'Dark docs layout, breadcrumb, monospace, TOC sidebar.',
+    descKey: 'vercel',
     preview: (
       <div className="flex h-28 flex-col gap-1.5 rounded-xl bg-black p-3">
         <div className="flex items-center gap-1">
@@ -95,7 +96,7 @@ const TEMPLATES = [
   {
     id: 'github',
     name: 'GitHub',
-    description: 'GitHub README renderer. Bordered container, GH styles.',
+    descKey: 'github',
     preview: (
       <div className="flex h-28 flex-col gap-1 rounded-xl bg-white p-3">
         <div className="flex items-center gap-1 text-[9px] text-[#59636e]">
@@ -120,7 +121,7 @@ const TEMPLATES = [
   {
     id: 'notion',
     name: 'Notion',
-    description: 'Page layout, callout blocks, property database rows.',
+    descKey: 'notion',
     preview: (
       <div className="flex h-28 flex-col rounded-xl bg-white overflow-hidden">
         <div className="h-8 bg-gradient-to-br from-[#f1f0ef] to-[#dddad6]" />
@@ -141,7 +142,7 @@ const TEMPLATES = [
   {
     id: 'apple',
     name: 'Apple',
-    description: 'SF Pro typography, generous whitespace, hero header.',
+    descKey: 'apple',
     preview: (
       <div className="flex h-28 flex-col rounded-xl bg-white overflow-hidden">
         <div className="bg-[#f5f5f7] px-3 pt-2.5 pb-3">
@@ -163,6 +164,7 @@ const TEMPLATES = [
 ]
 
 export default function TemplatesPage() {
+  const { t } = useLanguage()
   const [posts, setPosts] = useState<Post[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState<string | null>(null)
@@ -188,10 +190,10 @@ export default function TemplatesPage() {
       .update({ template })
       .eq('id', postId)
     if (error) {
-      toast.error('Failed to update template')
+      toast.error(t('admin.templates.updateError'))
     } else {
       setPosts((prev) => prev.map((p) => (p.id === postId ? { ...p, template } : p)))
-      toast.success('Template updated')
+      toast.success(t('admin.templates.updateSuccess'))
     }
     setSaving(null)
   }
@@ -200,10 +202,10 @@ export default function TemplatesPage() {
     setApplyingAll(template)
     const { error } = await supabase.from('posts').update({ template }).not('id', 'is', null)
     if (error) {
-      toast.error('Failed to apply to all posts')
+      toast.error(t('admin.templates.applyAllError'))
     } else {
       setPosts((prev) => prev.map((p) => ({ ...p, template })))
-      toast.success(`Applied "${template}" to all posts`)
+      toast.success(t('admin.templates.applyAllSuccess', { template }))
     }
     setApplyingAll(null)
   }
@@ -211,8 +213,8 @@ export default function TemplatesPage() {
   return (
     <div className="space-y-6 p-2 sm:p-5">
       <div>
-        <h1 className="font-poppins text-2xl font-semibold text-zinc-900">Templates</h1>
-        <p className="mt-1 text-sm text-zinc-500">Choose the display layout for each blog post.</p>
+        <h1 className="font-poppins text-2xl font-semibold text-zinc-900">{t('admin.templates.heading')}</h1>
+        <p className="mt-1 text-sm text-zinc-500">{t('admin.templates.subtitle')}</p>
       </div>
 
       {/* Template cards */}
@@ -230,13 +232,13 @@ export default function TemplatesPage() {
                 </span>
                 <span className="font-semibold text-zinc-900">{tpl.name}</span>
               </div>
-              <p className="mt-1 text-xs text-zinc-500">{tpl.description}</p>
+              <p className="mt-1 text-xs text-zinc-500">{t(`admin.templates.descriptions.${tpl.descKey}`)}</p>
               <button
                 onClick={() => applyToAll(tpl.id)}
                 disabled={!!applyingAll}
                 className="mt-3 w-full rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 transition-colors hover:border-zinc-300 hover:bg-zinc-50 disabled:opacity-50"
               >
-                {applyingAll === tpl.id ? 'Applying...' : 'Apply to all posts'}
+                {applyingAll === tpl.id ? t('admin.templates.applying') : t('admin.templates.applyToAll')}
               </button>
             </div>
           </div>
@@ -247,14 +249,14 @@ export default function TemplatesPage() {
       <div className="rounded-2xl border border-zinc-200 bg-white overflow-hidden">
         <div className="border-b border-zinc-100 px-3 py-2.5">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-400">
-            Posts — assign template
+            {t('admin.templates.postsHeading')}
           </p>
         </div>
 
         {loading ? (
-          <p className="p-5 text-sm text-zinc-400">Loading...</p>
+          <p className="p-5 text-sm text-zinc-400">{t('common.loading')}</p>
         ) : posts.length === 0 ? (
-          <p className="p-5 text-sm text-zinc-400">No posts yet.</p>
+          <p className="p-5 text-sm text-zinc-400">{t('admin.templates.emptyNoPosts')}</p>
         ) : (
           <div className="divide-y divide-zinc-100">
             {posts.map((post) => {
@@ -264,7 +266,7 @@ export default function TemplatesPage() {
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium ${post.published ? 'bg-emerald-100 text-emerald-700' : 'bg-zinc-100 text-zinc-500'}`}>
-                        {post.published ? 'live' : 'draft'}
+                        {post.published ? t('admin.templates.live') : t('admin.templates.draft')}
                       </span>
                       <Link
                         href={`/blog/${post.slug}`}

@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ConfirmModal } from '@/components/ui/confirm-modal'
 import RichEditor from '@/components/RichEditor'
+import { useLanguage } from '@/lib/i18n/language-context'
 
 // Block-level tags Quill uses to represent each line/paragraph.
 const BLOCK_CLOSE_TAGS = /<\/(p|div|h[1-6]|li|blockquote|pre)>/gi
@@ -72,6 +73,7 @@ interface PostFormProps {
 }
 
 export default function PostForm({ mode, initialPost, autotagName, submitting, onSubmit, onDelete }: PostFormProps) {
+  const { t } = useLanguage()
 
   const [title, setTitle] = useState(initialPost?.title ?? '')
   const [slug, setSlug] = useState(initialPost?.slug ?? '')
@@ -208,14 +210,14 @@ export default function PostForm({ mode, initialPost, autotagName, submitting, o
               <ArrowLeft className="h-4 w-4" />
             </Link>
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-emerald-600">Editor</p>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-emerald-600">{t('admin.postForm.eyebrow')}</p>
               <h2 className="mt-1 font-poppins text-2xl font-semibold leading-tight text-zinc-900">
-                {mode === 'create' ? 'Create New Post' : 'Update Post'}
+                {mode === 'create' ? t('admin.postForm.createHeading') : t('admin.postForm.updateHeading')}
               </h2>
               <p className="mt-1 text-sm text-zinc-600">
                 {mode === 'create'
-                  ? 'Compose a new article and publish when ready.'
-                  : 'Refine content, metadata, and visibility settings.'}
+                  ? t('admin.postForm.createSubtitle')
+                  : t('admin.postForm.updateSubtitle')}
               </p>
             </div>
           </div>
@@ -223,7 +225,7 @@ export default function PostForm({ mode, initialPost, autotagName, submitting, o
           <div className="flex flex-wrap items-center gap-2">
             <div className="hidden items-center gap-1.5 rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 sm:inline-flex">
               <CircleDot className="h-3.5 w-3.5" />
-              {published ? 'Published' : 'Draft mode'}
+              {published ? t('admin.posts.badgePublished') : t('admin.postForm.draftMode')}
             </div>
             {mode === 'edit' && onDelete && (
               <Button
@@ -234,12 +236,12 @@ export default function PostForm({ mode, initialPost, autotagName, submitting, o
                 className="rounded-lg text-rose-300 hover:bg-rose-500/15"
               >
                 <Trash2 />
-                Delete
+                {t('common.delete')}
               </Button>
             )}
             <Button type="submit" disabled={submitting} className="rounded-lg bg-linear-to-r from-emerald-500 to-emerald-600 text-white hover:from-emerald-400 hover:to-emerald-500">
               {submitting && <Loader2 className="animate-spin" />}
-              {mode === 'create' ? 'Create Post' : 'Save Changes'}
+              {mode === 'create' ? t('admin.postForm.createSubmit') : t('admin.postForm.saveSubmit')}
             </Button>
           </div>
         </div>
@@ -249,42 +251,42 @@ export default function PostForm({ mode, initialPost, autotagName, submitting, o
         <div className="space-y-6 lg:col-span-2">
           <section className="space-y-4 rounded-2xl border border-emerald-100 bg-white p-6 shadow-[0_30px_60px_-45px_rgba(16,185,129,0.32)]">
             <div>
-              <label className="mb-1.5 block text-sm font-semibold text-zinc-900">Title</label>
+              <label className="mb-1.5 block text-sm font-semibold text-zinc-900">{t('admin.postForm.titleLabel')}</label>
               <Input
                 value={title}
                 onChange={(e) => handleTitleChange(e.target.value)}
-                placeholder="Post title"
+                placeholder={t('admin.postForm.titlePlaceholder')}
                 required
                 className="border-emerald-200 bg-emerald-50/60 text-zinc-900 placeholder:text-zinc-500"
               />
             </div>
             <div>
-              <label className="mb-1.5 block text-sm font-semibold text-zinc-900">Slug</label>
+              <label className="mb-1.5 block text-sm font-semibold text-zinc-900">{t('admin.postForm.slugLabel')}</label>
               <Input
                 value={slug}
                 onChange={(e) => {
                   setSlug(e.target.value)
                   setSlugTouched(true)
                 }}
-                placeholder="post-slug"
+                placeholder={t('admin.postForm.slugPlaceholder')}
                 required
                 className="border-emerald-200 bg-emerald-50/60 text-zinc-900 placeholder:text-zinc-500"
               />
             </div>
             <div>
-              <label className="mb-1.5 block text-sm font-semibold text-zinc-900">Excerpt</label>
+              <label className="mb-1.5 block text-sm font-semibold text-zinc-900">{t('admin.postForm.excerptLabel')}</label>
               <textarea
                 value={excerpt}
                 onChange={(e) => setExcerpt(e.target.value)}
-                placeholder="Short summary shown in listings (auto-generated if left blank)"
+                placeholder={t('admin.postForm.excerptPlaceholder')}
                 rows={3}
                 className="w-full rounded-lg border border-emerald-200 bg-emerald-50/60 px-2.5 py-1.5 text-sm text-zinc-900 outline-none placeholder:text-zinc-500 focus-visible:border-emerald-400"
               />
             </div>
 
             <div>
-              <label className="mb-1.5 block text-sm font-semibold text-zinc-900">Content</label>
-              <RichEditor value={content} onChange={setContent} placeholder="Write your post..." />
+              <label className="mb-1.5 block text-sm font-semibold text-zinc-900">{t('admin.postForm.contentLabel')}</label>
+              <RichEditor value={content} onChange={setContent} placeholder={t('admin.postForm.contentPlaceholder')} />
             </div>
           </section>
         </div>
@@ -293,7 +295,7 @@ export default function PostForm({ mode, initialPost, autotagName, submitting, o
           <section className="rounded-2xl border border-emerald-100 bg-white p-6 shadow-[0_30px_60px_-45px_rgba(16,185,129,0.32)]">
             <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-zinc-900">
               <CircleDot className="h-4 w-4" />
-              Visibility
+              {t('admin.postForm.visibilityHeading')}
             </h3>
             <button
               type="button"
@@ -301,7 +303,7 @@ export default function PostForm({ mode, initialPost, autotagName, submitting, o
               className="flex w-full items-center justify-between rounded-lg border border-emerald-200 bg-emerald-50/60 px-3 py-2.5 text-sm"
             >
               <span className="font-medium text-zinc-900">
-                {published ? 'Published' : 'Draft'}
+                {published ? t('admin.posts.badgePublished') : t('admin.posts.badgeDraft')}
               </span>
               <span
                 className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
@@ -320,7 +322,7 @@ export default function PostForm({ mode, initialPost, autotagName, submitting, o
           <section className="rounded-2xl border border-emerald-100 bg-white p-6 shadow-[0_30px_60px_-45px_rgba(16,185,129,0.32)]">
             <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-zinc-900">
               <Tags className="h-4 w-4" />
-              Tags
+              {t('admin.postForm.tagsHeading')}
             </h3>
             <div className="flex flex-wrap gap-2">
               {tags.map((tag) => {
@@ -341,7 +343,7 @@ export default function PostForm({ mode, initialPost, autotagName, submitting, o
                 )
               })}
               {tags.length === 0 && (
-                <p className="text-xs text-zinc-500">No tags yet.</p>
+                <p className="text-xs text-zinc-500">{t('admin.postForm.noTags')}</p>
               )}
             </div>
             <div className="mt-3 flex gap-2">
@@ -354,7 +356,7 @@ export default function PostForm({ mode, initialPost, autotagName, submitting, o
                     handleCreateTag()
                   }
                 }}
-                placeholder="New tag name"
+                placeholder={t('admin.tags.newTagPlaceholder')}
                 className="h-8 border-emerald-200 bg-emerald-50/60 text-zinc-900 placeholder:text-zinc-500"
               />
               <Button

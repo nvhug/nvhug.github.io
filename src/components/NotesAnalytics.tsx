@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { Note } from '@/types'
+import { useLanguage } from '@/lib/i18n/language-context'
 
 const DAYS = 30
 const BAR_W = 18
@@ -29,6 +30,7 @@ function fmtDate(iso: string) {
 }
 
 export function NotesAnalytics({ notes }: Props) {
+  const { t } = useLanguage()
   const [hov, setHov] = useState<number | null>(null)
 
   const days = useMemo(
@@ -81,21 +83,21 @@ export function NotesAnalytics({ notes }: Props) {
     <div className="space-y-4 p-4">
       {/* Stat tiles */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Tile color="zinc"    label="Tổng (30 ngày)"  value={total30} sub="notes ghi lại" />
-        <Tile color="emerald" label="Việc tốt"         value={good30}  sub={`${goodPct}% tổng số`} />
-        <Tile color="amber"   label="Chưa tốt"         value={bad30}   sub={`${100 - goodPct}% tổng số`} />
-        <Tile color="zinc"    label="Streak"            value={streak}  sub="ngày liên tiếp" />
+        <Tile color="zinc"    label={t('notesAnalytics.total30d')}  value={total30} sub={t('notesAnalytics.notesLogged')} />
+        <Tile color="emerald" label={t('notesAnalytics.goodLabel')} value={good30}  sub={t('notesAnalytics.ofTotal', { pct: goodPct })} />
+        <Tile color="amber"   label={t('notesAnalytics.badLabel')}  value={bad30}   sub={t('notesAnalytics.ofTotal', { pct: 100 - goodPct })} />
+        <Tile color="zinc"    label={t('notesAnalytics.streak')}    value={streak}  sub={t('notesAnalytics.streakDays')} />
       </div>
 
       {/* Bar chart */}
       <div className="rounded-xl border border-emerald-100 bg-white shadow-sm">
         <div className="flex items-center justify-between border-b border-emerald-50 px-4 py-2.5">
           <span className="text-sm font-semibold uppercase tracking-wide text-zinc-500">
-            Ghi chép 30 ngày qua
+            {t('notesAnalytics.chartHeading')}
           </span>
           <div className="flex gap-3">
-            <Dot color={C_GOOD} label="Việc tốt" />
-            <Dot color={C_BAD}  label="Chưa tốt" />
+            <Dot color={C_GOOD} label={t('notesAnalytics.goodLabel')} />
+            <Dot color={C_BAD}  label={t('notesAnalytics.badLabel')} />
           </div>
         </div>
 
@@ -182,11 +184,11 @@ export function NotesAnalytics({ notes }: Props) {
               >
                 <p className="mb-1.5 font-medium text-zinc-700">{hovItem.date}</p>
                 <div className="space-y-0.5">
-                  <TipRow color={C_GOOD} label="Việc tốt"   val={hovItem.good} />
-                  <TipRow color={C_BAD}  label="Chưa tốt"   val={hovItem.bad} />
+                  <TipRow color={C_GOOD} label={t('notesAnalytics.goodLabel')} val={hovItem.good} />
+                  <TipRow color={C_BAD}  label={t('notesAnalytics.badLabel')} val={hovItem.bad} />
                 </div>
                 <p className="mt-1.5 border-t border-zinc-100 pt-1 text-zinc-500">
-                  Tổng: <strong>{hovItem.good + hovItem.bad}</strong>
+                  {t('notesAnalytics.total')}<strong>{hovItem.good + hovItem.bad}</strong>
                 </p>
               </div>
             )}

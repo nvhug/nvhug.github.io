@@ -9,11 +9,20 @@ const WEIGHT_START   = 61
 const WEIGHT_TARGET  = 75
 const ANALYZE_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000
 
-const USER_PROFILE = `- Giới tính: Nam, 34 tuổi
+type Lang = 'vi' | 'en'
+
+const USER_PROFILE: Record<Lang, string> = {
+  vi: `- Giới tính: Nam, 34 tuổi
 - Mục tiêu: Tăng cân từ ${WEIGHT_START}kg lên ${WEIGHT_TARGET}kg (lean bulk)
 - Công việc: Văn phòng (ít vận động trong giờ làm)
 - Nhu cầu calo: ${CALORIE_TARGET} kcal/ngày (surplus ~300–400 kcal cho lean bulk)
-- Tốc độ tăng cân mục tiêu: 0.25–0.5 kg/tuần`
+- Tốc độ tăng cân mục tiêu: 0.25–0.5 kg/tuần`,
+  en: `- Gender: Male, 34 years old
+- Goal: Gain weight from ${WEIGHT_START}kg to ${WEIGHT_TARGET}kg (lean bulk)
+- Job: Office work (sedentary during work hours)
+- Calorie needs: ${CALORIE_TARGET} kcal/day (surplus ~300–400 kcal for lean bulk)
+- Target weight gain rate: 0.25–0.5 kg/week`,
+}
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -266,17 +275,23 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'DEEPSEEK_API_KEY not configured' }, { status: 500 })
   }
 
-  const { notes, habits, period } = (await request.json()) as {
+  const { notes, habits, period, lang } = (await request.json()) as {
     notes:   Note[]
     habits:  Note[]
     period:  Period
+    lang?:   Lang
   }
+  const activeLang: Lang = lang === 'en' ? 'en' : 'vi'
 
   if (!period?.from || !period?.to || !period?.label) {
-    return NextResponse.json({ error: 'Thiếu thông tin kỳ phân tích.' }, { status: 400 })
+    return NextResponse.json({
+      error: activeLang === 'en' ? 'Missing analysis period information.' : 'Thiếu thông tin kỳ phân tích.',
+    }, { status: 400 })
   }
   if (!notes?.length) {
-    return NextResponse.json({ error: 'Không có dữ liệu ghi chú trong kỳ này.' }, { status: 400 })
+    return NextResponse.json({
+      error: activeLang === 'en' ? 'No note data in this period.' : 'Không có dữ liệu ghi chú trong kỳ này.',
+    }, { status: 400 })
   }
 
   const db = createClient(
@@ -299,7 +314,9 @@ export async function POST(request: Request) {
       const retryAfterSeconds = Math.ceil(remainingMs / 1000)
       return NextResponse.json(
         {
-          error: 'Bạn chỉ có thể phân tích AI 1 lần mỗi 7 ngày.',
+          error: activeLang === 'en'
+            ? 'You can only run AI analysis once every 7 days.'
+            : 'Bạn chỉ có thể phân tích AI 1 lần mỗi 7 ngày.',
           retryAfterSeconds,
           nextAnalyzeAt: new Date(lastAnalyzeAt + ANALYZE_COOLDOWN_MS).toISOString(),
         },
@@ -334,10 +351,58 @@ export async function POST(request: Request) {
   const weightSummary  = buildWeightSummary(weightRes.data ?? [])
   const calorieSummary = buildCalorieSummary(foodRes.data ?? [], mealRes.data ?? [])
 
-  const prompt = `Bạn là chuyên gia phân tích năng suất và sức khỏe cá nhân. Phân tích dữ liệu kỳ **${period.label}** (${period.from} → ${period.to}) và đưa ra nhận xét chuyên sâu bằng tiếng Việt.
+  const prompt = activeLang === 'en' ? `You are an expert in personal productivity and health analytics. Analyze the data for period **${period.label}** (${period.from} → ${period.to}) and give an in-depth review in English.
+
+=== USER PROFILE ===
+${USER_PROFILE.en}
+
+=== NOTES DATA ===
+${JSON.stringify(notesSummary, null, 2)}
+
+=== WEIGHT DATA ===
+${weightSummary ? JSON.stringify(weightSummary, null, 2) : 'No weight data in this period.'}
+
+=== NUTRITION DATA ===
+${calorieSummary ? JSON.stringify(calorieSummary, null, 2) : 'No nutrition data in this period.'}
+
+Field explanations:
+[NOTES] total_notes, good_pct/bad_pct, completion_rate_pct (done), avg_priority (1–5), avg_completion_pct (0–100), weekly_breakdown (good/bad per week), habits (name + reminder times), recent_content_samples.
+[WEIGHT] gain_per_week_kg (target 0.25–0.5 kg/week), progress_pct (% towards 75 kg), weekly_trend, logs_per_week (should be ≥3/week).
+[NUTRITION] total_calorie_deficit_kcal (>0=deficit), days_under_90pct (<2160 kcal), meal_completion_by_type, most_skipped_meal, weekly_calorie_trend, dow_avg_calories.
+
+Return JSON with exactly this structure (do not add or omit any field):
+{
+  "summary": "2-3 sentence overview of period ${period.label}, covering notes, weight, and nutrition",
+  "weight": {
+    "verdict": "One of: On track | Too slow | Too fast | No data",
+    "points": [
+      "Observation 1 with concrete numbers (e.g. gained 0.3 kg/week, on track for lean bulk)",
+      "Observation 2 about weekly trend or logging frequency"
+    ],
+    "next_target": "Concrete numeric target for next period (e.g. reach 62.5 kg, log weight ≥3 times/week)"
+  },
+  "nutrition": {
+    "verdict": "One of: Sufficient calories | Calorie deficit | Calorie surplus | No data",
+    "points": [
+      "Observation 1 with numbers (e.g. avg 2200 kcal/day, 92% of the 2400 kcal target)",
+      "Observation 2 about weekly trend or best/worst calorie days"
+    ],
+    "worst_day": "Day of week with lowest calories + avg (e.g. Monday — avg 1950 kcal)",
+    "skip_habit": "Most-skipped meal + skip % + estimated missed kcal (e.g. mid_morning 60% → ~300 kcal/day)"
+  },
+  "notes_habits": {
+    "points": [
+      "Observation about productivity/note quality (completion rate, good/bad ratio)",
+      "Observation about habit compliance — which habits are strong, which are inconsistent"
+    ],
+    "habit_gap": "The most inconsistent habit + one practical improvement suggestion"
+  },
+  "pattern": "The most notable correlation this period, with numbers (1 sentence)",
+  "recommendation": "3 action suggestions for next period, each with a clear numeric target"
+}` : `Bạn là chuyên gia phân tích năng suất và sức khỏe cá nhân. Phân tích dữ liệu kỳ **${period.label}** (${period.from} → ${period.to}) và đưa ra nhận xét chuyên sâu bằng tiếng Việt.
 
 === HỒ SƠ NGƯỜI DÙNG ===
-${USER_PROFILE}
+${USER_PROFILE.vi}
 
 === DỮ LIỆU GHI CHÚ ===
 ${JSON.stringify(notesSummary, null, 2)}

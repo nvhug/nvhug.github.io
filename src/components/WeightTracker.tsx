@@ -6,6 +6,9 @@ import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import { WeightLog } from '@/types'
 import { ConfirmModal } from '@/components/ui/confirm-modal'
+import { useLanguage } from '@/lib/i18n/language-context'
+import { getIntlLocale } from '@/lib/i18n/locale'
+import type { Lang } from '@/lib/i18n/language-context'
 
 const TARGET_WEIGHT = 75
 const START_WEIGHT = 61
@@ -14,9 +17,9 @@ function todayDate() {
   return new Date().toISOString().slice(0, 10)
 }
 
-function formatDate(iso: string) {
+function formatDate(iso: string, lang: Lang) {
   const [y, m, d] = iso.split('-').map(Number)
-  return new Intl.DateTimeFormat('vi-VN', { day: 'numeric', month: 'numeric', year: 'numeric' })
+  return new Intl.DateTimeFormat(getIntlLocale(lang), { day: 'numeric', month: 'numeric', year: 'numeric' })
     .format(new Date(y, m - 1, d))
 }
 
@@ -86,6 +89,7 @@ function WeightChart({ logs }: { logs: WeightLog[] }) {
 }
 
 export function WeightTracker() {
+  const { t, lang } = useLanguage()
   const [logs, setLogs] = useState<WeightLog[]>([])
   const [loading, setLoading] = useState(true)
   const [date, setDate] = useState(todayDate())
@@ -126,7 +130,7 @@ export function WeightTracker() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     const w = parseFloat(weight)
-    if (isNaN(w) || w <= 0) { toast.error('Cân nặng không hợp lệ'); return }
+    if (isNaN(w) || w <= 0) { toast.error(t('weightTracker.invalidWeight')); return }
     setSaving(true)
 
     if (editingId) {
@@ -134,14 +138,14 @@ export function WeightTracker() {
         .from('weight_logs')
         .update({ date, weight: w, notes: notes || null })
         .eq('id', editingId)
-      if (error) { toast.error('Lưu thất bại'); setSaving(false); return }
-      toast.success('Đã cập nhật')
+      if (error) { toast.error(t('weightTracker.saveFailed')); setSaving(false); return }
+      toast.success(t('weightTracker.updated'))
     } else {
       const { error } = await supabase
         .from('weight_logs')
         .upsert({ date, weight: w, notes: notes || null }, { onConflict: 'date' })
-      if (error) { toast.error('Lưu thất bại'); setSaving(false); return }
-      toast.success('Đã lưu')
+      if (error) { toast.error(t('weightTracker.saveFailed')); setSaving(false); return }
+      toast.success(t('weightTracker.saved'))
     }
 
     await fetchLogs()
@@ -151,8 +155,8 @@ export function WeightTracker() {
 
   async function handleDelete(id: string) {
     const { error } = await supabase.from('weight_logs').delete().eq('id', id)
-    if (error) { toast.error('Xóa thất bại'); return }
-    toast.success('Đã xóa')
+    if (error) { toast.error(t('weightTracker.deleteFailed')); return }
+    toast.success(t('weightTracker.deleted'))
     setLogs((prev) => prev.filter((l) => l.id !== id))
   }
 
@@ -170,22 +174,22 @@ export function WeightTracker() {
         <div className="rounded-2xl border border-emerald-200 bg-[linear-gradient(130deg,#f0fdf4_0%,#ffffff_100%)] p-4 shadow-sm">
           <div className="flex flex-wrap items-end gap-4">
             <div>
-              <p className="text-xs text-zinc-500">Hiện tại</p>
+              <p className="text-xs text-zinc-500">{t('weightTracker.current')}</p>
               <p className="text-3xl font-bold text-zinc-900">{latest.weight} <span className="text-lg font-normal text-zinc-500">kg</span></p>
             </div>
             <div>
-              <p className="text-xs text-zinc-500">Đã tăng</p>
+              <p className="text-xs text-zinc-500">{t('weightTracker.gained')}</p>
               <p className="text-xl font-semibold text-emerald-600">+{gained} kg</p>
             </div>
             <div>
-              <p className="text-xs text-zinc-500">Còn thiếu</p>
+              <p className="text-xs text-zinc-500">{t('weightTracker.remaining')}</p>
               <p className="text-xl font-semibold text-amber-600">{remaining} kg</p>
             </div>
           </div>
           <div className="mt-3">
             <div className="flex justify-between text-xs text-zinc-500 mb-1">
               <span>{START_WEIGHT}kg</span>
-              <span>Mục tiêu: {TARGET_WEIGHT}kg</span>
+              <span>{t('weightTracker.targetLabel', { target: TARGET_WEIGHT })}</span>
             </div>
             <div className="h-2 w-full rounded-full bg-zinc-200">
               <div
@@ -202,11 +206,11 @@ export function WeightTracker() {
       {/* Form */}
       <div className="rounded-2xl border border-emerald-200 bg-white p-4">
         <h3 className="mb-3 text-sm font-semibold text-zinc-700">
-          {editingId ? 'Sửa cân nặng' : 'Ghi cân nặng hôm nay'}
+          {editingId ? t('weightTracker.editHeading') : t('weightTracker.addHeading')}
         </h3>
         <form onSubmit={handleSubmit} className="flex flex-wrap gap-2 items-end">
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-zinc-500">Ngày</label>
+            <label className="text-xs text-zinc-500">{t('weightTracker.dateLabel')}</label>
             <input
               type="date"
               value={date}
@@ -216,7 +220,7 @@ export function WeightTracker() {
             />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-zinc-500">Cân nặng (kg)</label>
+            <label className="text-xs text-zinc-500">{t('weightTracker.weightLabel')}</label>
             <input
               type="number"
               step="0.1"
@@ -230,10 +234,10 @@ export function WeightTracker() {
             />
           </div>
           <div className="flex flex-col gap-1 flex-1 min-w-32">
-            <label className="text-xs text-zinc-500">Ghi chú</label>
+            <label className="text-xs text-zinc-500">{t('weightTracker.notesLabel')}</label>
             <input
               type="text"
-              placeholder="Sau ăn sáng..."
+              placeholder={t('weightTracker.notesPlaceholder')}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               className="rounded-lg border border-emerald-200 px-2.5 py-1.5 text-sm outline-none focus:border-emerald-400"
@@ -245,12 +249,12 @@ export function WeightTracker() {
             className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
           >
             <Plus className="h-3.5 w-3.5" />
-            {editingId ? 'Cập nhật' : 'Lưu'}
+            {editingId ? t('weightTracker.update') : t('common.save')}
           </button>
           {editingId && (
             <button type="button" onClick={resetForm}
               className="rounded-lg border border-zinc-200 px-3 py-1.5 text-sm text-zinc-600 hover:bg-zinc-50">
-              Hủy
+              {t('common.cancel')}
             </button>
           )}
         </form>
@@ -259,19 +263,19 @@ export function WeightTracker() {
       {/* History */}
       <div className="rounded-2xl border border-emerald-200 bg-white overflow-hidden">
         <div className="border-b border-emerald-100 px-4 py-3">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-600">Lịch sử</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-600">{t('weightTracker.history')}</p>
         </div>
         {loading ? (
-          <p className="p-4 text-sm text-zinc-400">Đang tải...</p>
+          <p className="p-4 text-sm text-zinc-400">{t('common.loading')}</p>
         ) : logs.length === 0 ? (
-          <p className="p-4 text-sm text-zinc-400">Chưa có dữ liệu. Hãy ghi cân nặng đầu tiên!</p>
+          <p className="p-4 text-sm text-zinc-400">{t('weightTracker.emptyHistory')}</p>
         ) : (
           <div className="divide-y divide-zinc-100">
             {logs.map((log) => (
               <div key={log.id} className="flex items-center justify-between px-4 py-2.5">
                 <div>
                   <span className="text-sm font-semibold text-zinc-800">{log.weight} kg</span>
-                  <span className="ml-2 text-xs text-zinc-400">{formatDate(log.date)}</span>
+                  <span className="ml-2 text-xs text-zinc-400">{formatDate(log.date, lang)}</span>
                   {log.notes && <span className="ml-2 text-xs text-zinc-400">· {log.notes}</span>}
                 </div>
                 <div className="flex gap-1">
@@ -292,8 +296,8 @@ export function WeightTracker() {
 
       <ConfirmModal
         open={!!deleteId}
-        itemContent="Xóa bản ghi cân nặng?"
-        itemMeta="Hành động này không thể hoàn tác."
+        itemContent={t('weightTracker.deleteConfirmContent')}
+        itemMeta={t('weightTracker.deleteConfirmMeta')}
         onConfirm={() => { if (deleteId) { handleDelete(deleteId); setDeleteId(null) } }}
         onCancel={() => setDeleteId(null)}
       />

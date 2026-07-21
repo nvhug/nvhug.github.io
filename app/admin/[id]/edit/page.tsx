@@ -6,10 +6,12 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { Post, Tag } from '@/types'
 import PostForm, { PostFormValues } from '@/components/PostForm'
+import { useLanguage } from '@/lib/i18n/language-context'
 
 type PostRow = Post & { post_tags: { tags: Tag | null }[] }
 
 export default function EditPostPage({ params }: { params: Promise<{ id: string }> }) {
+  const { t } = useLanguage()
   const { id } = use(params)
   const router = useRouter()
   const [post, setPost] = useState<Post | null>(null)
@@ -90,7 +92,7 @@ export default function EditPostPage({ params }: { params: Promise<{ id: string 
       router.push('/admin')
     } catch (error) {
       console.error('Error updating post:', error)
-      alert('Failed to save post. Please check the console for details.')
+      alert(t('admin.posts.updateError'))
     } finally {
       setSubmitting(false)
     }
@@ -103,16 +105,16 @@ export default function EditPostPage({ params }: { params: Promise<{ id: string 
       router.push('/admin')
     } catch (error) {
       console.error('Error deleting post:', error)
-      alert('Failed to delete post. Please check the console for details.')
+      alert(t('admin.posts.deleteError'))
     }
   }
 
   if (loading) {
-    return <div className="py-16 text-center text-sm text-muted-foreground">Loading...</div>
+    return <div className="py-16 text-center text-sm text-muted-foreground">{t('common.loading')}</div>
   }
 
   if (!post) {
-    return <div className="py-16 text-center text-sm text-muted-foreground">Post not found.</div>
+    return <div className="py-16 text-center text-sm text-muted-foreground">{t('admin.posts.notFound')}</div>
   }
 
   return (

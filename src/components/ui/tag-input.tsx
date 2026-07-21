@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { X } from 'lucide-react'
+import { useLanguage } from '@/lib/i18n/language-context'
 
 interface TagInputProps {
   value: string[]
@@ -11,7 +12,9 @@ interface TagInputProps {
   className?: string
 }
 
-export function TagInput({ value, onChange, suggestions = [], placeholder = 'Thêm tag...', className }: TagInputProps) {
+export function TagInput({ value, onChange, suggestions = [], placeholder: placeholderProp, className }: TagInputProps) {
+  const { t } = useLanguage()
+  const placeholder = placeholderProp ?? t('tagInput.placeholder')
   const [input, setInput] = useState('')
   const [open, setOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)

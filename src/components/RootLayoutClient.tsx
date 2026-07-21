@@ -6,6 +6,8 @@ import { LogOut, Settings, User as UserIcon } from 'lucide-react'
 import { Toaster } from 'sonner'
 import { useEffect, useState } from 'react'
 import { getSupabaseBrowserClient } from '@/lib/supabase-browser'
+import { useLanguage } from '@/lib/i18n/language-context'
+import { LanguageSwitch } from '@/components/LanguageSwitch'
 import type { User } from '@supabase/supabase-js'
 
 const AVATAR_COLORS = [
@@ -32,6 +34,7 @@ function avatarLabel(user: User) {
 }
 
 function AccountMenu({ user, onLogout }: { user: User; onLogout: () => void }) {
+  const { t } = useLanguage()
   const letter = avatarLetter(user)
   const color = avatarColor(user.email ?? user.id)
   const label = avatarLabel(user)
@@ -42,7 +45,7 @@ function AccountMenu({ user, onLogout }: { user: User; onLogout: () => void }) {
       <button
         type="button"
         className={`flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full text-sm font-semibold text-white select-none ring-2 ring-transparent transition-all group-hover:ring-white group-hover:ring-offset-1 ${color}`}
-        aria-label="Tài khoản"
+        aria-label={t('header.accountLabel')}
       >
         {letter}
       </button>
@@ -73,14 +76,14 @@ function AccountMenu({ user, onLogout }: { user: User; onLogout: () => void }) {
               className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-zinc-700 transition-colors hover:bg-zinc-50 hover:text-zinc-900"
             >
               <Settings className="h-4 w-4 shrink-0 text-zinc-400" />
-              Admin
+              {t('header.admin')}
             </Link>
             <Link
               href="/profile"
               className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-zinc-700 transition-colors hover:bg-zinc-50 hover:text-zinc-900"
             >
               <UserIcon className="h-4 w-4 shrink-0 text-zinc-400" />
-              Profile
+              {t('header.profile')}
             </Link>
 
             <div className="my-1 h-px bg-zinc-100" />
@@ -91,7 +94,7 @@ function AccountMenu({ user, onLogout }: { user: User; onLogout: () => void }) {
               className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-rose-600 transition-colors hover:bg-rose-50"
             >
               <LogOut className="h-4 w-4 shrink-0" />
-              Đăng xuất
+              {t('header.logout')}
             </button>
           </div>
 
@@ -102,6 +105,7 @@ function AccountMenu({ user, onLogout }: { user: User; onLogout: () => void }) {
 }
 
 export function RootLayoutClient({ children }: { children: React.ReactNode }) {
+  const { t } = useLanguage()
   const pathname = usePathname()
   const isAdmin = pathname.startsWith('/admin')
   const isLogin = pathname === '/login'
@@ -122,9 +126,9 @@ export function RootLayoutClient({ children }: { children: React.ReactNode }) {
   }, [])
 
   const navItems = [
-    { href: '/', label: 'Home' },
-    { href: '/notes', label: 'Notes' },
-    { href: '/quotes', label: 'Quotes' },
+    { href: '/', label: t('header.navHome') },
+    { href: '/notes', label: t('header.navNotes') },
+    { href: '/quotes', label: t('header.navQuotes') },
   ]
 
   async function handleLogout() {
@@ -159,6 +163,10 @@ export function RootLayoutClient({ children }: { children: React.ReactNode }) {
                 )
               })}
 
+              <div className="ml-1">
+                <LanguageSwitch />
+              </div>
+
               {user ? (
                 <AccountMenu user={user} onLogout={handleLogout} />
               ) : (
@@ -166,7 +174,7 @@ export function RootLayoutClient({ children }: { children: React.ReactNode }) {
                   type="button"
                   onClick={handleLogout}
                   className="ml-1 rounded-lg p-1.5 text-zinc-500 transition-colors hover:bg-emerald-50 hover:text-zinc-900"
-                  aria-label="Đăng xuất"
+                  aria-label={t('header.logout')}
                 >
                   <LogOut className="h-4 w-4" />
                 </button>
@@ -196,7 +204,7 @@ export function RootLayoutClient({ children }: { children: React.ReactNode }) {
                 ))}
               </div>
             </div>
-            <p className="text-xs text-zinc-500">© 2026 nvhug. Writing about code, ideas, and everyday learning.</p>
+            <p className="text-xs text-zinc-500">{t('footer.copyright')}</p>
           </div>
         </div>
       )}

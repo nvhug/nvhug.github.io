@@ -3,6 +3,7 @@ import "./globals.css";
 import { Geist, Playfair_Display, Monda, Poppins } from "next/font/google";
 import { cn } from "@/lib/utils";
 import { RootLayoutClient } from "@/components/RootLayoutClient";
+import { LanguageProvider } from "@/lib/i18n/language-context";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 
@@ -32,9 +33,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={cn("font-sans", geist.variable, playfair.variable, monda.variable, poppins.variable)} data-scroll-behavior="smooth">
+    <html lang="vi" className={cn("font-sans", geist.variable, playfair.variable, monda.variable, poppins.variable)} data-scroll-behavior="smooth">
       <body>
-        <RootLayoutClient>{children}</RootLayoutClient>
+        <LanguageProvider>
+          <RootLayoutClient>{children}</RootLayoutClient>
+        </LanguageProvider>
         <Analytics />
         <SpeedInsights />
       </body>

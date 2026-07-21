@@ -8,11 +8,13 @@ import { Tag } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+import { useLanguage } from '@/lib/i18n/language-context'
 
 type TagWithCount = Tag & { postCount: number }
 type TagRow = Tag & { post_tags: { count: number }[] }
 
 export default function AdminTagsPage() {
+  const { t } = useLanguage()
   const [tags, setTags] = useState<TagWithCount[]>([])
   const [loading, setLoading] = useState(true)
   const [newTagName, setNewTagName] = useState('')
@@ -67,7 +69,7 @@ export default function AdminTagsPage() {
       await fetchTags()
     } catch (error) {
       console.error('Error creating tag:', error)
-      alert('Failed to create tag. It may already exist.')
+      alert(t('admin.tags.createError'))
     } finally {
       setCreating(false)
     }
@@ -98,7 +100,7 @@ export default function AdminTagsPage() {
       cancelEdit()
     } catch (error) {
       console.error('Error updating tag:', error)
-      alert('Failed to rename tag. The name may already be in use.')
+      alert(t('admin.tags.renameError'))
     } finally {
       setBusyId(null)
     }
@@ -107,8 +109,8 @@ export default function AdminTagsPage() {
   async function handleDelete(tag: TagWithCount) {
     const message =
       tag.postCount > 0
-        ? `"${tag.name}" is used by ${tag.postCount} post(s). Delete it anyway?`
-        : `Delete tag "${tag.name}"?`
+        ? t('admin.tags.deleteConfirmWithCount', { name: tag.name, count: tag.postCount })
+        : t('admin.tags.deleteConfirm', { name: tag.name })
     if (!confirm(message)) return
 
     setBusyId(tag.id)
@@ -132,16 +134,16 @@ export default function AdminTagsPage() {
               <TagIcon className="h-5 w-5" />
             </div>
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-emerald-600">Taxonomy</p>
-              <h2 className="mt-1 font-poppins text-2xl font-semibold leading-tight text-zinc-900">Tag Manager</h2>
-              <p className="mt-1 text-sm text-zinc-600">Create and maintain topics used to classify your posts.</p>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-emerald-600">{t('admin.tags.eyebrow')}</p>
+              <h2 className="mt-1 font-poppins text-2xl font-semibold leading-tight text-zinc-900">{t('admin.tags.heading')}</h2>
+              <p className="mt-1 text-sm text-zinc-600">{t('admin.tags.subtitle')}</p>
             </div>
           </div>
 
           <div className="grid min-w-45 gap-2 rounded-xl border border-emerald-100 bg-white p-3 text-right shadow-[0_1px_0_0_rgba(16,185,129,0.15)]">
-            <p className="text-xs font-medium text-zinc-600">Total tags</p>
+            <p className="text-xs font-medium text-zinc-600">{t('admin.tags.totalTags')}</p>
             <p className="text-2xl font-semibold leading-none text-zinc-900">{tags.length}</p>
-            <p className="text-xs text-zinc-500">Live in the content system</p>
+            <p className="text-xs text-zinc-500">{t('admin.tags.totalTagsHint')}</p>
           </div>
         </div>
       </section>
@@ -157,7 +159,7 @@ export default function AdminTagsPage() {
                 handleCreate()
               }
             }}
-            placeholder="New tag name"
+            placeholder={t('admin.tags.newTagPlaceholder')}
             className="h-9 max-w-xs border-emerald-200 bg-emerald-50/60 text-zinc-900 placeholder:text-zinc-500"
           />
           <Button
@@ -166,21 +168,21 @@ export default function AdminTagsPage() {
             className="h-9 rounded-lg bg-linear-to-r from-emerald-500 to-emerald-600 px-3.5 text-white hover:from-emerald-400 hover:to-emerald-500"
           >
             <Plus />
-            Add Tag
+            {t('admin.tags.addTag')}
           </Button>
         </div>
 
         {loading ? (
-          <div className="py-16 text-center text-sm text-zinc-500">Loading...</div>
+          <div className="py-16 text-center text-sm text-zinc-500">{t('common.loading')}</div>
         ) : tags.length === 0 ? (
-          <div className="py-16 text-center text-sm text-zinc-500">No tags yet.</div>
+          <div className="py-16 text-center text-sm text-zinc-500">{t('admin.tags.emptyNoTags')}</div>
         ) : (
           <table className="w-full text-left text-sm">
             <thead>
               <tr className="border-b border-emerald-100 bg-emerald-50/60 text-xs font-semibold uppercase tracking-wide text-zinc-500">
-                <th className="px-4 py-3">Name</th>
-                <th className="px-4 py-3">Posts</th>
-                <th className="px-4 py-3 text-center">Actions</th>
+                <th className="px-4 py-3">{t('admin.tags.colName')}</th>
+                <th className="px-4 py-3">{t('admin.tags.colPosts')}</th>
+                <th className="px-4 py-3 text-center">{t('admin.tags.colActions')}</th>
               </tr>
             </thead>
             <tbody>

@@ -37,6 +37,9 @@ import { NotesAnalytics } from '@/components/NotesAnalytics'
 import { NotesAIInsights } from '@/components/NotesAIInsights'
 import { MealScheduleTracker } from '@/components/MealScheduleTracker'
 import { WeightTracker } from '@/components/WeightTracker'
+import { useLanguage } from '@/lib/i18n/language-context'
+import { getIntlLocale } from '@/lib/i18n/locale'
+import type { Lang } from '@/lib/i18n/language-context'
 
 type TypeFilter = 'all' | 'good' | 'bad'
 type TabType = 'notes' | 'todos' | 'goals' | 'calo' | 'meals' | 'health' | 'stats' | 'weight'
@@ -62,9 +65,9 @@ function todayDate() {
   return new Date().toISOString().slice(0, 10)
 }
 
-function formatNoteDate(isoDate: string): string {
+function formatNoteDate(isoDate: string, lang: Lang): string {
   const [year, month, day] = isoDate.split('-').map(Number)
-  return new Intl.DateTimeFormat('vi-VN', {
+  return new Intl.DateTimeFormat(getIntlLocale(lang), {
     weekday: 'long',
     year: 'numeric',
     month: 'long',
@@ -104,21 +107,18 @@ function stripWorkHourlyTimes(times: string[]) {
   return times.filter((t) => !WORK_HOURLY_NOTIFY_TIMES.includes(t))
 }
 
-function getGoalItemTypeLabel(itemType: string) {
-  switch (itemType) {
-    case 'routine':
-      return 'Thói quen'
-    case 'meal':
-      return 'Ăn'
-    case 'lesson':
-      return 'Bài học'
-    case 'exercise':
-      return 'Bài tập'
-    case 'other':
-      return 'Khác'
-    default:
-      return itemType
-  }
+type Translate = (key: string, vars?: Record<string, string | number>) => string
+
+function getGoalItemTypeLabel(itemType: string, t: Translate) {
+  const key = `notes.goals.itemTypeOptions.${itemType}`
+  const label = t(key)
+  return label === key ? itemType : label
+}
+
+function getGoalTypeLabel(type: string, t: Translate) {
+  const key = `notes.goals.typeOptions.${type}`
+  const label = t(key)
+  return label === key ? type : label
 }
 
 const textareaClass =
@@ -131,6 +131,7 @@ type GoalDraft = Omit<Goal, 'id' | 'created_at'>
 type GoalItemDraft = Omit<GoalItem, 'id' | 'goal_id' | 'created_at' | 'updated_at'>
 
 export default function NotesPage() {
+  const { t, lang } = useLanguage()
   const currentTab = useSyncExternalStore(
     subscribeToTabHash,
     getTabFromHash,
@@ -308,7 +309,7 @@ export default function NotesPage() {
           .filter((tag): tag is { id: string; name: string } => tag !== null)
           .map(tag => ({ id: tag.id, name: tag.name })),
       }))
-      const filtered = posts.filter((p) => p.tags?.some((tag) => tag.name === 'Sức Khỏe'))
+      const filtered = posts.filter((p) => p.tags?.some((tag) => tag.name === 'Sức Khỏe')) // fixed DB tag name — not translated
       setHealthPosts(filtered)
     } catch (error) {
       console.error('Error fetching health posts:', error)
@@ -362,9 +363,9 @@ export default function NotesPage() {
       if (error) throw error
       setTodoDraft('')
       await fetchTodos()
-      toast.success('Thêm việc cần làm thành công.')
+      toast.success(t('notes.todos.addSuccess'))
     } catch {
-      toast.error('Không thể thêm việc cần làm.')
+      toast.error(t('notes.todos.addError'))
     } finally {
       setSavingTodo(false)
     }
@@ -380,7 +381,7 @@ export default function NotesPage() {
       if (error) throw error
       setTodos((prev) => prev.map((t) => (t.id === todo.id ? { ...t, is_done: !t.is_done } : t)))
     } catch {
-      toast.error('Không thể cập nhật.')
+      toast.error(t('notes.toasts.updateError'))
     }
   }
 
@@ -393,7 +394,7 @@ export default function NotesPage() {
       setTodos((prev) => prev.map((t) => (t.id === id ? { ...t, content } : t)))
       setEditingTodoId(null)
     } catch {
-      toast.error('Không thể cập nhật.')
+      toast.error(t('notes.toasts.updateError'))
     }
   }
 
@@ -405,9 +406,9 @@ export default function NotesPage() {
       if (error) throw error
       setTodos((prev) => prev.filter((t) => t.id !== deleteTodo.id))
       setDeleteTodo(null)
-      toast.success('Đã xoá việc cần làm.')
+      toast.success(t('notes.todos.deleted'))
     } catch {
-      toast.error('Không thể xoá.')
+      toast.error(t('notes.toasts.deleteError'))
     } finally {
       setDeletingTodo(false)
     }
@@ -436,9 +437,9 @@ export default function NotesPage() {
       if (error) throw error
       setGoalDraft(null)
       await fetchGoals()
-      toast.success('Thêm mục tiêu thành công.')
+      toast.success(t('notes.goals.addSuccess'))
     } catch {
-      toast.error('Không thể thêm mục tiêu.')
+      toast.error(t('notes.goals.addError'))
     } finally {
       setSavingGoal(false)
     }
@@ -452,9 +453,9 @@ export default function NotesPage() {
       if (error) throw error
       setGoals((prev) => prev.filter((g) => g.id !== deleteGoal.id))
       setDeleteGoal(null)
-      toast.success('Đã xoá mục tiêu.')
+      toast.success(t('notes.goals.deleteSuccess'))
     } catch {
-      toast.error('Không thể xoá.')
+      toast.error(t('notes.toasts.deleteError'))
     } finally {
       setDeletingGoal(false)
     }
@@ -465,9 +466,9 @@ export default function NotesPage() {
       const { error } = await supabase.from('goals').update({ status: newStatus }).eq('id', goal.id)
       if (error) throw error
       setGoals((prev) => prev.map((g) => (g.id === goal.id ? { ...g, status: newStatus } : g)))
-      toast.success('Cập nhật trạng thái thành công.')
+      toast.success(t('notes.goals.statusUpdateSuccess'))
     } catch {
-      toast.error('Không thể cập nhật trạng thái.')
+      toast.error(t('notes.goals.statusUpdateError'))
     }
   }
 
@@ -488,9 +489,9 @@ export default function NotesPage() {
       const items = await fetchGoalItems(goal.id)
       setGoalItems((prev) => ({ ...prev, [goal.id]: items }))
       setGoalItemDraft((prev) => ({ ...prev, [goal.id]: { content: '', item_type: draft.item_type, metadata: {} } }))
-      toast.success('Thêm mục tiêu con thành công.')
+      toast.success(t('notes.goals.itemAddSuccess'))
     } catch {
-      toast.error('Không thể thêm mục tiêu con.')
+      toast.error(t('notes.goals.itemAddError'))
     } finally {
       setSavingGoalItem(false)
     }
@@ -507,9 +508,9 @@ export default function NotesPage() {
         [deleteGoalItem.goal_id]: prev[deleteGoalItem.goal_id]?.filter((i) => i.id !== deleteGoalItem.id) || []
       }))
       setDeleteGoalItem(null)
-      toast.success('Đã xoá.')
+      toast.success(t('notes.toasts.deleteSuccess'))
     } catch {
-      toast.error('Không thể xoá.')
+      toast.error(t('notes.toasts.deleteError'))
     } finally {
       setDeletingGoalItem(false)
     }
@@ -520,7 +521,7 @@ export default function NotesPage() {
       const { error } = await supabase.from('goal_items').update({ is_completed: !item.is_completed }).eq('id', item.id)
       if (error) throw error
     } catch {
-      toast.error('Không thể cập nhật.')
+      toast.error(t('notes.toasts.updateError'))
     }
   }
 
@@ -550,7 +551,7 @@ export default function NotesPage() {
         if (error) throw error
       }
     } catch {
-      toast.error('Không thể sắp xếp lại.')
+      toast.error(t('notes.goals.reorderError'))
       // Revert to previous state on error
       const items = await fetchGoalItems(goalId)
       setGoalItems((prev) => ({ ...prev, [goalId]: items }))
@@ -573,7 +574,7 @@ export default function NotesPage() {
 
   async function saveEditingGoalItem(item: GoalItem) {
     if (!editingGoalItemDraft || !editingGoalItemDraft.content.trim()) {
-      toast.error('Nội dung không được để trống.')
+      toast.error(t('notes.toasts.contentEmptyError'))
       return
     }
 
@@ -583,7 +584,7 @@ export default function NotesPage() {
         JSON.stringify(editingGoalItemDraft.metadata)
       }
     } catch {
-      toast.error('Metadata JSON không hợp lệ.')
+      toast.error(t('notes.goals.itemMetadataInvalid'))
       return
     }
 
@@ -610,9 +611,9 @@ export default function NotesPage() {
 
       setEditingGoalItemId(null)
       setEditingGoalItemDraft(null)
-      toast.success('Cập nhật thành công.')
+      toast.success(t('notes.toasts.updateSuccess'))
     } catch {
-      toast.error('Không thể cập nhật.')
+      toast.error(t('notes.toasts.updateError'))
     } finally {
       setSavingGoalItem(false)
     }
@@ -638,7 +639,7 @@ export default function NotesPage() {
 
   async function saveEditingGoal(goal: Goal) {
     if (!editingGoalDraft || !editingGoalDraft.title.trim()) {
-      toast.error('Tên mục tiêu không được để trống.')
+      toast.error(t('notes.goals.nameEmptyError'))
       return
     }
 
@@ -659,9 +660,9 @@ export default function NotesPage() {
 
       setEditingGoalId(null)
       setEditingGoalDraft(null)
-      toast.success('Cập nhật mục tiêu thành công.')
+      toast.success(t('notes.goals.updateSuccess'))
     } catch {
-      toast.error('Không thể cập nhật mục tiêu.')
+      toast.error(t('notes.goals.updateError'))
     } finally {
       setSavingGoal(false)
     }
@@ -727,7 +728,7 @@ export default function NotesPage() {
       setPinnedDraft('')
       await fetchNotes(false)
     } catch {
-      toast.error('Không thể thêm thói quen.')
+      toast.error(t('notes.habits.addError'))
     } finally {
       setSavingPinned(false)
     }
@@ -740,7 +741,7 @@ export default function NotesPage() {
       if (error) throw error
       setPinnedNotes((prev) => prev.filter((n) => n.id !== id))
     } catch {
-      toast.error('Không thể xoá thói quen.')
+      toast.error(t('notes.habits.deleteError'))
     } finally {
       setDeletingPinnedId(null)
     }
@@ -759,7 +760,7 @@ export default function NotesPage() {
   async function saveEditingHabit(habit: Note) {
     const content = editingHabitDraft.trim()
     if (!content) {
-      toast.error('Nội dung không được để trống.')
+      toast.error(t('notes.toasts.contentEmptyError'))
       return
     }
 
@@ -770,9 +771,9 @@ export default function NotesPage() {
       setPinnedNotes((prev) => prev.map((n) => (n.id === habit.id ? { ...n, content } : n)))
       setEditingHabitId(null)
       setEditingHabitDraft('')
-      toast.success('Cập nhật thói quen thành công.')
+      toast.success(t('notes.habits.updateSuccess'))
     } catch {
-      toast.error('Không thể cập nhật thói quen.')
+      toast.error(t('notes.habits.updateError'))
     } finally {
       setSavingHabit(false)
     }
@@ -791,7 +792,7 @@ export default function NotesPage() {
     if (updated.length === currentTimes.length) {
       setNotifyEditId(null)
       setNotifyDraftTime('')
-      toast.error('Khung giờ này đã được thêm trước đó.')
+      toast.error(t('notes.habits.timeSlotAlreadyAdded'))
       return
     }
 
@@ -802,7 +803,7 @@ export default function NotesPage() {
       const { error } = await supabase.from('notes').update({ notify_times: updated }).eq('id', habit.id)
       if (error) throw error
     } catch {
-      toast.error('Không thể cập nhật giờ thông báo.')
+      toast.error(t('notes.habits.notifyUpdateError'))
       setPinnedNotes((prev) => prev.map((n) => (n.id === habit.id ? { ...n, notify_times: habit.notify_times } : n)))
     }
   }
@@ -814,7 +815,7 @@ export default function NotesPage() {
       const { error } = await supabase.from('notes').update({ notify_times: updated }).eq('id', habit.id)
       if (error) throw error
     } catch {
-      toast.error('Không thể cập nhật.')
+      toast.error(t('notes.toasts.updateError'))
       setPinnedNotes((prev) => prev.map((n) => (n.id === habit.id ? { ...n, notify_times: habit.notify_times } : n)))
     }
   }
@@ -826,7 +827,7 @@ export default function NotesPage() {
       const { error } = await supabase.from('notes').update({ notify_times: updated }).eq('id', habit.id)
       if (error) throw error
     } catch {
-      toast.error('Không thể cập nhật.')
+      toast.error(t('notes.toasts.updateError'))
       setPinnedNotes((prev) => prev.map((n) => (n.id === habit.id ? { ...n, notify_times: habit.notify_times } : n)))
     }
   }
@@ -859,7 +860,7 @@ export default function NotesPage() {
       await fetchNotes()
     } catch (error) {
       console.error('Error creating note:', error)
-      toast.error('Không thể thêm note.')
+      toast.error(t('notes.list.addError'))
     } finally {
       setSavingDraft(false)
     }
@@ -908,7 +909,7 @@ export default function NotesPage() {
       cancelEdit()
     } catch (error) {
       console.error('Error updating note:', error)
-      toast.error('Không thể cập nhật note.')
+      toast.error(t('notes.list.updateError'))
     } finally {
       setBusyId(null)
     }
@@ -922,10 +923,10 @@ export default function NotesPage() {
       if (error) throw error
       setNotes((prev) => prev.filter((n) => n.id !== deleteTarget.id))
       setDeleteTarget(null)
-      toast.success('Đã xoá note.')
+      toast.success(t('notes.list.deleteSuccess'))
     } catch (error) {
       console.error('Error deleting note:', error)
-      toast.error('Không thể xoá note.')
+      toast.error(t('notes.list.deleteError'))
     } finally {
       setDeleting(false)
     }
@@ -938,7 +939,7 @@ export default function NotesPage() {
       if (error) throw error
     } catch {
       setNotes((prev) => prev.map((n) => (n.id === note.id ? { ...n, priority: note.priority } : n)))
-      toast.error('Không thể cập nhật.')
+      toast.error(t('notes.toasts.updateError'))
     }
   }
 
@@ -951,7 +952,7 @@ export default function NotesPage() {
       if (error) throw error
     } catch {
       setNotes((prev) => prev.map((n) => (n.id === note.id ? { ...n, completion_percentage: note.completion_percentage } : n)))
-      toast.error('Không thể cập nhật.')
+      toast.error(t('notes.toasts.updateError'))
     }
   }
 
@@ -1012,9 +1013,9 @@ export default function NotesPage() {
   )
 
   const typeTabs: { key: TypeFilter; label: string; count: number }[] = [
-    { key: 'all', label: 'Tất cả', count: counts.all },
-    { key: 'good', label: 'Việc tốt', count: counts.good },
-    { key: 'bad', label: 'Chưa tốt', count: counts.bad },
+    { key: 'all', label: t('notes.typeFilters.all'), count: counts.all },
+    { key: 'good', label: t('notes.typeFilters.good'), count: counts.good },
+    { key: 'bad', label: t('notes.typeFilters.bad'), count: counts.bad },
   ]
 
   return (
@@ -1026,33 +1027,33 @@ export default function NotesPage() {
               <NotebookPen className="h-5 w-5" />
             </div>
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-emerald-600">Nhật ký</p>
-              <h2 className="mt-1 font-poppins text-2xl font-semibold leading-tight text-zinc-900">Notes cá nhân</h2>
-              <p className="mt-1 text-sm text-zinc-600">Ghi lại thói quen tốt/xấu mỗi ngày và theo dõi tiến độ cải thiện.</p>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-emerald-600">{t('notes.header.eyebrow')}</p>
+              <h2 className="mt-1 font-poppins text-2xl font-semibold leading-tight text-zinc-900">{t('notes.header.title')}</h2>
+              <p className="mt-1 text-sm text-zinc-600">{t('notes.header.subtitle')}</p>
             </div>
           </div>
 
           <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
             <article className="rounded-xl border border-emerald-100 bg-white p-3 shadow-[0_1px_0_0_rgba(16,185,129,0.15)]">
-              <p className="text-xs font-medium text-zinc-600">Tổng số</p>
+              <p className="text-xs font-medium text-zinc-600">{t('notes.header.totalStat')}</p>
               <p className="mt-2 text-2xl font-semibold leading-none text-zinc-900">{counts.all}</p>
             </article>
             <article className="rounded-xl border border-emerald-100 bg-white p-3 shadow-[0_1px_0_0_rgba(16,185,129,0.15)]">
-              <p className="text-xs font-medium text-zinc-600">Việc tốt</p>
+              <p className="text-xs font-medium text-zinc-600">{t('notes.header.goodStat')}</p>
               <p className="mt-2 text-2xl font-semibold leading-none text-emerald-600">{counts.good}</p>
             </article>
             <article className="rounded-xl border border-amber-100 bg-white p-3 shadow-[0_1px_0_0_rgba(217,119,6,0.15)]">
-              <p className="text-xs font-medium text-zinc-600">Chưa tốt</p>
+              <p className="text-xs font-medium text-zinc-600">{t('notes.header.badStat')}</p>
               <p className="mt-2 text-2xl font-semibold leading-none text-amber-600">{counts.bad}</p>
             </article>
             <article className="rounded-xl border border-blue-100 bg-white p-3 shadow-[0_1px_0_0_rgba(59,130,246,0.15)]">
-              <p className="text-xs font-medium text-zinc-600">Cần làm</p>
+              <p className="text-xs font-medium text-zinc-600">{t('notes.header.todoStat')}</p>
               <p className="mt-2 text-2xl font-semibold leading-none text-blue-600">{counts.pendingTodos}</p>
             </article>
             <article className="rounded-xl border border-orange-100 bg-white p-3 shadow-[0_1px_0_0_rgba(234,88,12,0.15)]">
-              <p className="text-xs font-medium text-zinc-600">Calo hôm nay</p>
+              <p className="text-xs font-medium text-zinc-600">{t('notes.header.calorieStat')}</p>
               <p className="mt-2 text-2xl font-semibold leading-none text-orange-600">{Math.round(todayCalories)}</p>
-              <p className="text-xs text-zinc-500">/ {dailyCalorieGoal} kcal</p>
+              <p className="text-xs text-zinc-500">{t('notes.header.calorieGoalSuffix', { goal: dailyCalorieGoal })}</p>
             </article>
           </div>
         </section>
@@ -1067,7 +1068,7 @@ export default function NotesPage() {
             }`}
           >
             <NotebookPen className="h-4 w-4" />
-            <span className="text-center leading-tight">Notes</span>
+            <span className="text-center leading-tight">{t('notes.tabs.notes')}</span>
           </button>
           <button
             onClick={() => handleTabChange('todos')}
@@ -1078,7 +1079,7 @@ export default function NotesPage() {
             }`}
           >
             <ListTodo className="h-4 w-4" />
-            <span className="text-center leading-tight">Todos</span>
+            <span className="text-center leading-tight">{t('notes.tabs.todos')}</span>
           </button>
           <button
             onClick={() => handleTabChange('goals')}
@@ -1089,7 +1090,7 @@ export default function NotesPage() {
             }`}
           >
             <Target className="h-4 w-4" />
-            <span className="text-center leading-tight">Mục tiêu</span>
+            <span className="text-center leading-tight">{t('notes.tabs.goals')}</span>
           </button>
           <button
             onClick={() => handleTabChange('calo')}
@@ -1100,7 +1101,7 @@ export default function NotesPage() {
             }`}
           >
             <span className="text-base">🔥</span>
-            <span className="text-center leading-tight">Calo</span>
+            <span className="text-center leading-tight">{t('notes.tabs.calo')}</span>
           </button>
           <button
             onClick={() => handleTabChange('meals')}
@@ -1111,7 +1112,7 @@ export default function NotesPage() {
             }`}
           >
             <span className="text-base">🍽️</span>
-            <span className="text-center leading-tight">Meal Plan</span>
+            <span className="text-center leading-tight">{t('notes.tabs.meals')}</span>
           </button>
           <button
             onClick={() => handleTabChange('weight')}
@@ -1122,7 +1123,7 @@ export default function NotesPage() {
             }`}
           >
             <span className="text-base">⚖️</span>
-            <span className="text-center leading-tight">Cân nặng</span>
+            <span className="text-center leading-tight">{t('notes.tabs.weight')}</span>
           </button>
           <button
             onClick={() => handleTabChange('health')}
@@ -1133,7 +1134,7 @@ export default function NotesPage() {
             }`}
           >
             <span className="text-base">💪</span>
-            <span className="text-center leading-tight">Sức Khỏe</span>
+            <span className="text-center leading-tight">{t('notes.tabs.health')}</span>
           </button>
           <button
             onClick={() => handleTabChange('stats')}
@@ -1144,7 +1145,7 @@ export default function NotesPage() {
             }`}
           >
             <span className="text-base">📊</span>
-            <span className="text-center leading-tight">Thống kê</span>
+            <span className="text-center leading-tight">{t('notes.tabs.stats')}</span>
           </button>
         </div>
 
@@ -1153,16 +1154,16 @@ export default function NotesPage() {
         <section className="overflow-hidden rounded-2xl border border-emerald-200 bg-[linear-gradient(130deg,#f0fdf4_0%,#ffffff_100%)] shadow-[0_4px_20px_-8px_rgba(16,185,129,0.25)]">
           <div className="flex items-center gap-2 border-b border-emerald-100 px-4 py-3">
             <Pin className="h-3.5 w-3.5 text-emerald-600" />
-            <span className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-600">Thói quen hằng ngày</span>
+            <span className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-600">{t('notes.habits.heading')}</span>
             {notesStreak > 0 && (
               <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-xs font-semibold text-amber-600">
-                🔥 {notesStreak} ngày
+                🔥 {t('notes.habits.dayCount', { n: notesStreak })}
               </span>
             )}
           </div>
           <div className="px-4 py-3 space-y-2">
             {pinnedNotes.length === 0 && !savingPinned && (
-              <p className="text-xs text-zinc-400 italic">Chưa có thói quen nào. Thêm bên dưới.</p>
+              <p className="text-xs text-zinc-400 italic">{t('notes.habits.empty')}</p>
             )}
             {pinnedNotes.map((habit) => (
               <div key={habit.id} className="group flex flex-col gap-2 rounded-xl border border-emerald-100 border-l-2 border-l-emerald-300 bg-white px-3 py-2.5 shadow-[0_1px_4px_0_rgba(16,185,129,0.06)] transition-shadow hover:shadow-[0_3px_10px_0_rgba(16,185,129,0.12)] sm:flex-row sm:items-start">
@@ -1182,7 +1183,7 @@ export default function NotesPage() {
                         }
                       }}
                       className="min-w-0 flex-1 rounded-lg border border-emerald-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-emerald-500"
-                      placeholder="Thói quen..."
+                      placeholder={t('notes.habits.placeholder')}
                     />
                     <div className="flex items-center gap-1 sm:ml-auto">
                       <button
@@ -1190,7 +1191,7 @@ export default function NotesPage() {
                         onClick={() => void saveEditingHabit(habit)}
                         disabled={savingHabit || !editingHabitDraft.trim()}
                         className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-emerald-600 text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-45"
-                        aria-label="Lưu"
+                        aria-label={t('notes.habits.saveAria')}
                       >
                         <Check className="h-4 w-4" />
                       </button>
@@ -1199,7 +1200,7 @@ export default function NotesPage() {
                         onClick={cancelEditingHabit}
                         disabled={savingHabit}
                         className="inline-flex h-8 w-8 items-center justify-center rounded-md text-zinc-500 transition-colors hover:bg-white hover:text-zinc-700 disabled:opacity-40"
-                        aria-label="Huỷ"
+                        aria-label={t('notes.habits.cancelAria')}
                       >
                         <X className="h-4 w-4" />
                       </button>
@@ -1218,7 +1219,7 @@ export default function NotesPage() {
                   {hasWorkHourlySchedule(habit.notify_times || []) && (
                     <span className="group/chip inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] whitespace-nowrap">
                       <Bell className="h-2.5 w-2.5" />
-                      Mỗi 1 giờ (08:00-17:00)
+                      {t('notes.habits.hourlyChip')}
                       <button
                         type="button"
                         onClick={() => removeWorkHourlyNotify(habit)}
@@ -1249,16 +1250,16 @@ export default function NotesPage() {
                         onChange={(e) => setNotifyDraftTime(e.target.value)}
                         className="h-8 min-w-28 rounded-md border border-emerald-200 bg-white px-2 text-xs font-semibold text-emerald-700 outline-none focus:border-emerald-400"
                       >
-                        <option value="">Chọn giờ...</option>
+                        <option value="">{t('notes.habits.chooseTimePlaceholder')}</option>
                         <option
                           value={WORK_HOURLY_NOTIFY_OPTION}
                           disabled={hasWorkHourlySchedule(habit.notify_times || [])}
                         >
-                          Mỗi 1 giờ (08:00-17:00, trừ 12:00 & 17:00)
+                          {t('notes.habits.hourlyChipExceptNoon')}
                         </option>
-                        {NOTIFY_TIME_OPTIONS.map((t) => (
-                          <option key={t} value={t} disabled={(habit.notify_times || []).includes(t)}>
-                            {t}{(habit.notify_times || []).includes(t) ? ' (đã có)' : ''}
+                        {NOTIFY_TIME_OPTIONS.map((time) => (
+                          <option key={time} value={time} disabled={(habit.notify_times || []).includes(time)}>
+                            {time}{(habit.notify_times || []).includes(time) ? ` ${t('notes.habits.alreadyAddedSuffix')}` : ''}
                           </option>
                         ))}
                       </select>
@@ -1270,7 +1271,7 @@ export default function NotesPage() {
                           (notifyDraftTime !== WORK_HOURLY_NOTIFY_OPTION && (habit.notify_times || []).includes(notifyDraftTime))
                         }
                         className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-emerald-600 text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-45"
-                        aria-label="Lưu giờ thông báo"
+                        aria-label={t('notes.habits.saveTimesAria')}
                       >
                         <Check className="h-3.5 w-3.5" />
                       </button>
@@ -1278,7 +1279,7 @@ export default function NotesPage() {
                         type="button"
                         onClick={() => setNotifyEditId(null)}
                         className="inline-flex h-7 w-7 items-center justify-center rounded-md text-zinc-500 transition-colors hover:bg-white hover:text-zinc-700"
-                        aria-label="Huỷ chọn giờ thông báo"
+                        aria-label={t('notes.habits.cancelTimesAria')}
                       >
                         <X className="h-3.5 w-3.5" />
                       </button>
@@ -1290,7 +1291,7 @@ export default function NotesPage() {
                       className="inline-flex items-center gap-1 rounded-full border border-dashed border-emerald-200 px-2.5 py-0.5 text-xs text-emerald-400 transition-colors hover:border-emerald-400 hover:bg-emerald-50 hover:text-emerald-600 whitespace-nowrap"
                     >
                       <Bell className="h-2.5 w-2.5" />
-                      Thêm giờ
+                      {t('notes.habits.addTime')}
                     </button>
                   )}
                   </div>
@@ -1313,7 +1314,7 @@ export default function NotesPage() {
                 type="text"
                 value={pinnedDraft}
                 onChange={(e) => setPinnedDraft(e.target.value)}
-                placeholder="Thêm thói quen mới..."
+                placeholder={t('notes.habits.addPlaceholder')}
                 className="flex-1 rounded-lg border border-dashed border-emerald-200 bg-transparent px-3 py-1.5 text-sm text-zinc-700 outline-none placeholder:text-zinc-400 focus:border-emerald-400 focus:bg-white"
               />
               <button
@@ -1322,7 +1323,7 @@ export default function NotesPage() {
                 className="inline-flex items-center gap-1 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-100 disabled:opacity-40"
               >
                 <Plus className="h-3.5 w-3.5" />
-                Thêm
+                {t('common.add')}
               </button>
             </form>
           </div>
@@ -1348,7 +1349,7 @@ export default function NotesPage() {
                       }`}
                     >
                       <Sparkles className="h-3.5 w-3.5" />
-                      Tốt
+                      {t('notes.composer.good')}
                     </button>
                     <button
                       type="button"
@@ -1358,7 +1359,7 @@ export default function NotesPage() {
                       }`}
                     >
                       <ThumbsDown className="h-3.5 w-3.5" />
-                      Chưa tốt
+                      {t('notes.composer.bad')}
                     </button>
                   </div>
                   <div className="inline-flex items-center gap-0.5">
@@ -1390,7 +1391,7 @@ export default function NotesPage() {
                         onChange={(e) => updateDraft({ hide_meta: e.target.checked })}
                         className="h-3.5 w-3.5 accent-emerald-500"
                       />
-                      <span className="hidden sm:inline">Ẩn tiến độ</span>
+                      <span className="hidden sm:inline">{t('notes.composer.hideProgress')}</span>
                     </label>
                   </div>
                 </div>
@@ -1406,7 +1407,7 @@ export default function NotesPage() {
                       saveDraft()
                     }
                   }}
-                  placeholder="Hôm nay bạn đã làm gì..."
+                  placeholder={t('notes.composer.placeholder')}
                   className={textareaClass}
                 />
                 <TagInput
@@ -1416,7 +1417,7 @@ export default function NotesPage() {
                 />
                 <div className="flex items-center justify-end gap-2">
                   <Button variant="ghost" size="sm" onClick={cancelDraft} className="text-zinc-600 hover:bg-emerald-100 hover:text-emerald-700">
-                    Huỷ
+                    {t('common.cancel')}
                   </Button>
                   <Button
                     size="sm"
@@ -1425,7 +1426,7 @@ export default function NotesPage() {
                     className="bg-linear-to-r from-emerald-500 to-emerald-600 text-white hover:from-emerald-400 hover:to-emerald-500"
                   >
                     <Check />
-                    Lưu note
+                    {t('notes.composer.saveNote')}
                   </Button>
                 </div>
               </div>
@@ -1436,7 +1437,7 @@ export default function NotesPage() {
                 className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-emerald-300 py-2.5 text-sm font-medium text-emerald-700 transition-colors hover:bg-emerald-50"
               >
                 <Plus className="h-4 w-4" />
-                Thêm note mới
+                {t('notes.composer.addNew')}
               </button>
             )}
           </div>
@@ -1444,7 +1445,7 @@ export default function NotesPage() {
           <div className="border-b border-emerald-100 px-4 py-2.5">
             <input
               type="search"
-              placeholder="Tìm kiếm notes, tags..."
+              placeholder={t('notes.list.searchPlaceholder')}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full rounded-lg border border-emerald-200 bg-white px-3 py-1.5 text-sm text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-emerald-400"
@@ -1494,17 +1495,17 @@ export default function NotesPage() {
           </div>
 
           {loading ? (
-            <div className="py-16 text-center text-sm text-zinc-500">Đang tải...</div>
+            <div className="py-16 text-center text-sm text-zinc-500">{t('common.loading')}</div>
           ) : noteGroups.length === 0 ? (
             <div className="py-16 text-center text-sm text-zinc-500">
-              {searchQuery.trim() ? `Không tìm thấy kết quả cho "${searchQuery}"` : 'Chưa có note nào.'}
+              {searchQuery.trim() ? t('notes.list.noResults', { q: searchQuery }) : t('notes.list.empty')}
             </div>
           ) : (
             <div className="divide-y divide-emerald-50">
               {noteGroups.map((group, gi) => (
                 <div key={`${group.date}-${gi}`} className="px-4 py-3.5">
                   <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">
-                    {formatNoteDate(group.date)}
+                    {formatNoteDate(group.date, lang)}
                   </p>
                   <div className="space-y-2">
                     {group.items.map((note) => (
@@ -1531,7 +1532,7 @@ export default function NotesPage() {
                                     }`}
                                   >
                                     <Sparkles className="h-3.5 w-3.5" />
-                                    Tốt
+                                    {t('notes.composer.good')}
                                   </button>
                                   <button
                                     type="button"
@@ -1541,7 +1542,7 @@ export default function NotesPage() {
                                     }`}
                                   >
                                     <ThumbsDown className="h-3.5 w-3.5" />
-                                    Chưa tốt
+                                    {t('notes.composer.bad')}
                                   </button>
                                 </div>
                                 <div className="inline-flex items-center gap-0.5">
@@ -1575,7 +1576,7 @@ export default function NotesPage() {
                                       onChange={(e) => updateEditingDraft({ hide_meta: e.target.checked })}
                                       className="h-3.5 w-3.5 accent-emerald-500"
                                     />
-                                    <span className="hidden sm:inline">Ẩn tiến độ</span>
+                                    <span className="hidden sm:inline">{t('notes.composer.hideProgress')}</span>
                                   </label>
                                 </div>
                               </div>
@@ -1719,9 +1720,9 @@ export default function NotesPage() {
           <div className="flex items-center justify-between border-b border-emerald-100 px-4 py-3">
             <div className="flex items-center gap-2">
               <ListTodo className="h-3.5 w-3.5 text-emerald-600" />
-              <span className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-600">Việc cần làm</span>
+              <span className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-600">{t('notes.todos.heading')}</span>
             </div>
-            <span className="text-xs font-medium text-emerald-600">{todos.length} việc</span>
+            <span className="text-xs font-medium text-emerald-600">{t('notes.todos.count', { n: todos.length })}</span>
           </div>
 
           <div className="px-4 py-3">
@@ -1736,15 +1737,15 @@ export default function NotesPage() {
                 let bgColor = 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
 
                 if (filter === 'all') {
-                  label = 'Tất cả'
+                  label = t('notes.todos.filterAll')
                   count = todos.length
                   bgColor = isSelected ? 'bg-emerald-100 text-emerald-700' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
                 } else if (filter === 'pending') {
-                  label = 'Chưa làm'
+                  label = t('notes.todos.filterPending')
                   count = pendingCount
                   bgColor = isSelected ? 'bg-blue-100 text-blue-700' : 'bg-blue-50 text-blue-600 hover:bg-blue-100'
                 } else if (filter === 'done') {
-                  label = 'Đã làm'
+                  label = t('notes.todos.filterDone')
                   count = doneCount
                   bgColor = isSelected ? 'bg-emerald-100 text-emerald-700' : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'
                 }
@@ -1869,9 +1870,9 @@ export default function NotesPage() {
                 return true
               }).length === 0 && (
                 <div className="text-center py-8 text-zinc-500">
-                  {todoFilter === 'all' && 'Chưa có việc cần làm nào.'}
-                  {todoFilter === 'pending' && 'Tất cả việc đã xong!'}
-                  {todoFilter === 'done' && 'Chưa có việc nào hoàn thành.'}
+                  {todoFilter === 'all' && t('notes.todos.emptyAll')}
+                  {todoFilter === 'pending' && t('notes.todos.emptyPending')}
+                  {todoFilter === 'done' && t('notes.todos.emptyDone')}
                 </div>
               )}
             </div>
@@ -1879,7 +1880,7 @@ export default function NotesPage() {
             <div className="flex gap-2 border-t border-emerald-100 pt-4">
               <Input
                 type="text"
-                placeholder="Thêm việc cần làm..."
+                placeholder={t('notes.todos.addPlaceholder')}
                 value={todoDraft}
                 onChange={(e) => setTodoDraft(e.target.value)}
                 onKeyDown={(e) => {
@@ -1895,7 +1896,7 @@ export default function NotesPage() {
                 className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
               >
                 <Plus className="h-4 w-4" />
-                Thêm
+                {t('common.add')}
               </Button>
             </div>
           </div>
@@ -1906,7 +1907,7 @@ export default function NotesPage() {
         <section className="overflow-hidden rounded-2xl border border-emerald-200 bg-[linear-gradient(130deg,#f0fdf4_0%,#ffffff_100%)] shadow-[0_4px_20px_-8px_rgba(16,185,129,0.25)]">
           <div className="flex items-center gap-2 border-b border-emerald-100 px-4 py-3">
             <Target className="h-3.5 w-3.5 text-emerald-600" />
-            <span className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-600">Mục tiêu của tôi</span>
+            <span className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-600">{t('notes.goals.heading')}</span>
           </div>
 
           <div className="px-4 py-3">
@@ -1922,15 +1923,15 @@ export default function NotesPage() {
                 let bgColor = 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
 
                 if (filter === 'all') {
-                  label = 'Tất cả'
+                  label = t('notes.goals.filterAll')
                   count = allGoals
                   bgColor = isSelected ? 'bg-emerald-100 text-emerald-700' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
                 } else if (filter === 'active') {
-                  label = 'Đang làm'
+                  label = t('notes.goals.filterActive')
                   count = activeGoals
                   bgColor = isSelected ? 'bg-blue-100 text-blue-700' : 'bg-blue-50 text-blue-600 hover:bg-blue-100'
                 } else {
-                  label = 'Hoàn thành'
+                  label = t('notes.goals.filterCompleted')
                   count = completedGoals
                   bgColor = isSelected ? 'bg-emerald-100 text-emerald-700' : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'
                 }
@@ -1973,7 +1974,7 @@ export default function NotesPage() {
                     type="text"
                     value={goalDraft.title}
                     onChange={(e) => setGoalDraft((prev) => prev ? { ...prev, title: e.target.value } : null)}
-                    placeholder="Tên mục tiêu..."
+                    placeholder={t('notes.goals.namePlaceholder')}
                     className="flex-1 h-8 border-emerald-200 bg-white text-zinc-900"
                   />
                   <select
@@ -1981,19 +1982,19 @@ export default function NotesPage() {
                     onChange={(e) => setGoalDraft((prev) => prev ? { ...prev, type: e.target.value } : null)}
                     className="h-8 rounded-md border border-emerald-200 bg-white px-2 text-xs font-semibold text-emerald-700 outline-none focus:border-emerald-400"
                   >
-                    <option value="health">Sức khỏe</option>
-                    <option value="learning">Học tập</option>
-                    <option value="fitness">Thể dục</option>
-                    <option value="work">Công việc</option>
-                    <option value="personal">Cá nhân</option>
-                    <option value="other">Khác</option>
+                    <option value="health">{t('notes.goals.typeOptions.health')}</option>
+                    <option value="learning">{t('notes.goals.typeOptions.learning')}</option>
+                    <option value="fitness">{t('notes.goals.typeOptions.fitness')}</option>
+                    <option value="work">{t('notes.goals.typeOptions.work')}</option>
+                    <option value="personal">{t('notes.goals.typeOptions.personal')}</option>
+                    <option value="other">{t('notes.goals.typeOptions.other')}</option>
                   </select>
                 </div>
                 <textarea
                   ref={goalDescriptionRef}
                   value={goalDraft.description || ''}
                   onChange={(e) => setGoalDraft((prev) => prev ? { ...prev, description: e.target.value } : null)}
-                  placeholder="Mô tả (tùy chọn)..."
+                  placeholder={t('notes.goals.descPlaceholder')}
                   rows={2}
                   className={autoTextareaClass}
                 />
@@ -2017,7 +2018,7 @@ export default function NotesPage() {
                 </div>
                 <div className="flex items-center justify-end gap-2">
                   <Button variant="ghost" size="sm" onClick={cancelGoalDraft} className="text-zinc-600 hover:bg-emerald-100 hover:text-emerald-700">
-                    Huỷ
+                    {t('common.cancel')}
                   </Button>
                   <Button
                     size="sm"
@@ -2026,7 +2027,7 @@ export default function NotesPage() {
                     className="bg-linear-to-r from-emerald-500 to-emerald-600 text-white hover:from-emerald-400 hover:to-emerald-500"
                   >
                     <Check />
-                    Thêm
+                    {t('common.add')}
                   </Button>
                 </div>
               </div>
@@ -2037,7 +2038,7 @@ export default function NotesPage() {
                 className="mb-4 inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-emerald-300 py-2.5 text-sm font-medium text-emerald-700 transition-colors hover:bg-emerald-50"
               >
                 <Plus className="h-4 w-4" />
-                Thêm mục tiêu mới
+                {t('notes.goals.addNew')}
               </button>
             )}
 
@@ -2056,7 +2057,7 @@ export default function NotesPage() {
                               type="text"
                               value={editingGoalDraft.title}
                               onChange={(e) => setEditingGoalDraft((prev) => prev ? { ...prev, title: e.target.value } : null)}
-                              placeholder="Tên mục tiêu..."
+                              placeholder={t('notes.goals.namePlaceholder')}
                               className="w-full rounded-md border border-emerald-300 bg-white px-2 py-1.5 text-sm font-medium text-zinc-900 outline-none focus:border-emerald-500"
                             />
                             <div className="flex flex-wrap gap-2">
@@ -2065,12 +2066,12 @@ export default function NotesPage() {
                                 onChange={(e) => setEditingGoalDraft((prev) => prev ? { ...prev, type: e.target.value } : null)}
                                 className="h-8 rounded-md border border-emerald-200 bg-white px-2 text-xs font-semibold text-emerald-700 outline-none focus:border-emerald-400"
                               >
-                                <option value="health">Sức khỏe</option>
-                                <option value="learning">Học tập</option>
-                                <option value="fitness">Thể dục</option>
-                                <option value="work">Công việc</option>
-                                <option value="personal">Cá nhân</option>
-                                <option value="other">Khác</option>
+                                <option value="health">{t('notes.goals.typeOptions.health')}</option>
+                                <option value="learning">{t('notes.goals.typeOptions.learning')}</option>
+                                <option value="fitness">{t('notes.goals.typeOptions.fitness')}</option>
+                                <option value="work">{t('notes.goals.typeOptions.work')}</option>
+                                <option value="personal">{t('notes.goals.typeOptions.personal')}</option>
+                                <option value="other">{t('notes.goals.typeOptions.other')}</option>
                               </select>
                               <Input
                                 type="date"
@@ -2089,7 +2090,7 @@ export default function NotesPage() {
                               ref={editingGoalDescriptionRef}
                               value={editingGoalDraft.description || ''}
                               onChange={(e) => setEditingGoalDraft((prev) => prev ? { ...prev, description: e.target.value } : null)}
-                              placeholder="Mô tả (tùy chọn)..."
+                              placeholder={t('notes.goals.descPlaceholder')}
                               rows={2}
                               className={autoTextareaClass}
                             />
@@ -2130,7 +2131,7 @@ export default function NotesPage() {
                           <div className="space-y-3">
                             <div className="flex items-center gap-2 flex-wrap">
                               <h3 className="font-medium text-base text-zinc-900">{goal.title}</h3>
-                              <span className="text-sm px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700 font-medium">{goal.type}</span>
+                              <span className="text-sm px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700 font-medium">{getGoalTypeLabel(goal.type, t)}</span>
                             </div>
 
                             {/* Timeline */}
@@ -2138,10 +2139,10 @@ export default function NotesPage() {
                               <div className="text-sm text-zinc-600 space-y-1">
                                 <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3">
                                   {goal.start_date && (
-                                    <span>📅 <span className="text-zinc-700 font-medium">{new Date(goal.start_date).toLocaleDateString('vi-VN')}</span></span>
+                                    <span>📅 <span className="text-zinc-700 font-medium">{new Date(goal.start_date).toLocaleDateString(getIntlLocale(lang))}</span></span>
                                   )}
                                   {goal.target_date && (
-                                    <span>🎯 <span className="text-zinc-700 font-medium">{new Date(goal.target_date).toLocaleDateString('vi-VN')}</span></span>
+                                    <span>🎯 <span className="text-zinc-700 font-medium">{new Date(goal.target_date).toLocaleDateString(getIntlLocale(lang))}</span></span>
                                   )}
                                 </div>
                                 {goal.start_date && goal.target_date && (() => {
@@ -2152,7 +2153,7 @@ export default function NotesPage() {
                                   const elapsedDays = Math.ceil((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
                                   const remainingDays = Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
                                   return (
-                                    <div className="text-sm text-zinc-600">⏱️ <span className="font-medium text-zinc-700">{Math.max(0, elapsedDays)}/{totalDays}</span> ngày | Còn: <span className="font-medium text-zinc-700">{Math.max(0, remainingDays)}</span></div>
+                                    <div className="text-sm text-zinc-600">⏱️ <span className="font-medium text-zinc-700">{Math.max(0, elapsedDays)}/{totalDays}</span> {t('notes.goals.daysRemainingPrefix')} <span className="font-medium text-zinc-700">{Math.max(0, remainingDays)}</span></div>
                                   )
                                 })()}
                               </div>
@@ -2166,7 +2167,7 @@ export default function NotesPage() {
                             {goal.completion_percentage !== undefined && (
                               <div>
                                 <div className="flex items-center justify-between mb-1.5">
-                                  <span className="text-sm font-medium text-zinc-700">Tiến độ</span>
+                                  <span className="text-sm font-medium text-zinc-700">{t('notes.goals.progress')}</span>
                                   <span className="text-sm font-semibold text-emerald-600">{goal.completion_percentage}%</span>
                                 </div>
                                 <div className="w-full bg-emerald-100 rounded-full h-2 overflow-hidden shadow-inner">
@@ -2189,9 +2190,9 @@ export default function NotesPage() {
                             onChange={(e) => updateGoalStatus(goal, e.target.value as Goal['status'])}
                             className="h-8 rounded-md border border-emerald-200 bg-white px-2 text-xs font-semibold text-emerald-700 outline-none focus:border-emerald-400"
                           >
-                            <option value="active">Đang làm</option>
-                            <option value="completed">Hoàn thành</option>
-                            <option value="archived">Lưu trữ</option>
+                            <option value="active">{t('notes.goals.statusOptions.active')}</option>
+                            <option value="completed">{t('notes.goals.statusOptions.completed')}</option>
+                            <option value="archived">{t('notes.goals.statusOptions.archived')}</option>
                           </select>
                           <div className="flex items-center gap-1 ml-auto">
                             <Button
@@ -2222,12 +2223,12 @@ export default function NotesPage() {
                       {expandedGoal === goal.id ? (
                         <>
                           <ChevronUp className="h-4 w-4" />
-                          Ẩn chi tiết
+                          {t('notes.goals.hideDetails')}
                         </>
                       ) : (
                         <>
                           <ChevronDown className="h-4 w-4" />
-                          Xem chi tiết
+                          {t('notes.goals.showDetails')}
                         </>
                       )}
                     </button>
@@ -2286,7 +2287,7 @@ export default function NotesPage() {
                                       type="text"
                                       value={editingGoalItemDraft.content}
                                       onChange={(e) => setEditingGoalItemDraft((prev) => prev ? { ...prev, content: e.target.value } : null)}
-                                      placeholder="Nội dung..."
+                                      placeholder={t('notes.goals.itemContentPlaceholder')}
                                       className="w-full rounded-md border border-emerald-300 bg-white px-2 py-1.5 text-xs text-zinc-900 outline-none focus:border-emerald-500"
                                     />
                                     <div className="flex gap-2">
@@ -2295,11 +2296,11 @@ export default function NotesPage() {
                                         onChange={(e) => setEditingGoalItemDraft((prev) => prev ? { ...prev, item_type: e.target.value } : null)}
                                         className="h-7 rounded-md border border-emerald-200 bg-white px-2 text-xs font-semibold text-emerald-700 outline-none focus:border-emerald-400"
                                       >
-                                        <option value="routine">Thói quen</option>
-                                        <option value="meal">Ăn</option>
-                                        <option value="lesson">Bài học</option>
-                                        <option value="exercise">Bài tập</option>
-                                        <option value="other">Khác</option>
+                                        <option value="routine">{t('notes.goals.itemTypeOptions.routine')}</option>
+                                        <option value="meal">{t('notes.goals.itemTypeOptions.meal')}</option>
+                                        <option value="lesson">{t('notes.goals.itemTypeOptions.lesson')}</option>
+                                        <option value="exercise">{t('notes.goals.itemTypeOptions.exercise')}</option>
+                                        <option value="other">{t('notes.goals.itemTypeOptions.other')}</option>
                                       </select>
                                       <label className="flex items-center gap-1.5 cursor-pointer">
                                         <input
@@ -2308,21 +2309,21 @@ export default function NotesPage() {
                                           onChange={(e) => setEditingGoalItemDraft((prev) => prev ? { ...prev, is_completed: e.target.checked } : null)}
                                           className="h-4 w-4 accent-emerald-500"
                                         />
-                                        <span className="text-xs font-medium text-zinc-600">Hoàn thành</span>
+                                        <span className="text-xs font-medium text-zinc-600">{t('notes.goals.itemDoneLabel')}</span>
                                       </label>
                                     </div>
                                     <div>
-                                      <label className="text-xs font-medium text-zinc-700 block mb-1">📝 Kết quả:</label>
+                                      <label className="text-xs font-medium text-zinc-700 block mb-1">{t('notes.goals.itemResultLabel')}</label>
                                       <textarea
                                         value={editingGoalItemDraft.result || ''}
                                         onChange={(e) => setEditingGoalItemDraft((prev) => prev ? { ...prev, result: e.target.value } : null)}
-                                        placeholder="Nhập kết quả sau khi hoàn thành..."
+                                        placeholder={t('notes.goals.itemResultPlaceholder')}
                                         rows={3}
                                         className="w-full rounded-md border border-emerald-200 bg-white px-2 py-1.5 text-xs text-zinc-900 outline-none focus:border-emerald-500 resize-none"
                                       />
                                     </div>
                                     <div>
-                                      <label className="text-xs font-medium text-zinc-700 block mb-1">Metadata (JSON):</label>
+                                      <label className="text-xs font-medium text-zinc-700 block mb-1">{t('notes.goals.itemMetadataLabel')}</label>
                                       <textarea
                                         value={JSON.stringify(editingGoalItemDraft.metadata || {}, null, 2)}
                                         onChange={(e) => {
@@ -2370,17 +2371,17 @@ export default function NotesPage() {
                                     </p>
                                     <div className="flex gap-1.5 flex-wrap items-center mt-1">
                                       <span className="text-sm px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 inline-block">
-                                        {getGoalItemTypeLabel(item.item_type)}
+                                        {getGoalItemTypeLabel(item.item_type, t)}
                                       </span>
                                       {item.is_completed && (
                                         <span className="text-sm px-1.5 py-0.5 rounded bg-emerald-500 text-white inline-block">
-                                          ✓ Hoàn thành
+                                          {t('notes.goals.itemDoneBadge')}
                                         </span>
                                       )}
                                     </div>
                                     {item.result && (
                                       <div className="mt-1.5 p-1.5 rounded-md bg-blue-50 border border-blue-100">
-                                        <p className="text-sm font-medium text-blue-900">📝 Kết quả:</p>
+                                        <p className="text-sm font-medium text-blue-900">{t('notes.goals.itemResultLabel')}</p>
                                         <p className="text-sm text-blue-800 whitespace-pre-wrap mt-0.5">{item.result}</p>
                                       </div>
                                     )}
@@ -2415,7 +2416,7 @@ export default function NotesPage() {
                             </div>
                           ))}
                           {(goalItems[goal.id] || []).length === 0 && (
-                            <p className="text-sm text-zinc-400 italic">Chưa có chi tiết nào.</p>
+                            <p className="text-sm text-zinc-400 italic">{t('notes.goals.itemsEmpty')}</p>
                           )}
                         </div>
                         <form
@@ -2429,7 +2430,7 @@ export default function NotesPage() {
                               ...prev,
                               [goal.id]: { ...prev[goal.id], content: e.target.value, item_type: prev[goal.id]?.item_type || 'routine' }
                             }))}
-                            placeholder="Thêm chi tiết..."
+                            placeholder={t('notes.goals.itemAddPlaceholder')}
                             className="flex-1 rounded-lg border border-dashed border-emerald-200 bg-transparent px-2 py-1.5 text-xs text-zinc-700 outline-none placeholder:text-zinc-400 focus:border-emerald-400 focus:bg-white"
                           />
                           <select
@@ -2444,11 +2445,11 @@ export default function NotesPage() {
                             }))}
                             className="h-8 rounded-md border border-emerald-200 bg-white px-2 text-xs font-semibold text-emerald-700 outline-none focus:border-emerald-400"
                           >
-                            <option value="routine">Thói quen</option>
-                            <option value="meal">Ăn</option>
-                            <option value="lesson">Bài học</option>
-                            <option value="exercise">Bài tập</option>
-                            <option value="other">Khác</option>
+                            <option value="routine">{t('notes.goals.itemTypeOptions.routine')}</option>
+                            <option value="meal">{t('notes.goals.itemTypeOptions.meal')}</option>
+                            <option value="lesson">{t('notes.goals.itemTypeOptions.lesson')}</option>
+                            <option value="exercise">{t('notes.goals.itemTypeOptions.exercise')}</option>
+                            <option value="other">{t('notes.goals.itemTypeOptions.other')}</option>
                           </select>
                           <button
                             type="submit"
@@ -2456,7 +2457,7 @@ export default function NotesPage() {
                             className="inline-flex items-center gap-1 rounded-lg border border-emerald-300 bg-emerald-50 px-2 py-1.5 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-100 disabled:opacity-40"
                           >
                             <Plus className="h-3.5 w-3.5" />
-                            Thêm
+                            {t('common.add')}
                           </button>
                         </form>
                       </div>
@@ -2465,7 +2466,7 @@ export default function NotesPage() {
                 ))}
 
               {goals.filter((goal) => goalFilter === 'all' || goal.status === goalFilter).length === 0 && (
-                <div className="text-center py-8 text-zinc-500">Chưa có mục tiêu nào.</div>
+                <div className="text-center py-8 text-zinc-500">{t('notes.goals.empty')}</div>
               )}
             </div>
           </div>
@@ -2476,8 +2477,8 @@ export default function NotesPage() {
         <>
         <section className="overflow-hidden rounded-2xl border border-emerald-200 bg-white shadow-[0_4px_20px_-8px_rgba(16,185,129,0.25)]">
           <div className="border-b border-emerald-100 px-4 py-3.5">
-            <h3 className="font-semibold text-zinc-900">Theo dõi calo</h3>
-            <p className="mt-1 text-xs text-zinc-600">Ghi lại thực phẩm ăn trong ngày và theo dõi tiến độ đạt mục tiêu calo hàng ngày.</p>
+            <h3 className="font-semibold text-zinc-900">{t('notes.calo.heading')}</h3>
+            <p className="mt-1 text-xs text-zinc-600">{t('notes.calo.subtitle')}</p>
           </div>
           <div className="p-4">
             <CalorieTracker />
@@ -2489,7 +2490,7 @@ export default function NotesPage() {
         {currentTab === 'meals' && (
         <section className="overflow-hidden rounded-2xl border border-orange-200 bg-white shadow-[0_4px_20px_-8px_rgba(234,88,12,0.25)]">
           <div className="border-b border-orange-100 px-4 py-3.5">
-            <h3 className="font-semibold text-zinc-900">Lịch Ăn</h3>
+            <h3 className="font-semibold text-zinc-900">{t('notes.meals.heading')}</h3>
           </div>
           <div className="p-4">
             <MealScheduleTracker />
@@ -2501,19 +2502,19 @@ export default function NotesPage() {
         <section className="overflow-hidden rounded-2xl border border-emerald-200 bg-[linear-gradient(130deg,#f0fdf4_0%,#ffffff_100%)] shadow-[0_4px_20px_-8px_rgba(16,185,129,0.25)]">
           <div className="flex items-center gap-2 border-b border-emerald-100 px-4 py-3">
             <span className="text-xl">💪</span>
-            <span className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-600">Bài viết sức khỏe</span>
+            <span className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-600">{t('notes.health.heading')}</span>
             <a
               href={`/admin/create?autotag=${encodeURIComponent('Sức Khỏe')}`}
               className="ml-auto inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-white px-2 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-50 transition-colors"
             >
               <Plus className="h-3 w-3" />
-              Tạo bài
+              {t('notes.health.newPost')}
             </a>
           </div>
 
           <div className="px-4 py-3">
             {healthPosts.length === 0 ? (
-              <div className="py-6 text-center text-sm text-zinc-500">Chưa có bài viết nào.</div>
+              <div className="py-6 text-center text-sm text-zinc-500">{t('notes.health.empty')}</div>
             ) : (
               <div className="space-y-3">
                 {healthPosts.map((post) => (
@@ -2545,7 +2546,7 @@ export default function NotesPage() {
         <section className="overflow-hidden rounded-2xl border border-emerald-200 bg-[linear-gradient(130deg,#f0fdf4_0%,#ffffff_100%)] shadow-[0_4px_20px_-8px_rgba(16,185,129,0.25)]">
           <div className="flex items-center gap-2 border-b border-emerald-100 px-4 py-3">
             <span className="text-xl">⚖️</span>
-            <span className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-600">Theo dõi cân nặng</span>
+            <span className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-600">{t('notes.weight.heading')}</span>
           </div>
           <div className="p-4">
             <WeightTracker />
@@ -2558,14 +2559,14 @@ export default function NotesPage() {
           <section className="overflow-hidden rounded-2xl border border-emerald-200 bg-[linear-gradient(130deg,#f0fdf4_0%,#ffffff_100%)] shadow-[0_4px_20px_-8px_rgba(16,185,129,0.25)]">
             <div className="flex items-center gap-2 border-b border-emerald-100 px-4 py-3">
               <span className="text-xl">📊</span>
-              <span className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-600">Thống kê Notes</span>
+              <span className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-600">{t('notes.stats.notesHeading')}</span>
             </div>
             <NotesAnalytics notes={notes} />
           </section>
           <section className="overflow-hidden rounded-2xl border border-emerald-200 bg-[linear-gradient(130deg,#f0fdf4_0%,#ffffff_100%)] shadow-[0_4px_20px_-8px_rgba(16,185,129,0.25)]">
             <div className="border-b border-emerald-100 px-4 py-3.5">
-              <h3 className="font-semibold text-zinc-900">Phân tích calo</h3>
-              <p className="mt-1 text-xs text-zinc-600">Xu hướng 14 ngày gần nhất và top thực phẩm trong 30 ngày.</p>
+              <h3 className="font-semibold text-zinc-900">{t('notes.stats.calorieHeading')}</h3>
+              <p className="mt-1 text-xs text-zinc-600">{t('notes.stats.calorieSubtitle')}</p>
             </div>
             <div className="p-4">
               <CalorieAnalytics />
@@ -2574,7 +2575,7 @@ export default function NotesPage() {
           <section className="overflow-hidden rounded-2xl border border-violet-200 bg-[linear-gradient(130deg,#f5f3ff_0%,#ffffff_100%)] shadow-[0_4px_20px_-8px_rgba(139,92,246,0.2)]">
             <div className="flex items-center gap-2 border-b border-violet-100 px-4 py-3">
               <span className="text-xl">🤖</span>
-              <span className="text-xs font-semibold uppercase tracking-[0.2em] text-violet-600">AI Insights</span>
+              <span className="text-xs font-semibold uppercase tracking-[0.2em] text-violet-600">{t('notes.stats.aiHeading')}</span>
             </div>
             <NotesAIInsights notes={notes} habits={pinnedNotes} />
           </section>

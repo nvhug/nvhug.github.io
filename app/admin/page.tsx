@@ -22,11 +22,13 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { ConfirmModal } from '@/components/ui/confirm-modal'
+import { useLanguage } from '@/lib/i18n/language-context'
 
 type StatusFilter = 'all' | 'published' | 'draft'
 type PostRow = Post & { post_tags: { tags: Tag | null }[] }
 
 export default function AdminPostsPage() {
+  const { t } = useLanguage()
   const [posts, setPosts] = useState<Post[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -135,32 +137,32 @@ export default function AdminPostsPage() {
   })
 
   const statusTabs: { key: StatusFilter; label: string; count: number }[] = [
-    { key: 'all', label: 'All', count: counts.all },
-    { key: 'published', label: 'Published', count: counts.published },
-    { key: 'draft', label: 'Draft', count: counts.draft },
+    { key: 'all', label: t('common.all'), count: counts.all },
+    { key: 'published', label: t('admin.posts.filterPublished'), count: counts.published },
+    { key: 'draft', label: t('admin.posts.filterDraft'), count: counts.draft },
   ]
 
   const statCards = [
     {
       key: 'all',
-      label: 'Total Posts',
+      label: t('admin.posts.statTotal'),
       value: counts.all,
       icon: Layers,
-      hint: 'In library',
+      hint: t('admin.posts.statTotalHint'),
     },
     {
       key: 'published',
-      label: 'Published',
+      label: t('admin.posts.statPublished'),
       value: counts.published,
       icon: CircleDot,
-      hint: 'Visible to readers',
+      hint: t('admin.posts.statPublishedHint'),
     },
     {
       key: 'draft',
-      label: 'Drafts',
+      label: t('admin.posts.statDrafts'),
       value: counts.draft,
       icon: CalendarClock,
-      hint: 'Pending editing',
+      hint: t('admin.posts.statDraftsHint'),
     },
   ]
 
@@ -174,16 +176,16 @@ export default function AdminPostsPage() {
               <FileText className="h-5 w-5" />
             </div>
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-emerald-600">Editorial</p>
-              <h2 className="mt-1 font-poppins text-2xl font-semibold leading-tight text-zinc-900">Posts Workspace</h2>
-              <p className="mt-1 text-sm text-zinc-600">Create, review, and publish content from a single panel.</p>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-emerald-600">{t('admin.posts.eyebrow')}</p>
+              <h2 className="mt-1 font-poppins text-2xl font-semibold leading-tight text-zinc-900">{t('admin.posts.heading')}</h2>
+              <p className="mt-1 text-sm text-zinc-600">{t('admin.posts.subtitle')}</p>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Link href="/admin/create">
               <Button className="h-9 rounded-lg bg-linear-to-r from-emerald-500 to-emerald-600 px-3.5 text-white hover:from-emerald-400 hover:to-emerald-500">
                 <Plus />
-                New Post
+                {t('admin.posts.newPost')}
               </Button>
             </Link>
           </div>
@@ -236,7 +238,7 @@ export default function AdminPostsPage() {
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search posts..."
+              placeholder={t('admin.posts.searchPlaceholder')}
               className="h-9 border-emerald-200 bg-emerald-50/60 pl-8 text-zinc-900 placeholder:text-zinc-500"
             />
           </div>
@@ -245,7 +247,7 @@ export default function AdminPostsPage() {
             onChange={(e) => setTagFilter(e.target.value)}
             className="h-9 rounded-lg border border-emerald-200 bg-emerald-50/60 px-2.5 text-sm text-zinc-900 outline-none focus-visible:border-emerald-400"
           >
-            <option value="all">All tags</option>
+            <option value="all">{t('admin.posts.allTagsOption')}</option>
             {allTags.map((tag) => (
               <option key={tag.id} value={tag.id}>
                 {tag.name}
@@ -255,18 +257,18 @@ export default function AdminPostsPage() {
         </div>
 
         {loading ? (
-          <div className="py-16 text-center text-sm text-zinc-500">Loading...</div>
+          <div className="py-16 text-center text-sm text-zinc-500">{t('common.loading')}</div>
         ) : filteredPosts.length === 0 ? (
           <div className="py-16 text-center text-sm text-zinc-500">
             {posts.length === 0 ? (
               <>
-                No posts yet.{' '}
+                {t('admin.posts.emptyNoPosts')}{' '}
                 <Link href="/admin/create" className="font-semibold text-emerald-600 hover:underline">
-                  Write your first post →
+                  {t('admin.posts.writeFirstPost')}
                 </Link>
               </>
             ) : (
-              'No posts match your filters.'
+              t('admin.posts.emptyNoMatch')
             )}
           </div>
         ) : (
@@ -274,11 +276,11 @@ export default function AdminPostsPage() {
             <table className="w-full text-left text-sm">
               <thead>
                 <tr className="border-b border-emerald-100 bg-emerald-50/60 text-xs font-semibold uppercase tracking-wide text-zinc-500">
-                  <th className="px-5 py-3.5">Title</th>
-                  <th className="px-5 py-3.5">Tags</th>
-                  <th className="px-5 py-3.5">Status</th>
-                  <th className="px-5 py-3.5">Created</th>
-                  <th className="px-5 py-3.5 text-center">Actions</th>
+                  <th className="px-5 py-3.5">{t('admin.posts.colTitle')}</th>
+                  <th className="px-5 py-3.5">{t('admin.posts.colTags')}</th>
+                  <th className="px-5 py-3.5">{t('admin.posts.colStatus')}</th>
+                  <th className="px-5 py-3.5">{t('admin.posts.colCreated')}</th>
+                  <th className="px-5 py-3.5 text-center">{t('admin.posts.colActions')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -312,9 +314,9 @@ export default function AdminPostsPage() {
                     </td>
                     <td className="px-5 py-3.5">
                       {post.published ? (
-                        <Badge className="border border-emerald-300 bg-emerald-50 text-emerald-700">Published</Badge>
+                        <Badge className="border border-emerald-300 bg-emerald-50 text-emerald-700">{t('admin.posts.badgePublished')}</Badge>
                       ) : (
-                        <Badge variant="secondary" className="bg-zinc-100 text-zinc-700">Draft</Badge>
+                        <Badge variant="secondary" className="bg-zinc-100 text-zinc-700">{t('admin.posts.badgeDraft')}</Badge>
                       )}
                     </td>
                     <td className="whitespace-nowrap px-5 py-3.5 text-zinc-500">
@@ -323,17 +325,17 @@ export default function AdminPostsPage() {
                     <td className="px-5 py-3.5">
                       <div className="flex items-center justify-center gap-1">
                         {post.published ? (
-                          <Link href={`/blog/${post.slug}`} title="View published post">
+                          <Link href={`/blog/${post.slug}`} title={t('admin.posts.viewPublishedTitle')}>
                             <Button variant="ghost" size="icon-sm" className="text-zinc-600 hover:bg-emerald-100 hover:text-emerald-700">
                               <Eye />
                             </Button>
                           </Link>
                         ) : (
-                          <Button variant="ghost" size="icon-sm" disabled title="View" className="text-zinc-400">
+                          <Button variant="ghost" size="icon-sm" disabled title={t('admin.posts.viewTitle')} className="text-zinc-400">
                             <Eye />
                           </Button>
                         )}
-                        <Link href={`/admin/${post.id}/edit`} title="Edit">
+                        <Link href={`/admin/${post.id}/edit`} title={t('admin.posts.editTitle')}>
                           <Button variant="ghost" size="icon-sm" className="text-zinc-600 hover:bg-emerald-100 hover:text-emerald-700">
                             <Pencil />
                           </Button>
@@ -343,7 +345,7 @@ export default function AdminPostsPage() {
                           size="icon-sm"
                           disabled={busyId === post.id}
                           onClick={() => togglePublished(post)}
-                          title={post.published ? 'Unpublish' : 'Publish'}
+                          title={post.published ? t('admin.posts.unpublishTitle') : t('admin.posts.publishTitle')}
                           className="text-zinc-600 hover:bg-emerald-100 hover:text-emerald-700"
                         >
                           <Rss />
@@ -353,7 +355,7 @@ export default function AdminPostsPage() {
                           size="icon-sm"
                           disabled={busyId === post.id}
                           onClick={() => setDeleteTarget(post)}
-                          title="Delete"
+                          title={t('admin.posts.deleteTitle')}
                           className="text-rose-300 hover:bg-rose-500/15"
                         >
                           <Trash2 />
