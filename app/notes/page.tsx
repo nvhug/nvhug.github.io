@@ -37,6 +37,7 @@ import { NotesAnalytics } from '@/components/NotesAnalytics'
 import { NotesAIInsights } from '@/components/NotesAIInsights'
 import { MealScheduleTracker } from '@/components/MealScheduleTracker'
 import { WeightTracker } from '@/components/WeightTracker'
+import { DatePicker } from '@/components/ui/date-picker'
 import { useLanguage } from '@/lib/i18n/language-context'
 import { getIntlLocale } from '@/lib/i18n/locale'
 import type { Lang } from '@/lib/i18n/language-context'
@@ -1334,12 +1335,7 @@ export default function NotesPage() {
             {draft ? (
               <div className="flex flex-col gap-2 rounded-xl border-l-4 border-dashed border-emerald-300 bg-emerald-50/40 p-3">
                 <div className="flex flex-wrap items-center gap-2">
-                  <Input
-                    type="date"
-                    value={draft.note_date}
-                    onChange={(e) => updateDraft({ note_date: e.target.value })}
-                    className="h-8 w-auto border-emerald-200 bg-white text-zinc-900"
-                  />
+                  <DatePicker value={draft.note_date} onChange={(v) => updateDraft({ note_date: v })} />
                   <div className="inline-flex overflow-hidden rounded-lg border border-emerald-200">
                     <button
                       type="button"
@@ -1999,12 +1995,7 @@ export default function NotesPage() {
                   className={autoTextareaClass}
                 />
                 <div className="flex flex-wrap items-center gap-2">
-                  <Input
-                    type="date"
-                    value={goalDraft.target_date || ''}
-                    onChange={(e) => setGoalDraft((prev) => prev ? { ...prev, target_date: e.target.value } : null)}
-                    className="h-8 w-auto border-emerald-200 bg-white text-zinc-900"
-                  />
+                  <DatePicker value={goalDraft.target_date || ''} onChange={(v) => setGoalDraft((prev) => prev ? { ...prev, target_date: v } : null)} />
                   <input
                     type="range"
                     min="0"
@@ -2073,18 +2064,8 @@ export default function NotesPage() {
                                 <option value="personal">{t('notes.goals.typeOptions.personal')}</option>
                                 <option value="other">{t('notes.goals.typeOptions.other')}</option>
                               </select>
-                              <Input
-                                type="date"
-                                value={editingGoalDraft.start_date || ''}
-                                onChange={(e) => setEditingGoalDraft((prev) => prev ? { ...prev, start_date: e.target.value } : null)}
-                                className="h-8 w-auto border-emerald-200 bg-white text-zinc-900"
-                              />
-                              <Input
-                                type="date"
-                                value={editingGoalDraft.target_date || ''}
-                                onChange={(e) => setEditingGoalDraft((prev) => prev ? { ...prev, target_date: e.target.value } : null)}
-                                className="h-8 w-auto border-emerald-200 bg-white text-zinc-900"
-                              />
+                              <DatePicker value={editingGoalDraft.start_date || ''} onChange={(v) => setEditingGoalDraft((prev) => prev ? { ...prev, start_date: v } : null)} />
+                              <DatePicker value={editingGoalDraft.target_date || ''} onChange={(v) => setEditingGoalDraft((prev) => prev ? { ...prev, target_date: v } : null)} />
                             </div>
                             <textarea
                               ref={editingGoalDescriptionRef}

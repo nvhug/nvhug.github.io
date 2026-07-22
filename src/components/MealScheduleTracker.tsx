@@ -7,6 +7,8 @@ import { supabase } from '@/lib/supabase'
 import { getSupabaseBrowserClient } from '@/lib/supabase-browser'
 import { Meal } from '@/types'
 import { useLanguage } from '@/lib/i18n/language-context'
+import { DatePicker } from '@/components/ui/date-picker'
+import { TimePicker } from '@/components/ui/time-picker'
 
 const DEFAULT_MEALS = [
   { time: '07:00', name: 'Bữa sáng', target_calories: 520, foods: ['Cơm trắng: 150g', 'Trứng luộc: 2 quả', 'Sữa nóng: 150ml', 'Mật ong: 1.5 thìa'] },
@@ -230,12 +232,7 @@ export function MealScheduleTracker() {
       <div className="rounded-xl border border-emerald-200 bg-linear-to-br from-emerald-50 to-white p-3 sm:p-4">
         <div className="mb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <h3 className="font-semibold text-zinc-900">{t('mealScheduleTracker.todayHeading', { date: selectedDate })}</h3>
-          <input
-            type="date"
-            value={selectedDate}
-            onChange={(e) => setSelectedDate(e.target.value)}
-            className="rounded-lg border border-emerald-200 bg-white px-2 sm:px-3 py-1.5 sm:py-1 text-xs sm:text-sm text-zinc-900"
-          />
+          <DatePicker value={selectedDate} onChange={setSelectedDate} align="end" />
         </div>
 
         <div className="space-y-2">
@@ -312,12 +309,7 @@ export function MealScheduleTracker() {
                 {editingId === meal.id ? (
                   <div className="space-y-2">
                     <div className="flex flex-wrap gap-2">
-                      <input
-                        type="time"
-                        value={editForm.time}
-                        onChange={(e) => setEditForm((f) => ({ ...f, time: e.target.value }))}
-                        className="rounded border border-emerald-300 px-2 py-1 text-xs w-24 focus:outline-none focus:ring-1 focus:ring-emerald-400"
-                      />
+                      <TimePicker value={editForm.time} onChange={(v) => setEditForm((f) => ({ ...f, time: v }))} />
                       <input
                         type="text"
                         value={editForm.name}
@@ -413,12 +405,7 @@ export function MealScheduleTracker() {
             <p className="mb-2 text-xs font-medium text-emerald-700">{t('mealScheduleTracker.newMealTitle')}</p>
             <div className="space-y-2">
               <div className="flex flex-wrap gap-2">
-                <input
-                  type="time"
-                  value={newForm.time}
-                  onChange={(e) => setNewForm((f) => ({ ...f, time: e.target.value }))}
-                  className="rounded border border-emerald-300 px-2 py-1 text-xs w-24 focus:outline-none focus:ring-1 focus:ring-emerald-400"
-                />
+                <TimePicker value={newForm.time} onChange={(v) => setNewForm((f) => ({ ...f, time: v }))} />
                 <input
                   type="text"
                   value={newForm.name}

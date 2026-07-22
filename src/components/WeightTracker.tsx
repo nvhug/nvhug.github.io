@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase'
 import { WeightLog } from '@/types'
 import { ConfirmModal } from '@/components/ui/confirm-modal'
 import { useLanguage } from '@/lib/i18n/language-context'
+import { DatePicker } from '@/components/ui/date-picker'
 import { getIntlLocale } from '@/lib/i18n/locale'
 import type { Lang } from '@/lib/i18n/language-context'
 
@@ -211,13 +212,7 @@ export function WeightTracker() {
         <form onSubmit={handleSubmit} className="flex flex-wrap gap-2 items-end">
           <div className="flex flex-col gap-1">
             <label className="text-xs text-zinc-500">{t('weightTracker.dateLabel')}</label>
-            <input
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className="rounded-lg border border-emerald-200 px-2.5 py-1.5 text-sm outline-none focus:border-emerald-400"
-              required
-            />
+            <DatePicker value={date} onChange={setDate} />
           </div>
           <div className="flex flex-col gap-1">
             <label className="text-xs text-zinc-500">{t('weightTracker.weightLabel')}</label>
