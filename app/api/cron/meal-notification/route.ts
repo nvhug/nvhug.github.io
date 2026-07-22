@@ -7,8 +7,6 @@ import { getServiceSupabaseClient, notifyMealRows, type MealNotifyRow } from '@/
 // schedule still points at it — verify whether it's still wired up there,
 // and if not, it's safe to delete.
 
-const CRON_SECRET = process.env.CRON_SECRET || 'default-secret'
-
 function withinWindow(time: string, curMinutes: number) {
   const [h, m] = time.split(':').map(Number)
   const diff = curMinutes - (h * 60 + m)
@@ -39,21 +37,7 @@ async function findAndNotify() {
 
 export async function POST(request: NextRequest) {
   const authHeader = request.headers.get('authorization')
-  if (authHeader !== `Bearer ${CRON_SECRET}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
-  const result = await findAndNotify()
-  if ('error' in result) {
-    return NextResponse.json({ error: result.error }, { status: 500 })
-  }
-  return NextResponse.json({ success: true, ...result })
-}
-
-// GET endpoint for testing
-export async function GET(request: NextRequest) {
-  const secret = request.nextUrl.searchParams.get('secret')
-  if (secret !== CRON_SECRET) {
+  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

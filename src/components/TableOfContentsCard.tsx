@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { marked } from 'marked'
+import DOMPurify from 'isomorphic-dompurify'
 import { Post } from '@/types'
 import { formatDate, getTagColor } from '@/lib/utils'
 
@@ -29,7 +30,7 @@ export default function TableOfContentsCard({ post, index }: TableOfContentsCard
             <p
               className="toc-description"
               dangerouslySetInnerHTML={{
-                __html: marked.parseInline(post.excerpt) as string,
+                __html: DOMPurify.sanitize(marked.parseInline(post.excerpt) as string),
               }}
             />
           )}

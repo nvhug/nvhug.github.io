@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, use } from 'react'
+import DOMPurify from 'isomorphic-dompurify'
 import { useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { Post, Comment } from '@/types'
@@ -60,7 +61,7 @@ export default function BlogPost({ params }: { params: Promise<{ slug: string }>
   const [relatedPosts, setRelatedPosts] = useState<Post[]>([])
   const [loading, setLoading] = useState(true)
 
-  const processedContent = post ? injectHeadingIds(post.content) : ''
+  const processedContent = post ? DOMPurify.sanitize(injectHeadingIds(post.content)) : ''
   const readingMinutes = Math.max(1, Math.ceil((post?.content?.replace(/<[^>]*>/g, '').trim().split(/\s+/).length || 0) / 220))
 
   useEffect(() => {
