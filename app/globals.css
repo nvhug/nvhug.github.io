@@ -11,13 +11,13 @@
   .home-page .text-xs,
   .notes-page .text-xs,
   .quotes-page .text-xs {
-    font-size: 13px;
+    font-size: 14px;
   }
 
   .home-page .text-sm,
   .notes-page .text-sm,
   .quotes-page .text-sm {
-    font-size: 15px;
+    font-size: 16px;
   }
 }
 
