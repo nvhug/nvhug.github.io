@@ -6,7 +6,20 @@
   --font-poppins: var(--font-poppins);
 }
 
-/* Accessibility floor: no text smaller than 16px on mobile (overrides Tailwind's text-xs/text-sm) */
+/* Slightly larger text on mobile for main pages */
+@media (max-width: 767px) {
+  .home-page .text-xs,
+  .notes-page .text-xs,
+  .quotes-page .text-xs {
+    font-size: 13px;
+  }
+
+  .home-page .text-sm,
+  .notes-page .text-sm,
+  .quotes-page .text-sm {
+    font-size: 15px;
+  }
+}
 
 @layer utilities {
   .bg-current {

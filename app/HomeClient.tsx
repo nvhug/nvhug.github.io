@@ -72,7 +72,7 @@ export default function HomeClient({
   }, [filteredPosts, currentPage])
 
   return (
-    <main className="min-h-svh bg-[#f7fef9] pb-16 pt-24">
+    <main className="home-page min-h-svh bg-[#f7fef9] pb-16 pt-24">
       <section className="mx-auto w-full max-w-6xl px-4 sm:px-6">
         <div className="rounded-3xl border border-emerald-200/70 bg-white/80 p-5 shadow-[0_20px_42px_-32px_rgba(16,185,129,0.28)] backdrop-blur sm:p-7">
           <div className="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
