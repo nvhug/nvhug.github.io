@@ -1,18 +1,14 @@
 import { NextResponse } from 'next/server'
 import {
   getServiceSupabaseClient,
-  getProfilesByIds,
-  resolveNotifyProfile,
-  dispatchByRole,
-  buildNotifyEmailHtml,
-  escapeHtml,
+  sendTeamsCard,
   notifyMealRows,
   type MealNotifyRow,
 } from '@/lib/notify'
 
 export const dynamic = 'force-dynamic'
 
-type HabitRow = { user_id: string | null; content: string; notify_times: string[] | null }
+type HabitRow = { content: string; notify_times: string[] | null }
 
 function withinWindow(time: string, curMinutes: number) {
   const [h, m] = time.split(':').map(Number)
@@ -36,7 +32,7 @@ export async function GET(request: Request) {
 
   const { data: habits, error: habitsError } = await client
     .from('notes')
-    .select('user_id, content, notify_times')
+    .select('content, notify_times')
     .eq('pinned', true)
     .order('created_at', { ascending: true })
 
@@ -58,44 +54,25 @@ export async function GET(request: Request) {
   )
   const scheduledMeals = ((meals || []) as MealNotifyRow[]).filter((m) => withinWindow(m.time, curMinutes))
 
-  const habitsByUser = new Map<string | null, HabitRow[]>()
-  for (const h of scheduledHabits) {
-    habitsByUser.set(h.user_id, [...(habitsByUser.get(h.user_id) ?? []), h])
-  }
-
-  const habitUserIds = [...habitsByUser.keys()].filter((id): id is string => !!id)
-  const profiles = await getProfilesByIds(client, habitUserIds)
-
   const todayLabel = new Intl.DateTimeFormat('vi-VN', {
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
     timeZone: 'Asia/Ho_Chi_Minh',
   }).format(new Date())
 
   let habitsSent = 0
-  for (const [userId, rows] of habitsByUser) {
-    const profile = resolveNotifyProfile(userId, profiles)
+  if (scheduledHabits.length > 0) {
     const teamsPayload = {
       '@type': 'MessageCard',
       '@context': 'http://schema.org/extensions',
       themeColor: '10b981',
-      summary: rows.map((h) => h.content).join(' | '),
+      summary: scheduledHabits.map((h) => h.content).join(' | '),
       sections: [{
         activityTitle: `🌿 Nhắc nhở lúc ${currentTime}`,
         activitySubtitle: todayLabel,
-        facts: rows.map((h) => ({ name: '✅', value: h.content })),
+        facts: scheduledHabits.map((h) => ({ name: '✅', value: h.content })),
       }],
     }
-    const emailHtml = buildNotifyEmailHtml({
-      title: `🌿 Nhắc nhở lúc ${currentTime}`,
-      subtitle: todayLabel,
-      bodyHtml: `<ul style="margin:0;padding-left:20px;">${rows.map((h) => `<li style="margin-bottom:6px;font-size:14px;color:#27272a;">${escapeHtml(h.content)}</li>`).join('')}</ul>`,
-    })
-    const ok = await dispatchByRole({
-      profile,
-      teamsPayload,
-      emailSubject: `Nhắc nhở thói quen lúc ${currentTime}`,
-      emailHtml,
-    })
+    const ok = await sendTeamsCard(teamsPayload)
     if (ok) habitsSent++
   }
 
