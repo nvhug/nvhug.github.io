@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { Note } from '@/types'
+import { createSupabaseServerClient } from '@/lib/supabase-server'
 
 export const dynamic = 'force-dynamic'
 
@@ -282,6 +283,30 @@ export async function POST(request: Request) {
     lang?:   Lang
   }
   const activeLang: Lang = lang === 'en' ? 'en' : 'vi'
+
+  // AI analysis is a paid feature — gate it server-side too, since the
+  // client button can be bypassed by calling this route directly. Checked
+  // against the same page_permissions matrix admins edit at
+  // /admin/settings/pages, not a hardcoded role list, so it stays configurable.
+  const supabaseAuth = await createSupabaseServerClient()
+  const { data: { user } } = await supabaseAuth.auth.getUser()
+  const { data: profile } = user
+    ? await supabaseAuth.from('user_profiles').select('role').eq('id', user.id).single()
+    : { data: null }
+  const role = profile?.role ?? 'user'
+  const { data: permission } = await supabaseAuth
+    .from('page_permissions')
+    .select('allowed')
+    .eq('page_key', 'notes.ai_analysis')
+    .eq('role', role)
+    .maybeSingle()
+  if (!permission?.allowed) {
+    return NextResponse.json({
+      error: activeLang === 'en'
+        ? 'AI analysis is a paid feature, available to Pro accounts only. Please contact the admin to upgrade.'
+        : 'Phân tích AI là tính năng trả phí, chỉ dành cho tài khoản Pro. Vui lòng liên hệ admin để nâng cấp.',
+    }, { status: 403 })
+  }
 
   if (!period?.from || !period?.to || !period?.label) {
     return NextResponse.json({

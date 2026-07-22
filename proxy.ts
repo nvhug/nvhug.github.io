@@ -1,8 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { AUTH_COOKIE_NAME, isValidAuthCookie } from '@/lib/auth'
-
-const PROTECTED_PREFIXES = ['/notes', '/admin', '/quotes']
+import { matchProtectedPage } from '@/lib/permissions'
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
@@ -30,8 +29,8 @@ export async function proxy(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser()
 
-  const needsAuth = PROTECTED_PREFIXES.some((prefix) => pathname.startsWith(prefix))
-  if (!needsAuth) return supabaseResponse
+  const matchedPage = matchProtectedPage(pathname)
+  if (!matchedPage) return supabaseResponse
 
   const pinCookie = request.cookies.get(AUTH_COOKIE_NAME)?.value
   const hasPinCookie = isValidAuthCookie(pinCookie)
@@ -49,6 +48,27 @@ export async function proxy(request: NextRequest) {
     url.searchParams.set('step', 'oauth')
     url.searchParams.set('redirect', pathname)
     return NextResponse.redirect(url)
+  }
+
+  // Layer 3: role-based page access — checked against the page_permissions
+  // matrix editable in /admin/settings/pages
+  const { data: profile } = await supabase
+    .from('user_profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single()
+
+  const role = profile?.role ?? 'user'
+
+  const { data: permission } = await supabase
+    .from('page_permissions')
+    .select('allowed')
+    .eq('page_key', matchedPage.key)
+    .eq('role', role)
+    .maybeSingle()
+
+  if (!permission?.allowed) {
+    return NextResponse.redirect(new URL('/403', request.url))
   }
 
   return supabaseResponse
