@@ -6,12 +6,18 @@ export function LanguageSwitch() {
   const { lang, setLang } = useLanguage()
 
   return (
-    <div className="flex items-center rounded-lg border border-emerald-100 p-0.5 text-xs font-semibold">
+    <div className="relative inline-flex h-7 rounded-full bg-zinc-100 text-xs font-semibold">
+      <span
+        aria-hidden
+        className={`pointer-events-none absolute inset-0 w-1/2 rounded-full bg-emerald-100 shadow-sm transition-transform duration-200 ease-out ${
+          lang === 'en' ? 'translate-x-full' : 'translate-x-0'
+        }`}
+      />
       <button
         type="button"
         onClick={() => setLang('vi')}
-        className={`rounded-md px-1.5 py-1 transition-colors ${
-          lang === 'vi' ? 'bg-emerald-100 text-emerald-700' : 'text-zinc-500 hover:text-zinc-900'
+        className={`relative z-10 w-8 py-1 text-center text-sm transition-colors duration-150 sm:text-xs ${
+          lang === 'vi' ? 'text-emerald-700' : 'text-zinc-400 hover:text-zinc-600'
         }`}
       >
         VI
@@ -19,8 +25,8 @@ export function LanguageSwitch() {
       <button
         type="button"
         onClick={() => setLang('en')}
-        className={`rounded-md px-1.5 py-1 transition-colors ${
-          lang === 'en' ? 'bg-emerald-100 text-emerald-700' : 'text-zinc-500 hover:text-zinc-900'
+        className={`relative z-10 w-8 py-1 text-center text-sm transition-colors duration-150 sm:text-xs ${
+          lang === 'en' ? 'text-emerald-700' : 'text-zinc-400 hover:text-zinc-600'
         }`}
       >
         EN
