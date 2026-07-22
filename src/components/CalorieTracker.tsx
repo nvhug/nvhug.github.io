@@ -25,6 +25,46 @@ function timeStrFromISO(iso: string) {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 }
 
+function TimeInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const parse = (v: string) => { const [h = '00', m = '00'] = (v || '00:00').split(':'); return { h, m } }
+  const [local, setLocal] = useState(() => parse(value))
+
+  useEffect(() => { setLocal(parse(value)) }, [value])
+
+  function commit(h: string, m: string) {
+    const hh = String(Math.min(23, Math.max(0, parseInt(h) || 0))).padStart(2, '0')
+    const mm = String(Math.min(59, Math.max(0, parseInt(m) || 0))).padStart(2, '0')
+    onChange(`${hh}:${mm}`)
+  }
+
+  return (
+    <div className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-white px-2 py-1.5 transition-colors focus-within:border-emerald-400 focus-within:ring-1 focus-within:ring-emerald-400/20">
+      <Clock className="h-3 w-3 shrink-0 text-zinc-400" />
+      <input
+        type="text"
+        inputMode="numeric"
+        maxLength={2}
+        value={local.h}
+        onChange={(e) => setLocal(l => ({ ...l, h: e.target.value.replace(/\D/g, '').slice(0, 2) }))}
+        onBlur={(e) => commit(e.target.value, local.m)}
+        onFocus={(e) => e.target.select()}
+        className="w-6 bg-transparent text-center text-sm font-medium tabular-nums text-zinc-900 outline-none"
+      />
+      <span className="pointer-events-none select-none text-xs font-medium text-zinc-300">:</span>
+      <input
+        type="text"
+        inputMode="numeric"
+        maxLength={2}
+        value={local.m}
+        onChange={(e) => setLocal(l => ({ ...l, m: e.target.value.replace(/\D/g, '').slice(0, 2) }))}
+        onBlur={(e) => commit(local.h, e.target.value)}
+        onFocus={(e) => e.target.select()}
+        className="w-6 bg-transparent text-center text-sm font-medium tabular-nums text-zinc-900 outline-none"
+      />
+    </div>
+  )
+}
+
 export function CalorieTracker() {
   const { t, lang } = useLanguage()
   const [foodTemplates, setFoodTemplates] = useState<FoodTemplate[]>([])
@@ -316,15 +356,7 @@ export function CalorieTracker() {
                 placeholder={t('calorieTracker.caloriesPlaceholder')}
                 className="w-24 rounded-lg border border-emerald-200 bg-white px-2 py-1.5 text-sm text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-emerald-400"
               />
-              <div className="flex items-center gap-1.5 rounded-lg border border-emerald-200 px-2 py-1.5 w-fit">
-                <Clock className="h-3 w-3 text-zinc-400 shrink-0" />
-                <input
-                  type="time"
-                  value={customTime}
-                  onChange={(e) => setCustomTime(e.target.value)}
-                  className="w-full text-sm text-zinc-900 outline-none bg-transparent"
-                />
-              </div>
+              <TimeInput value={customTime} onChange={setCustomTime} />
             </div>
             <button
               type="button"
@@ -352,15 +384,7 @@ export function CalorieTracker() {
             </select>
 
             <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1.5 rounded-lg border border-emerald-200 px-2 py-1.5 w-fit">
-                <Clock className="h-3 w-3 text-zinc-400 shrink-0" />
-                <input
-                  type="time"
-                  value={customTime}
-                  onChange={(e) => setCustomTime(e.target.value)}
-                  className="w-fit text-sm text-zinc-900 outline-none bg-transparent"
-                />
-              </div>
+              <TimeInput value={customTime} onChange={setCustomTime} />
               <input
                 type="number"
                 value={quantity}
@@ -406,10 +430,10 @@ export function CalorieTracker() {
                 <div
                   key={food.id}
                   onDoubleClick={() => !isEditing && startEdit(food)}
-                  className={`rounded-lg border p-3 transition-all cursor-pointer select-none ${
+                  className={`rounded-lg border p-3 transition-all ${
                     isEditing
                       ? 'border-emerald-400 bg-emerald-50 shadow-md ring-1 ring-emerald-300'
-                      : 'border-emerald-100 bg-emerald-50 hover:shadow-sm'
+                      : 'cursor-pointer select-none border-emerald-100 bg-emerald-50 hover:shadow-sm'
                   }`}
                 >
                   {isEditing ? (
@@ -431,15 +455,7 @@ export function CalorieTracker() {
                           step="1"
                         />
                         <span className="text-xs text-zinc-600">kcal</span>
-                        <div className="flex items-center gap-1 rounded border border-emerald-300 px-1.5 py-1">
-                          <Clock className="h-3 w-3 text-zinc-400 shrink-0" />
-                          <input
-                            type="time"
-                            value={editingTime}
-                            onChange={(e) => setEditingTime(e.target.value)}
-                            className="text-sm text-zinc-900 outline-none bg-transparent"
-                          />
-                        </div>
+                        <TimeInput value={editingTime} onChange={setEditingTime} />
                         <div className="ml-auto flex items-center gap-1">
                           <button
                             onClick={() => { setEditingId(null); setEditingData(null); setEditingTime('') }}

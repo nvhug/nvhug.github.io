@@ -24,7 +24,6 @@ export const vi = {
     profile: 'Hồ sơ',
     logout: 'Đăng xuất',
     accountLabel: 'Tài khoản',
-    menuLabel: 'Menu',
   },
 
   footer: {
@@ -304,6 +303,7 @@ export const vi = {
     cooldownError: 'Bạn chỉ có thể phân tích 1 lần mỗi tuần. Vui lòng thử lại sau {cooldown}.',
     analyzeFailed: 'Phân tích thất bại',
     analyzeError: 'Có lỗi khi phân tích. Vui lòng thử lại.',
+    paidFeatureError: 'Phân tích AI là tính năng trả phí, chỉ dành cho tài khoản Pro. Vui lòng liên hệ admin để nâng cấp.',
     byMonth: 'Theo tháng',
     byQuarter: 'Theo quý',
     notesCount: '{n} notes',
@@ -499,6 +499,7 @@ export const vi = {
       tagsDesc: 'Sắp xếp chủ đề',
       templatesTitle: 'Giao diện',
       templatesDesc: 'Hình thức & bố cục',
+      settingsTitle: 'Cài đặt',
     },
     topbar: {
       subtitle: 'Không gian xuất bản nội dung',
@@ -601,6 +602,37 @@ export const vi = {
       tagsHeading: 'Thẻ',
       noTags: 'Chưa có thẻ nào.',
     },
+    settings: {
+      eyebrow: 'Quản trị',
+      heading: 'Cài đặt',
+      subtitle: 'Quản lý người dùng và quyền truy cập từng trang.',
+      usersTab: 'Người dùng',
+      pagesTab: 'Phân quyền trang',
+      users: {
+        colUser: 'Người dùng',
+        colRole: 'Vai trò',
+        colJoined: 'Ngày tham gia',
+        roleAdmin: 'Quản trị viên',
+        rolePaid: 'Người dùng trả phí',
+        roleUser: 'Người dùng thường',
+        selfRoleHint: 'Không thể tự thay đổi vai trò của chính mình',
+        updateSuccess: 'Đã cập nhật vai trò.',
+        updateError: 'Không thể cập nhật vai trò.',
+        empty: 'Chưa có người dùng nào.',
+      },
+      pages: {
+        colPage: 'Tính năng',
+        featureAiAnalysis: 'Phân tích AI (trong Notes)',
+        updateSuccess: 'Đã cập nhật quyền truy cập.',
+        updateError: 'Không thể cập nhật quyền truy cập.',
+      },
+    },
+  },
+
+  forbidden: {
+    heading: 'Không có quyền truy cập',
+    message: 'Tài khoản của bạn không có quyền xem trang này.',
+    backHome: 'Về trang chủ',
   },
 
   bugReport: {

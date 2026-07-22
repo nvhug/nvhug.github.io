@@ -26,7 +26,6 @@ export const en: Dictionary = {
     profile: 'Profile',
     logout: 'Logout',
     accountLabel: 'Account',
-    menuLabel: 'Menu',
   },
 
   footer: {
@@ -306,6 +305,7 @@ export const en: Dictionary = {
     cooldownError: 'You can only run analysis once per week. Please try again after {cooldown}.',
     analyzeFailed: 'Analysis failed',
     analyzeError: 'An error occurred during analysis. Please try again.',
+    paidFeatureError: 'AI analysis is a paid feature, available to Pro accounts only. Please contact the admin to upgrade.',
     byMonth: 'By month',
     byQuarter: 'By quarter',
     notesCount: '{n} notes',
@@ -501,6 +501,7 @@ export const en: Dictionary = {
       tagsDesc: 'Organize topics',
       templatesTitle: 'Templates',
       templatesDesc: 'Appearance & layout',
+      settingsTitle: 'Settings',
     },
     topbar: {
       subtitle: 'Content publishing workspace',
@@ -603,6 +604,37 @@ export const en: Dictionary = {
       tagsHeading: 'Tags',
       noTags: 'No tags yet.',
     },
+    settings: {
+      eyebrow: 'Admin',
+      heading: 'Settings',
+      subtitle: 'Manage users and per-page access.',
+      usersTab: 'Users',
+      pagesTab: 'Page Access',
+      users: {
+        colUser: 'User',
+        colRole: 'Role',
+        colJoined: 'Joined',
+        roleAdmin: 'Admin',
+        rolePaid: 'Paid user',
+        roleUser: 'Normal user',
+        selfRoleHint: 'You cannot change your own role',
+        updateSuccess: 'Role updated.',
+        updateError: 'Could not update role.',
+        empty: 'No users yet.',
+      },
+      pages: {
+        colPage: 'Feature',
+        featureAiAnalysis: 'AI Analysis (in Notes)',
+        updateSuccess: 'Access updated.',
+        updateError: 'Could not update access.',
+      },
+    },
+  },
+
+  forbidden: {
+    heading: 'Access denied',
+    message: 'Your account does not have permission to view this page.',
+    backHome: 'Back to home',
   },
 
   bugReport: {

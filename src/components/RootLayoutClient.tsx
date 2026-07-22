@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LogOut, Menu, Settings, User as UserIcon, X } from 'lucide-react'
+import { Home, LogOut, Quote, Settings, StickyNote, User as UserIcon, type LucideIcon } from 'lucide-react'
 import { Toaster } from 'sonner'
 import { useEffect, useRef, useState } from 'react'
 import { getSupabaseBrowserClient } from '@/lib/supabase-browser'
@@ -12,7 +12,17 @@ import { BugReportButton } from '@/components/BugReportButton'
 import { getAvatarLetter, getAvatarLabel } from '@/lib/avatar'
 import type { User } from '@supabase/supabase-js'
 
-function AccountMenu({ user, onLogout }: { user: User; onLogout: () => void }) {
+function AccountMenu({
+  user,
+  onLogout,
+  navItems,
+  pathname,
+}: {
+  user: User
+  onLogout: () => void
+  navItems: { href: string; label: string; icon: LucideIcon }[]
+  pathname: string
+}) {
   const { t } = useLanguage()
   const letter = getAvatarLetter(user)
   const label = getAvatarLabel(user)
@@ -67,6 +77,28 @@ function AccountMenu({ user, onLogout }: { user: User; onLogout: () => void }) {
               </div>
             </div>
 
+            {/* Nav links — only needed on mobile, since desktop shows them in the header */}
+            <div className="border-b border-zinc-100 p-1 font-poppins sm:hidden">
+              {navItems.map((item) => {
+                const isActive = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href)
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={() => setOpen(false)}
+                    className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                      isActive
+                        ? 'bg-emerald-100 text-emerald-700'
+                        : 'text-zinc-700 hover:bg-zinc-50 hover:text-zinc-900'
+                    }`}
+                  >
+                    <item.icon className={`h-4 w-4 shrink-0 ${isActive ? 'text-emerald-600' : 'text-zinc-400'}`} />
+                    {item.label}
+                  </Link>
+                )
+              })}
+            </div>
+
             {/* Menu items */}
             <div className="p-1">
               <Link
@@ -116,8 +148,6 @@ export function RootLayoutClient({ children }: { children: React.ReactNode }) {
   const hideSiteChrome = isAdmin || isLogin
 
   const [user, setUser] = useState<User | null>(null)
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const headerRef = useRef<HTMLElement>(null)
 
   useEffect(() => {
     const supabase = getSupabaseBrowserClient()
@@ -131,29 +161,10 @@ export function RootLayoutClient({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe()
   }, [])
 
-  useEffect(() => {
-    setMobileMenuOpen(false)
-  }, [pathname])
-
-  useEffect(() => {
-    if (!mobileMenuOpen) return
-    function handleOutside(e: MouseEvent | TouchEvent) {
-      if (headerRef.current && !headerRef.current.contains(e.target as Node)) {
-        setMobileMenuOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handleOutside)
-    document.addEventListener('touchstart', handleOutside)
-    return () => {
-      document.removeEventListener('mousedown', handleOutside)
-      document.removeEventListener('touchstart', handleOutside)
-    }
-  }, [mobileMenuOpen])
-
   const navItems = [
-    { href: '/', label: t('header.navHome') },
-    { href: '/notes', label: t('header.navNotes') },
-    { href: '/quotes', label: t('header.navQuotes') },
+    { href: '/', label: t('header.navHome'), icon: Home },
+    { href: '/notes', label: t('header.navNotes'), icon: StickyNote },
+    { href: '/quotes', label: t('header.navQuotes'), icon: Quote },
   ]
 
   async function handleLogout() {
@@ -164,7 +175,7 @@ export function RootLayoutClient({ children }: { children: React.ReactNode }) {
   return (
     <>
       {!hideSiteChrome && (
-        <header ref={headerRef} className="site-header fixed inset-x-0 top-0 z-50 border-b border-emerald-100/80 bg-white/88 backdrop-blur-md">
+        <header className="site-header fixed inset-x-0 top-0 z-50 border-b border-emerald-100/80 bg-white/88 backdrop-blur-md">
           <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-3 sm:px-6">
             <Link href="/" className="font-poppins text-xl font-semibold tracking-tight text-zinc-900">
               nvhug
@@ -195,7 +206,7 @@ export function RootLayoutClient({ children }: { children: React.ReactNode }) {
               </div>
 
               {user ? (
-                <AccountMenu user={user} onLogout={handleLogout} />
+                <AccountMenu user={user} onLogout={handleLogout} navItems={navItems} pathname={pathname} />
               ) : (
                 <button
                   type="button"
@@ -206,43 +217,8 @@ export function RootLayoutClient({ children }: { children: React.ReactNode }) {
                   <LogOut className="h-4 w-4" />
                 </button>
               )}
-
-              <button
-                type="button"
-                onClick={() => setMobileMenuOpen((v) => !v)}
-                className="ml-1 flex h-10 w-10 items-center justify-center rounded-lg text-zinc-600 transition-colors hover:bg-emerald-50 hover:text-zinc-900 sm:hidden"
-                aria-label={t('header.menuLabel')}
-                aria-expanded={mobileMenuOpen}
-              >
-                {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-              </button>
             </div>
           </div>
-
-          {/* Mobile nav list — toggled by the hamburger icon */}
-          {mobileMenuOpen && (
-            <nav className="border-t border-emerald-100/80 bg-white/95 px-4 py-2 backdrop-blur-md sm:hidden">
-              <div className="mx-auto flex w-full max-w-6xl flex-col gap-1">
-                {navItems.map((item) => {
-                  const isActive = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href)
-                  return (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      onClick={() => setMobileMenuOpen(false)}
-                      className={`rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
-                        isActive
-                          ? 'bg-emerald-100 text-emerald-700'
-                          : 'text-zinc-600 hover:bg-emerald-50 hover:text-zinc-900'
-                      }`}
-                    >
-                      {item.label}
-                    </Link>
-                  )
-                })}
-              </div>
-            </nav>
-          )}
         </header>
       )}
       {children}

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { ArrowRight, Quote as QuoteIcon } from 'lucide-react'
+import { ArrowRight, ChevronLeft, ChevronRight, Quote as QuoteIcon } from 'lucide-react'
 import TableOfContentsCard from '@/components/TableOfContentsCard'
 import { Post, Quote } from '@/types'
 import { getTagColor } from '@/lib/utils'
@@ -187,9 +187,11 @@ export default function HomeClient({
                     window.scrollTo({ top: 0, behavior: 'smooth' })
                   }}
                   disabled={currentPage === 1}
-                  className="rounded-lg border border-emerald-200 px-4 py-2 text-sm font-medium text-emerald-700 transition-colors disabled:border-zinc-100 disabled:text-zinc-400 hover:bg-emerald-50 disabled:hover:bg-transparent"
+                  aria-label={t('home.previous')}
+                  className="flex h-10 w-10 items-center justify-center rounded-lg border border-emerald-200 text-emerald-700 transition-colors disabled:border-zinc-100 disabled:text-zinc-400 hover:bg-emerald-50 disabled:hover:bg-transparent sm:h-auto sm:w-auto sm:px-4 sm:py-2 sm:text-sm sm:font-medium"
                 >
-                  {t('home.previous')}
+                  <ChevronLeft className="h-5 w-5 sm:hidden" />
+                  <span className="hidden sm:inline">{t('home.previous')}</span>
                 </button>
 
                 <div className="flex items-center gap-1.5 sm:gap-1">
@@ -217,9 +219,11 @@ export default function HomeClient({
                     window.scrollTo({ top: 0, behavior: 'smooth' })
                   }}
                   disabled={currentPage === totalPages}
-                  className="rounded-lg border border-emerald-200 px-4 py-2 text-sm font-medium text-emerald-700 transition-colors disabled:border-zinc-100 disabled:text-zinc-400 hover:bg-emerald-50 disabled:hover:bg-transparent"
+                  aria-label={t('home.next')}
+                  className="flex h-10 w-10 items-center justify-center rounded-lg border border-emerald-200 text-emerald-700 transition-colors disabled:border-zinc-100 disabled:text-zinc-400 hover:bg-emerald-50 disabled:hover:bg-transparent sm:h-auto sm:w-auto sm:px-4 sm:py-2 sm:text-sm sm:font-medium"
                 >
-                  {t('home.next')}
+                  <ChevronRight className="h-5 w-5 sm:hidden" />
+                  <span className="hidden sm:inline">{t('home.next')}</span>
                 </button>
               </div>
             )}

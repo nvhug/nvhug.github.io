@@ -4,13 +4,14 @@ import { useState, useEffect, useMemo } from 'react'
 import {
   Sparkles, RefreshCw, ChevronRight,
   AlertCircle, Lightbulb, History, ChevronDown, ChevronUp,
-  Scale, Utensils, BookOpen,
+  Scale, Utensils, BookOpen, Crown,
 } from 'lucide-react'
 import { Note } from '@/types'
 import { supabase } from '@/lib/supabase'
 import { useLanguage } from '@/lib/i18n/language-context'
 import { getIntlLocale } from '@/lib/i18n/locale'
 import type { Lang } from '@/lib/i18n/language-context'
+import { useFeatureAccess } from '@/lib/useFeatureAccess'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -186,6 +187,7 @@ function rowToInsight(row: {
 
 export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note[] }) {
   const { t, lang } = useLanguage()
+  const { allowed: canUseAI } = useFeatureAccess('notes.ai_analysis')
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const periodOptions = useMemo(() => generatePeriodOptions(t), [lang])
 
@@ -220,6 +222,14 @@ export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note
     () => notes.filter(n => n.note_date >= selectedPeriod.from && n.note_date <= selectedPeriod.to),
     [notes, selectedPeriod]
   )
+
+  function handleAnalyzeClick() {
+    if (!canUseAI) {
+      setError(t('notesAIInsights.paidFeatureError'))
+      return
+    }
+    void analyze()
+  }
 
   async function analyze() {
     if (cooldown.isBlocked) {
@@ -287,16 +297,17 @@ export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note
           {t('notesAIInsights.notesCount', { n: filteredNotes.length })}
         </span>
 
-        {/* Analyze button */}
+        {/* Analyze button — visible to everyone; normal users get an upsell message on click instead of running the analysis */}
         <button
-          onClick={analyze}
-          disabled={loading || fetching || filteredNotes.length === 0 || cooldown.isBlocked}
+          onClick={handleAnalyzeClick}
+          disabled={loading || fetching || filteredNotes.length === 0 || (canUseAI && cooldown.isBlocked)}
           className="flex items-center gap-2 rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-violet-700 disabled:opacity-60"
         >
           {loading
             ? <RefreshCw className="h-4 w-4 animate-spin" />
             : <Sparkles className="h-4 w-4" />}
           {loading ? t('notesAIInsights.analyzing') : t('notesAIInsights.analyzeAI')}
+          {!canUseAI && <Crown className="h-3.5 w-3.5 text-amber-300" />}
         </button>
       </div>
 

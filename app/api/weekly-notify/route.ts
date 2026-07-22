@@ -1,5 +1,11 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import {
+  getServiceSupabaseClient,
+  getProfilesByIds,
+  resolveNotifyProfile,
+  dispatchByRole,
+  buildNotifyEmailHtml,
+} from '@/lib/notify'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,108 +19,129 @@ function isoDate(daysAgo: number): string {
   return d.toISOString().slice(0, 10)
 }
 
+type UserStats = {
+  notesTotal: number
+  notesDone: number
+  notesGood: number
+  activeDays: number
+  avgCalo: number
+  mealsTotal: number
+  mealsDone: number
+  mealPct: number
+  latestWeight: number | null
+}
+
 export async function GET(request: Request) {
   const authHeader = request.headers.get('authorization')
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const webhookUrl = process.env.TEAMS_WEBHOOK_URL
-  if (!webhookUrl) {
-    return NextResponse.json({ error: 'TEAMS_WEBHOOK_URL not set' }, { status: 500 })
-  }
-
-  const client = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  )
-
+  const client = getServiceSupabaseClient()
   const fromDate = isoDate(6) // 7 days including today
   const toDate = isoDate(0)
 
-  // Notes stats
-  const { data: notesData } = await client
-    .from('notes')
-    .select('type, status, note_date')
-    .gte('note_date', fromDate)
-    .lte('note_date', toDate)
-    .eq('pinned', false)
+  const [{ data: notesData }, { data: caloData }, { data: mealsData }, { data: weightData }] = await Promise.all([
+    client.from('notes').select('user_id, type, status, note_date').gte('note_date', fromDate).lte('note_date', toDate).eq('pinned', false),
+    client.from('daily_foods').select('user_id, total_calories, date').gte('date', fromDate).lte('date', toDate),
+    client.from('meals').select('user_id, is_completed, date').gte('date', fromDate).lte('date', toDate),
+    client.from('weight_logs').select('user_id, weight, date').gte('date', fromDate).lte('date', toDate).order('date', { ascending: false }),
+  ])
 
-  const notesTotal = notesData?.length ?? 0
-  const notesDone = notesData?.filter((n) => n.status === 'done').length ?? 0
-  const notesGood = notesData?.filter((n) => n.type === 'good').length ?? 0
-  const activeDays = new Set(notesData?.map((n) => n.note_date)).size
+  const statsByUser = new Map<string | null, UserStats>()
+  function stats(userId: string | null): UserStats {
+    let s = statsByUser.get(userId)
+    if (!s) {
+      s = { notesTotal: 0, notesDone: 0, notesGood: 0, activeDays: 0, avgCalo: 0, mealsTotal: 0, mealsDone: 0, mealPct: 0, latestWeight: null }
+      statsByUser.set(userId, s)
+    }
+    return s
+  }
 
-  // Calorie stats
-  const { data: caloData } = await client
-    .from('daily_foods')
-    .select('total_calories, date')
-    .gte('date', fromDate)
-    .lte('date', toDate)
+  const activeDaysByUser = new Map<string | null, Set<string>>()
+  for (const n of (notesData ?? []) as { user_id: string | null; type: string; status: string; note_date: string }[]) {
+    const s = stats(n.user_id)
+    s.notesTotal++
+    if (n.status === 'done') s.notesDone++
+    if (n.type === 'good') s.notesGood++
+    const days = activeDaysByUser.get(n.user_id) ?? new Set<string>()
+    days.add(n.note_date)
+    activeDaysByUser.set(n.user_id, days)
+  }
+  for (const [userId, days] of activeDaysByUser) {
+    stats(userId).activeDays = days.size
+  }
 
-  const totalCalo = caloData?.reduce((s, f) => s + (f.total_calories ?? 0), 0) ?? 0
-  const avgCalo = activeDays > 0 ? Math.round(totalCalo / 7) : 0
+  const caloTotalByUser = new Map<string | null, number>()
+  for (const f of (caloData ?? []) as { user_id: string | null; total_calories: number | null }[]) {
+    caloTotalByUser.set(f.user_id, (caloTotalByUser.get(f.user_id) ?? 0) + (f.total_calories ?? 0))
+  }
+  for (const [userId, total] of caloTotalByUser) {
+    stats(userId).avgCalo = Math.round(total / 7)
+  }
 
-  // Meal completion
-  const { data: mealsData } = await client
-    .from('meals')
-    .select('is_completed')
-    .gte('date', fromDate)
-    .lte('date', toDate)
+  for (const m of (mealsData ?? []) as { user_id: string | null; is_completed: boolean }[]) {
+    const s = stats(m.user_id)
+    s.mealsTotal++
+    if (m.is_completed) s.mealsDone++
+  }
+  for (const s of statsByUser.values()) {
+    s.mealPct = s.mealsTotal > 0 ? Math.round((s.mealsDone / s.mealsTotal) * 100) : 0
+  }
 
-  const mealsTotal = mealsData?.length ?? 0
-  const mealsDone = mealsData?.filter((m) => m.is_completed).length ?? 0
-  const mealPct = mealsTotal > 0 ? Math.round((mealsDone / mealsTotal) * 100) : 0
+  const seenWeightUser = new Set<string | null>()
+  for (const w of (weightData ?? []) as { user_id: string | null; weight: number }[]) {
+    if (seenWeightUser.has(w.user_id)) continue // rows already ordered by date desc — first hit per user is latest
+    seenWeightUser.add(w.user_id)
+    stats(w.user_id).latestWeight = w.weight
+  }
 
-  // Weight
-  const { data: weightData } = await client
-    .from('weight_logs')
-    .select('weight, date')
-    .gte('date', fromDate)
-    .lte('date', toDate)
-    .order('date', { ascending: false })
-    .limit(1)
+  const userIds = [...statsByUser.keys()].filter((id): id is string => !!id)
+  const profiles = await getProfilesByIds(client, userIds)
 
-  const latestWeight = weightData?.[0]?.weight ?? null
-
-  const today = new Intl.DateTimeFormat('vi-VN', {
-    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
-    timeZone: 'Asia/Ho_Chi_Minh',
+  const todayLabel = new Intl.DateTimeFormat('vi-VN', {
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'Asia/Ho_Chi_Minh',
   }).format(new Date())
 
-  const payload = {
-    '@type': 'MessageCard',
-    '@context': 'http://schema.org/extensions',
-    themeColor: '10b981',
-    summary: `📅 Tổng kết tuần — ${fromDate} → ${toDate}`,
-    sections: [
-      {
-        activityTitle: `📅 Tổng kết tuần`,
-        activitySubtitle: `${fromDate} → ${toDate} · ${today}`,
-        facts: [
-          { name: '📝 Notes ghi', value: `${notesTotal} ghi chú (${activeDays}/7 ngày)` },
-          { name: '✅ Hoàn thành', value: `${notesDone}/${notesTotal} notes · ${notesTotal > 0 ? Math.round((notesDone / notesTotal) * 100) : 0}%` },
-          { name: '😊 Ngày tốt', value: `${notesGood}/${notesTotal} ghi chú` },
-          { name: '🔥 Calo trung bình', value: `${avgCalo} kcal/ngày (mục tiêu 2400)` },
-          { name: '🍽️ Bữa ăn', value: `${mealsDone}/${mealsTotal} bữa hoàn thành (${mealPct}%)` },
-          ...(latestWeight ? [{ name: '⚖️ Cân nặng', value: `${latestWeight} kg` }] : []),
-        ],
-      },
-    ],
-  }
+  let sent = 0
+  for (const [userId, s] of statsByUser) {
+    const profile = resolveNotifyProfile(userId, profiles)
+    const facts = [
+      { name: '📝 Notes ghi', value: `${s.notesTotal} ghi chú (${s.activeDays}/7 ngày)` },
+      { name: '✅ Hoàn thành', value: `${s.notesDone}/${s.notesTotal} notes · ${s.notesTotal > 0 ? Math.round((s.notesDone / s.notesTotal) * 100) : 0}%` },
+      { name: '😊 Ngày tốt', value: `${s.notesGood}/${s.notesTotal} ghi chú` },
+      { name: '🔥 Calo trung bình', value: `${s.avgCalo} kcal/ngày (mục tiêu 2400)` },
+      { name: '🍽️ Bữa ăn', value: `${s.mealsDone}/${s.mealsTotal} bữa hoàn thành (${s.mealPct}%)` },
+      ...(s.latestWeight ? [{ name: '⚖️ Cân nặng', value: `${s.latestWeight} kg` }] : []),
+    ]
 
-  try {
-    const res = await fetch(webhookUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    })
-    if (!res.ok) {
-      return NextResponse.json({ error: 'Teams webhook failed', status: res.status }, { status: 500 })
+    const teamsPayload = {
+      '@type': 'MessageCard',
+      '@context': 'http://schema.org/extensions',
+      themeColor: '10b981',
+      summary: `📅 Tổng kết tuần — ${fromDate} → ${toDate}`,
+      sections: [{
+        activityTitle: '📅 Tổng kết tuần',
+        activitySubtitle: `${fromDate} → ${toDate} · ${todayLabel}`,
+        facts,
+      }],
     }
-  } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 })
+    const emailHtml = buildNotifyEmailHtml({
+      title: '📅 Tổng kết tuần',
+      subtitle: `${fromDate} → ${toDate} · ${todayLabel}`,
+      bodyHtml: `<table style="width:100%;border-collapse:collapse;">${facts.map((f) => `
+        <tr><td style="padding:8px 0;border-top:1px solid #f0f0f0;font-size:13px;color:#71717a;">${f.name}</td>
+        <td style="padding:8px 0;border-top:1px solid #f0f0f0;font-size:14px;color:#18181b;text-align:right;">${f.value}</td></tr>`).join('')}</table>`,
+    })
+
+    const ok = await dispatchByRole({
+      profile,
+      teamsPayload,
+      emailSubject: `Tổng kết tuần ${fromDate} → ${toDate}`,
+      emailHtml,
+    })
+    if (ok) sent++
   }
 
-  return NextResponse.json({ ok: true, period: `${fromDate} → ${toDate}`, notesTotal, avgCalo, mealPct })
+  return NextResponse.json({ ok: true, period: `${fromDate} → ${toDate}`, usersNotified: sent })
 }

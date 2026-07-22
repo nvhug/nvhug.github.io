@@ -1,3 +1,21 @@
+export type UserRole = 'admin' | 'paid' | 'user'
+
+export interface UserProfile {
+  id: string
+  email: string | null
+  full_name: string | null
+  avatar_url: string | null
+  role: UserRole
+  created_at: string
+}
+
+export interface PagePermission {
+  id: string
+  page_key: string
+  role: UserRole
+  allowed: boolean
+}
+
 export interface Post {
   id: string
   title: string
