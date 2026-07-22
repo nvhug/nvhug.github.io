@@ -1061,7 +1061,7 @@ export default function NotesPage() {
         <div className="flex overflow-x-auto border-b border-emerald-200">
           <button
             onClick={() => handleTabChange('notes')}
-            className={`shrink-0 flex w-20 flex-col items-center justify-center gap-1 py-3 text-sm font-medium transition-colors sm:w-auto sm:flex-1 sm:px-3 ${
+            className={`shrink-0 flex w-20 flex-col items-center justify-center gap-1.5 py-4 text-sm font-medium transition-colors sm:w-auto sm:flex-1 sm:gap-1 sm:px-3 sm:py-3 ${
               currentTab === 'notes'
                 ? 'border-b-2 border-emerald-600 text-emerald-600'
                 : 'text-zinc-600 hover:text-zinc-900'
@@ -1072,7 +1072,7 @@ export default function NotesPage() {
           </button>
           <button
             onClick={() => handleTabChange('todos')}
-            className={`shrink-0 flex w-20 flex-col items-center justify-center gap-1 py-3 text-sm font-medium transition-colors sm:w-auto sm:flex-1 sm:px-3 ${
+            className={`shrink-0 flex w-20 flex-col items-center justify-center gap-1.5 py-4 text-sm font-medium transition-colors sm:w-auto sm:flex-1 sm:gap-1 sm:px-3 sm:py-3 ${
               currentTab === 'todos'
                 ? 'border-b-2 border-emerald-600 text-emerald-600'
                 : 'text-zinc-600 hover:text-zinc-900'
@@ -1083,7 +1083,7 @@ export default function NotesPage() {
           </button>
           <button
             onClick={() => handleTabChange('goals')}
-            className={`shrink-0 flex w-20 flex-col items-center justify-center gap-1 py-3 text-sm font-medium transition-colors sm:w-auto sm:flex-1 sm:px-3 ${
+            className={`shrink-0 flex w-20 flex-col items-center justify-center gap-1.5 py-4 text-sm font-medium transition-colors sm:w-auto sm:flex-1 sm:gap-1 sm:px-3 sm:py-3 ${
               currentTab === 'goals'
                 ? 'border-b-2 border-emerald-600 text-emerald-600'
                 : 'text-zinc-600 hover:text-zinc-900'
@@ -1094,7 +1094,7 @@ export default function NotesPage() {
           </button>
           <button
             onClick={() => handleTabChange('calo')}
-            className={`shrink-0 flex w-20 flex-col items-center justify-center gap-1 py-3 text-sm font-medium transition-colors sm:w-auto sm:flex-1 sm:px-3 ${
+            className={`shrink-0 flex w-20 flex-col items-center justify-center gap-1.5 py-4 text-sm font-medium transition-colors sm:w-auto sm:flex-1 sm:gap-1 sm:px-3 sm:py-3 ${
               currentTab === 'calo'
                 ? 'border-b-2 border-emerald-600 text-emerald-600'
                 : 'text-zinc-600 hover:text-zinc-900'
@@ -1105,7 +1105,7 @@ export default function NotesPage() {
           </button>
           <button
             onClick={() => handleTabChange('meals')}
-            className={`shrink-0 flex w-20 flex-col items-center justify-center gap-1 py-3 text-sm font-medium transition-colors sm:w-auto sm:flex-1 sm:px-3 ${
+            className={`shrink-0 flex w-20 flex-col items-center justify-center gap-1.5 py-4 text-sm font-medium transition-colors sm:w-auto sm:flex-1 sm:gap-1 sm:px-3 sm:py-3 ${
               currentTab === 'meals'
                 ? 'border-b-2 border-emerald-600 text-emerald-600'
                 : 'text-zinc-600 hover:text-zinc-900'
@@ -1116,7 +1116,7 @@ export default function NotesPage() {
           </button>
           <button
             onClick={() => handleTabChange('weight')}
-            className={`shrink-0 flex w-20 flex-col items-center justify-center gap-1 py-3 text-sm font-medium transition-colors sm:w-auto sm:flex-1 sm:px-3 ${
+            className={`shrink-0 flex w-20 flex-col items-center justify-center gap-1.5 py-4 text-sm font-medium transition-colors sm:w-auto sm:flex-1 sm:gap-1 sm:px-3 sm:py-3 ${
               currentTab === 'weight'
                 ? 'border-b-2 border-emerald-600 text-emerald-600'
                 : 'text-zinc-600 hover:text-zinc-900'
@@ -1127,7 +1127,7 @@ export default function NotesPage() {
           </button>
           <button
             onClick={() => handleTabChange('health')}
-            className={`shrink-0 flex w-20 flex-col items-center justify-center gap-1 py-3 text-sm font-medium transition-colors sm:w-auto sm:flex-1 sm:px-3 ${
+            className={`shrink-0 flex w-20 flex-col items-center justify-center gap-1.5 py-4 text-sm font-medium transition-colors sm:w-auto sm:flex-1 sm:gap-1 sm:px-3 sm:py-3 ${
               currentTab === 'health'
                 ? 'border-b-2 border-emerald-600 text-emerald-600'
                 : 'text-zinc-600 hover:text-zinc-900'
@@ -1138,7 +1138,7 @@ export default function NotesPage() {
           </button>
           <button
             onClick={() => handleTabChange('stats')}
-            className={`shrink-0 flex w-20 flex-col items-center justify-center gap-1 py-3 text-sm font-medium transition-colors sm:w-auto sm:flex-1 sm:px-3 ${
+            className={`shrink-0 flex w-20 flex-col items-center justify-center gap-1.5 py-4 text-sm font-medium transition-colors sm:w-auto sm:flex-1 sm:gap-1 sm:px-3 sm:py-3 ${
               currentTab === 'stats'
                 ? 'border-b-2 border-emerald-600 text-emerald-600'
                 : 'text-zinc-600 hover:text-zinc-900'
