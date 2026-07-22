@@ -18,6 +18,7 @@ export const vi = {
 
   header: {
     navHome: 'Trang chủ',
+    navBlog: 'Blog',
     navNotes: 'Notes',
     navQuotes: 'Quotes',
     admin: 'Quản trị',
