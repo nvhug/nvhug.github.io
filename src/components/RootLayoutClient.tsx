@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Home, LogOut, Quote, Settings, StickyNote, User as UserIcon, type LucideIcon } from 'lucide-react'
+import { BookOpen, Home, LogOut, Quote, Settings, StickyNote, User as UserIcon, type LucideIcon } from 'lucide-react'
 import { Toaster } from 'sonner'
 import { useEffect, useRef, useState } from 'react'
 import { getSupabaseBrowserClient } from '@/lib/supabase-browser'
@@ -80,7 +80,7 @@ function AccountMenu({
             {/* Nav links — only needed on mobile, since desktop shows them in the header */}
             <div className="border-b border-zinc-100 p-1 font-poppins sm:hidden">
               {navItems.map((item) => {
-                const isActive = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href)
+                const isActive = pathname.startsWith(item.href)
                 return (
                   <Link
                     key={item.href}
@@ -162,8 +162,8 @@ export function RootLayoutClient({ children }: { children: React.ReactNode }) {
   }, [])
 
   const navItems = [
-    { href: '/', label: t('header.navHome'), icon: Home },
-    { href: '/notes', label: t('header.navNotes'), icon: StickyNote },
+    { href: '/notes', label: t('header.navNotes'), icon: Home },
+    { href: '/blog', label: t('header.navBlog'), icon: BookOpen },
     { href: '/quotes', label: t('header.navQuotes'), icon: Quote },
   ]
 
@@ -184,7 +184,7 @@ export function RootLayoutClient({ children }: { children: React.ReactNode }) {
             <div className="flex items-center gap-1">
               <div className="hidden items-center gap-1 sm:flex">
                 {navItems.map((item) => {
-                  const isActive = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href)
+                  const isActive = pathname.startsWith(item.href)
                   return (
                     <Link
                       key={item.href}

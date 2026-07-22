@@ -20,6 +20,7 @@ export const en: Dictionary = {
 
   header: {
     navHome: 'Home',
+    navBlog: 'Blog',
     navNotes: 'Notes',
     navQuotes: 'Quotes',
     admin: 'Admin',
