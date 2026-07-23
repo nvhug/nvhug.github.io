@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
 import { Note } from '@/types'
 import { createSupabaseServerClient } from '@/lib/supabase-server'
 
@@ -319,11 +318,6 @@ export async function POST(request: Request) {
     }, { status: 400 })
   }
 
-  const db = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  )
-
   const { data: latestAnalysis } = await supabaseAuth
     .from('ai_analysis_history')
     .select('created_at')
@@ -357,18 +351,21 @@ export async function POST(request: Request) {
   }
 
   const [weightRes, foodRes, mealRes] = await Promise.all([
-    db.from('weight_logs')
+    supabaseAuth.from('weight_logs')
       .select('date, weight')
+      .eq('user_id', user!.id)
       .gte('date', period.from).lte('date', period.to)
       .order('date', { ascending: true }),
 
-    db.from('daily_foods')
+    supabaseAuth.from('daily_foods')
       .select('date, total_calories')
+      .eq('user_id', user!.id)
       .gte('date', period.from).lte('date', period.to)
       .order('date', { ascending: true }),
 
-    db.from('meals')
+    supabaseAuth.from('meals')
       .select('date, meal_type, time, is_completed')
+      .eq('user_id', user!.id)
       .gte('date', period.from).lte('date', period.to)
       .order('date', { ascending: true }),
   ])
