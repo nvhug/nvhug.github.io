@@ -139,7 +139,7 @@ export async function POST(request: NextRequest) {
       from: FROM_EMAIL,
       to: BUG_REPORT_TO_EMAIL,
       replyTo: reporterEmail || undefined,
-      subject: `[${isFeature ? 'Feature Request' : 'Bug Report'}] ${description.slice(0, 60)}`,
+      subject: `[${isFeature ? 'Feature Request' : 'Bug Report'}] ${description.replace(/\s+/g, ' ').slice(0, 60)}`,
       html: buildEmailHtml({ typeLabel, isFeature, description, reporterName, reporterEmail, pageUrl, userAgent }),
       attachments: attachments.length ? attachments : undefined,
     })
