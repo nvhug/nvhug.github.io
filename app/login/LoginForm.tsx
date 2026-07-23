@@ -59,7 +59,6 @@ function OAuthStep({ redirect, onSignup, onEmailLogin, onForgot }: { redirect: s
           </svg>
         </div>
         <h2 className="font-poppins text-xl font-semibold text-zinc-900">{t('login.oauthHeading')}</h2>
-        <p className="mt-1 text-sm text-zinc-500">{t('login.oauthStep')}</p>
       </div>
 
       <div className="space-y-3">
