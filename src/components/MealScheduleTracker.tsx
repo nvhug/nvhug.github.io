@@ -236,12 +236,12 @@ export function MealScheduleTracker() {
         </div>
 
         <div className="space-y-2">
-          <div className="flex items-center justify-between text-xs sm:text-sm">
+          <div className="flex items-center justify-between text-sm">
             <span className="text-zinc-600">{t('mealScheduleTracker.caloriesEaten')}</span>
             <span className="font-semibold text-zinc-900">{Math.round(completedCalories)} / {totalCalories} kcal</span>
           </div>
 
-          <div className="flex items-center justify-between text-xs sm:text-sm">
+          <div className="flex items-center justify-between text-sm">
             <span className="text-zinc-600">{t('mealScheduleTracker.completedLabel')}</span>
             <span className="font-semibold text-zinc-900">{t('mealScheduleTracker.mealsCount', { done: completedCount, total: meals.length })}</span>
           </div>
@@ -253,7 +253,7 @@ export function MealScheduleTracker() {
             />
           </div>
 
-          <div className="flex items-center justify-between text-xs text-zinc-500">
+          <div className="flex items-center justify-between text-sm text-zinc-500">
             <span>{t('mealScheduleTracker.percentDone', { pct: completionPercent })}</span>
             {totalCalories > 0 && (
               <span className="text-emerald-600 font-medium">
@@ -273,14 +273,14 @@ export function MealScheduleTracker() {
           <button
             type="button"
             onClick={() => { setAddingNew(true); setEditingId(null) }}
-            className="flex items-center gap-1 rounded-lg border border-emerald-200 px-2.5 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-50 transition-colors"
+            className="flex items-center gap-1 rounded-lg border border-emerald-200 px-2.5 py-1 text-sm font-medium text-emerald-700 hover:bg-emerald-50 transition-colors"
           >
             <Plus className="h-3.5 w-3.5" /> {t('mealScheduleTracker.addMeal')}
           </button>
         </div>
 
         {loading ? (
-          <p className="text-xs text-zinc-400">{t('common.loading')}</p>
+          <p className="text-sm text-zinc-400">{t('common.loading')}</p>
         ) : meals.length === 0 && !addingNew ? (
           <div className="flex flex-col items-center gap-3 py-6 text-center">
             <p className="text-sm text-zinc-400">{t('mealScheduleTracker.noMealsToday')}</p>
@@ -314,14 +314,14 @@ export function MealScheduleTracker() {
                         type="text"
                         value={editForm.name}
                         onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
-                        className="rounded border border-emerald-300 px-2 py-1 text-xs flex-1 min-w-28 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                        className="rounded border border-emerald-300 px-2 py-1 text-sm flex-1 min-w-28 focus:outline-none focus:ring-1 focus:ring-emerald-400"
                         placeholder={t('mealScheduleTracker.mealNamePlaceholder')}
                       />
                       <input
                         type="number"
                         value={editForm.target_calories}
                         onChange={(e) => setEditForm((f) => ({ ...f, target_calories: e.target.value }))}
-                        className="rounded border border-emerald-300 px-2 py-1 text-xs w-20 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                        className="rounded border border-emerald-300 px-2 py-1 text-sm w-20 focus:outline-none focus:ring-1 focus:ring-emerald-400"
                         placeholder={t('mealScheduleTracker.caloriesPlaceholder')}
                       />
                     </div>
@@ -329,21 +329,21 @@ export function MealScheduleTracker() {
                       value={editForm.foods}
                       onChange={(e) => setEditForm((f) => ({ ...f, foods: e.target.value }))}
                       rows={Math.max(meal.foods.length, 2) + 1}
-                      className="w-full rounded border border-emerald-300 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-400 resize-none"
+                      className="w-full rounded border border-emerald-300 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-400 resize-none"
                       placeholder={t('mealScheduleTracker.foodsPlaceholder')}
                     />
                     <div className="flex justify-end gap-2">
                       <button
                         onClick={cancelEdit}
-                        className="flex items-center gap-1 rounded px-2 py-1 text-xs text-zinc-500 hover:bg-zinc-100 transition-colors"
+                        className="flex items-center gap-1 rounded px-2 py-1 text-sm text-zinc-500 hover:bg-zinc-100 transition-colors"
                       >
-                        <X className="h-3.5 w-3.5" /> {t('common.cancel')}
+                        <X className="h-4 w-4 sm:h-3.5 sm:w-3.5" /> {t('common.cancel')}
                       </button>
                       <button
                         onClick={() => saveEdit(meal.id)}
-                        className="flex items-center gap-1 rounded bg-emerald-500 px-2.5 py-1 text-xs font-medium text-white hover:bg-emerald-600 transition-colors"
+                        className="flex items-center gap-1 rounded bg-emerald-500 px-2.5 py-1 text-sm font-medium text-white hover:bg-emerald-600 transition-colors"
                       >
-                        <Check className="h-3.5 w-3.5" /> {t('common.save')}
+                        <Check className="h-4 w-4 sm:h-3.5 sm:w-3.5" /> {t('common.save')}
                       </button>
                     </div>
                   </div>
@@ -364,14 +364,14 @@ export function MealScheduleTracker() {
                           <span className="font-medium text-sm text-zinc-900">{meal.time}</span>
                         </div>
                         <span className="text-sm font-medium text-zinc-700">{meal.name}</span>
-                        <span className="sm:ml-auto shrink-0 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+                        <span className="sm:ml-auto shrink-0 rounded-full bg-emerald-100 px-2.5 py-1 text-sm font-semibold text-emerald-700">
                           {meal.target_calories} kcal
                         </span>
                       </div>
 
                       <div className="ml-0 sm:ml-6 space-y-0.5">
                         {meal.foods.map((food, idx) => (
-                          <p key={idx} className="text-xs text-zinc-600">• {food}</p>
+                          <p key={idx} className="text-sm text-zinc-600">• {food}</p>
                         ))}
                       </div>
                     </div>
@@ -402,7 +402,7 @@ export function MealScheduleTracker() {
         {/* Add new meal form */}
         {addingNew && (
           <div className="mt-3 rounded-lg border border-emerald-400 bg-emerald-50 p-2 sm:p-3 shadow-md ring-1 ring-emerald-300">
-            <p className="mb-2 text-xs font-medium text-emerald-700">{t('mealScheduleTracker.newMealTitle')}</p>
+            <p className="mb-2 text-sm font-medium text-emerald-700">{t('mealScheduleTracker.newMealTitle')}</p>
             <div className="space-y-2">
               <div className="flex flex-wrap gap-2">
                 <TimePicker value={newForm.time} onChange={(v) => setNewForm((f) => ({ ...f, time: v }))} />
@@ -410,7 +410,7 @@ export function MealScheduleTracker() {
                   type="text"
                   value={newForm.name}
                   onChange={(e) => setNewForm((f) => ({ ...f, name: e.target.value }))}
-                  className="rounded border border-emerald-300 px-2 py-1 text-xs flex-1 min-w-28 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                  className="rounded border border-emerald-300 px-2 py-1 text-sm flex-1 min-w-28 focus:outline-none focus:ring-1 focus:ring-emerald-400"
                   placeholder="Tên bữa ăn"
                   autoFocus
                 />
@@ -418,7 +418,7 @@ export function MealScheduleTracker() {
                   type="number"
                   value={newForm.target_calories}
                   onChange={(e) => setNewForm((f) => ({ ...f, target_calories: e.target.value }))}
-                  className="rounded border border-emerald-300 px-2 py-1 text-xs w-20 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                  className="rounded border border-emerald-300 px-2 py-1 text-sm w-20 focus:outline-none focus:ring-1 focus:ring-emerald-400"
                   placeholder="kcal"
                 />
               </div>
@@ -426,22 +426,22 @@ export function MealScheduleTracker() {
                 value={newForm.foods}
                 onChange={(e) => setNewForm((f) => ({ ...f, foods: e.target.value }))}
                 rows={3}
-                className="w-full rounded border border-emerald-300 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-400 resize-none"
+                className="w-full rounded border border-emerald-300 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-400 resize-none"
                 placeholder={t('mealScheduleTracker.foodsPlaceholderOptional')}
               />
               <div className="flex justify-end gap-2">
                 <button
                   onClick={() => { setAddingNew(false); setNewForm(EMPTY_FORM) }}
-                  className="flex items-center gap-1 rounded px-2 py-1 text-xs text-zinc-500 hover:bg-zinc-100 transition-colors"
+                  className="flex items-center gap-1 rounded px-2 py-1 text-sm text-zinc-500 hover:bg-zinc-100 transition-colors"
                 >
-                  <X className="h-3.5 w-3.5" /> {t('common.cancel')}
+                  <X className="h-4 w-4 sm:h-3.5 sm:w-3.5" /> {t('common.cancel')}
                 </button>
                 <button
                   onClick={addMeal}
                   disabled={savingNew}
                   className="flex items-center gap-1 rounded bg-emerald-500 px-2.5 py-1 text-xs font-medium text-white hover:bg-emerald-600 transition-colors disabled:opacity-50"
                 >
-                  <Check className="h-3.5 w-3.5" /> {savingNew ? t('common.saving') : t('common.add')}
+                  <Check className="h-4 w-4 sm:h-3.5 sm:w-3.5" /> {savingNew ? t('common.saving') : t('common.add')}
                 </button>
               </div>
             </div>

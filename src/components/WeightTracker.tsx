@@ -275,12 +275,12 @@ export function WeightTracker() {
                 </div>
                 <div className="flex gap-1">
                   <button onClick={() => startEdit(log)}
-                    className="rounded p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600">
-                    <Pencil className="h-3.5 w-3.5" />
+                    className="rounded p-1.5 sm:p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600">
+                    <Pencil className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
                   </button>
                   <button onClick={() => setDeleteId(log.id)}
-                    className="rounded p-1 text-zinc-400 hover:bg-red-50 hover:text-red-500">
-                    <Trash2 className="h-3.5 w-3.5" />
+                    className="rounded p-1.5 sm:p-1 text-zinc-400 hover:bg-red-50 hover:text-red-500">
+                    <Trash2 className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
                   </button>
                 </div>
               </div>

@@ -403,30 +403,30 @@ export function CalorieTracker() {
                         className="rounded border border-emerald-300 px-2 py-1 text-sm text-zinc-900 focus:outline-none focus:ring-1 focus:ring-emerald-400"
                         placeholder={t('calorieTracker.editFoodNamePlaceholder')}
                       />
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5">
                         <input
                           type="number"
                           value={editingData?.total_calories ?? 0}
                           onChange={(e) => setEditingData({ ...editingData, total_calories: Number(e.target.value) || 0 })}
-                          className="w-24 rounded border border-emerald-300 px-2 py-1 text-sm text-zinc-900 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                          className="w-14 sm:w-24 rounded border border-emerald-300 px-1.5 py-1 text-sm text-zinc-900 focus:outline-none focus:ring-1 focus:ring-emerald-400"
                           min="0"
                           step="1"
                         />
-                        <span className="text-xs text-zinc-600">kcal</span>
-                        <TimePicker value={editingTime} onChange={setEditingTime} />
+                        <span className="hidden sm:inline text-xs text-zinc-600">kcal</span>
+                        <TimePicker value={editingTime} onChange={setEditingTime} className="px-1.5 py-1 text-xs sm:px-2.5 sm:py-1.5 sm:text-sm" />
                         <div className="ml-auto flex items-center gap-1">
                           <button
                             onClick={() => { setEditingId(null); setEditingData(null); setEditingTime('') }}
-                            className="flex items-center gap-1 rounded px-2 py-1 text-xs text-zinc-500 hover:bg-white transition-colors"
+                            className="flex items-center gap-1 rounded p-1.5 sm:px-2 sm:py-1 text-xs text-zinc-500 hover:bg-white transition-colors"
                           >
-                            <X className="h-3.5 w-3.5" /> {t('common.cancel')}
+                            <X className="h-4 w-4 sm:h-3.5 sm:w-3.5" /> <span className="hidden sm:inline">{t('common.cancel')}</span>
                           </button>
                           <button
                             onClick={() => updateFood(food)}
                             disabled={saving}
-                            className="flex items-center gap-1 rounded bg-emerald-500 px-2.5 py-1 text-xs font-medium text-white hover:bg-emerald-600 transition-colors disabled:opacity-50"
+                            className="flex items-center gap-1 rounded bg-emerald-500 p-1.5 sm:px-2.5 sm:py-1 text-xs font-medium text-white hover:bg-emerald-600 transition-colors disabled:opacity-50"
                           >
-                            <Check className="h-3.5 w-3.5" /> {t('common.save')}
+                            <Check className="h-4 w-4 sm:h-3.5 sm:w-3.5" /> <span className="hidden sm:inline">{t('common.save')}</span>
                           </button>
                         </div>
                       </div>
@@ -440,15 +440,15 @@ export function CalorieTracker() {
                         <div className="flex items-center gap-1 shrink-0">
                           <button
                             onClick={() => startEdit(food)}
-                            className="rounded-md text-zinc-400 hover:bg-emerald-100 hover:text-emerald-600 p-1"
+                            className="rounded-md text-zinc-400 hover:bg-emerald-100 hover:text-emerald-600 p-1.5 sm:p-1"
                           >
-                            <Edit2 className="h-3.5 w-3.5" />
+                            <Edit2 className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
                           </button>
                           <button
                             onClick={() => deleteFood(food.id)}
-                            className="rounded-md text-zinc-300 hover:bg-rose-100 hover:text-rose-600 p-1"
+                            className="rounded-md text-zinc-300 hover:bg-rose-100 hover:text-rose-600 p-1.5 sm:p-1"
                           >
-                            <Trash2 className="h-3.5 w-3.5" />
+                            <Trash2 className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
                           </button>
                         </div>
                       </div>

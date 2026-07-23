@@ -86,13 +86,13 @@ function AccountMenu({
                     key={item.href}
                     href={item.href}
                     onClick={() => setOpen(false)}
-                    className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                    className={`flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-base font-medium transition-colors ${
                       isActive
                         ? 'bg-emerald-100 text-emerald-700'
                         : 'text-zinc-700 hover:bg-zinc-50 hover:text-zinc-900'
                     }`}
                   >
-                    <item.icon className={`h-4 w-4 shrink-0 ${isActive ? 'text-emerald-600' : 'text-zinc-400'}`} />
+                    <item.icon className={`h-5 w-5 shrink-0 ${isActive ? 'text-emerald-600' : 'text-zinc-400'}`} />
                     {item.label}
                   </Link>
                 )
