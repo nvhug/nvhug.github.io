@@ -241,20 +241,24 @@ export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note
 
   async function handleDonateConfirm() {
     setDonating(true)
+    let succeeded = false
     try {
       const { data: { user } } = await getSupabaseBrowserClient().auth.getUser()
-      await fetch('/api/donate-notify', {
+      const res = await fetch('/api/donate-notify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userName:  user?.user_metadata?.full_name ?? user?.user_metadata?.name ?? '',
           userEmail: user?.email ?? '',
           ts: new Date().toLocaleString('vi-VN'),
+          userId: user?.id ?? '',
         }),
       })
+      succeeded = res.ok
     } finally {
       setDonating(false)
       setDonated(true)
+      if (succeeded) setTimeout(() => window.location.reload(), 2000)
     }
   }
 

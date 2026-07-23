@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Resend } from 'resend'
+import { sendTeamsCard, getServiceSupabaseClient } from '@/lib/notify'
 
 const RESEND_API_KEY    = process.env.RESEND_API_KEY
 const TO_EMAIL          = process.env.BUG_REPORT_TO_EMAIL
@@ -50,10 +51,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'not configured' }, { status: 500 })
   }
 
-  const { userName = '', userEmail = '', ts = '' } = await request.json().catch(() => ({})) as {
+  const { userName = '', userEmail = '', ts = '', userId = '' } = await request.json().catch(() => ({})) as {
     userName?: string
     userEmail?: string
     ts?: string
+    userId?: string
   }
 
   const resend = new Resend(RESEND_API_KEY)
@@ -67,6 +69,23 @@ export async function POST(request: NextRequest) {
   if (error) {
     console.error('donate-notify resend error:', error)
     return NextResponse.json({ error: 'send failed' }, { status: 500 })
+  }
+
+  await sendTeamsCard({
+    '@type': 'MessageCard',
+    '@context': 'http://schema.org/extensions',
+    themeColor: '7c3aed',
+    summary: 'Có người vừa ủng hộ! 🎉',
+    sections: [{
+      activityTitle: '🎉 Có người vừa ủng hộ!',
+      activitySubtitle: userName ? `${userName} — ${userEmail}` : userEmail || 'Khách',
+      text: `Thời gian: ${ts}`,
+    }],
+  })
+
+  if (userId) {
+    const supabase = getServiceSupabaseClient()
+    await supabase.from('user_profiles').update({ role: 'paid' }).eq('id', userId)
   }
 
   return NextResponse.json({ success: true })
