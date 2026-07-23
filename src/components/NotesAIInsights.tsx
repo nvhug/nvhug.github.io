@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react'
 import {
   Sparkles, RefreshCw, ChevronRight,
   AlertCircle, Lightbulb, History, ChevronDown, ChevronUp,
-  Scale, Utensils, BookOpen, Crown,
+  Scale, Utensils, BookOpen, Crown, X,
 } from 'lucide-react'
 import { Note } from '@/types'
 import { supabase } from '@/lib/supabase'
@@ -12,6 +12,7 @@ import { useLanguage } from '@/lib/i18n/language-context'
 import { getIntlLocale } from '@/lib/i18n/locale'
 import type { Lang } from '@/lib/i18n/language-context'
 import { useFeatureAccess } from '@/lib/useFeatureAccess'
+import { getSupabaseBrowserClient } from '@/lib/supabase-browser'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -114,6 +115,7 @@ function fmtDate(iso: string) {
 
 const STRIP_HTML = /<[^>]*>/g
 const ANALYZE_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000
+const MIN_NOTES_REQUIRED = 5
 
 function getCooldownInfo(lastAnalyzedAt?: string | null) {
   if (!lastAnalyzedAt) {
@@ -195,9 +197,12 @@ export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note
   const [history,      setHistory]      = useState<AIInsights[]>([])
   const [viewIndex,    setViewIndex]    = useState(0)
   const [showHistory,  setShowHistory]  = useState(false)
-  const [loading,      setLoading]      = useState(false)
-  const [fetching,     setFetching]     = useState(true)
-  const [error,        setError]        = useState<string | null>(null)
+  const [loading,          setLoading]          = useState(false)
+  const [fetching,         setFetching]         = useState(true)
+  const [error,            setError]            = useState<string | null>(null)
+  const [showDonateModal,  setShowDonateModal]  = useState(false)
+  const [donating,         setDonating]         = useState(false)
+  const [donated,          setDonated]          = useState(false)
 
   useEffect(() => {
     supabase
@@ -223,12 +228,34 @@ export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note
     [notes, selectedPeriod]
   )
 
+  // Total data items available for analysis (notes in period + all habits)
+  const totalItems = filteredNotes.length + habits.length
+
   function handleAnalyzeClick() {
     if (!canUseAI) {
-      setError(t('notesAIInsights.paidFeatureError'))
+      setShowDonateModal(true)
       return
     }
     void analyze()
+  }
+
+  async function handleDonateConfirm() {
+    setDonating(true)
+    try {
+      const { data: { user } } = await getSupabaseBrowserClient().auth.getUser()
+      await fetch('/api/donate-notify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userName:  user?.user_metadata?.full_name ?? user?.user_metadata?.name ?? '',
+          userEmail: user?.email ?? '',
+          ts: new Date().toLocaleString('vi-VN'),
+        }),
+      })
+    } finally {
+      setDonating(false)
+      setDonated(true)
+    }
   }
 
   async function analyze() {
@@ -294,13 +321,13 @@ export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note
 
         {/* Note count hint */}
         <span className="text-sm text-zinc-400">
-          {t('notesAIInsights.notesCount', { n: filteredNotes.length })}
+          {t('notesAIInsights.notesCount', { n: totalItems })}
         </span>
 
-        {/* Analyze button — visible to everyone; normal users get an upsell message on click instead of running the analysis */}
+        {/* Analyze button — visible to everyone; users without permission get a donate modal on click */}
         <button
           onClick={handleAnalyzeClick}
-          disabled={loading || fetching || filteredNotes.length === 0 || (canUseAI && cooldown.isBlocked)}
+          disabled={loading || fetching || totalItems < MIN_NOTES_REQUIRED || (canUseAI && cooldown.isBlocked)}
           className="flex items-center gap-2 rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-violet-700 disabled:opacity-60"
         >
           {loading
@@ -320,10 +347,15 @@ export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note
         </p>
       )}
 
-      {/* Empty period warning */}
-      {filteredNotes.length === 0 && !loading && !fetching && (
+      {/* Empty / insufficient notes warning */}
+      {!loading && !fetching && totalItems === 0 && (
         <p className="text-center text-sm text-zinc-400">
           {t('notesAIInsights.noDataForPeriod', { period: selectedPeriod.label })}
+        </p>
+      )}
+      {!loading && !fetching && totalItems > 0 && totalItems < MIN_NOTES_REQUIRED && (
+        <p className="text-center text-sm text-amber-500">
+          {t('notesAIInsights.minNotesHint', { min: MIN_NOTES_REQUIRED, n: totalItems })}
         </p>
       )}
 
@@ -476,6 +508,60 @@ export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note
               <span className="ml-auto text-zinc-400">{formatDateTime(viewed.analyzedAt, lang)}</span>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Donate modal — shown when user clicks Analyze without permission */}
+      {showDonateModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={() => { setShowDonateModal(false); setDonated(false) }}
+        >
+          <div
+            className="relative w-full max-w-sm rounded-2xl bg-white p-8 shadow-2xl"
+            onClick={e => e.stopPropagation()}
+          >
+            <button
+              onClick={() => { setShowDonateModal(false); setDonated(false) }}
+              className="absolute right-4 top-4 rounded-full p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
+            >
+              <X className="h-4 w-4" />
+            </button>
+            <h3 className="text-center text-lg font-bold text-zinc-800">
+              {t('notesAIInsights.donateModalTitle')}
+            </h3>
+            <p className="mt-3 text-center text-sm leading-relaxed text-zinc-500">
+              {t('notesAIInsights.donateModalBody')}
+            </p>
+            <div className="mt-5 flex justify-center">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/dnm.jpg" alt="Donate QR" className="h-56 w-56 rounded-xl object-cover" />
+            </div>
+
+            {donated ? (
+              <p className="mt-5 text-center text-base font-semibold text-violet-600">
+                {t('notesAIInsights.donateModalThanks')}
+              </p>
+            ) : (
+              <div className="mt-5 flex gap-3">
+                <button
+                  onClick={() => { setShowDonateModal(false); setDonated(false) }}
+                  className="flex-1 rounded-lg border border-zinc-200 py-2.5 text-sm font-medium text-zinc-500 transition hover:bg-zinc-50"
+                >
+                  {t('notesAIInsights.donateModalClose')}
+                </button>
+                <button
+                  onClick={handleDonateConfirm}
+                  disabled={donating}
+                  className="flex-1 rounded-lg bg-violet-600 py-2.5 text-sm font-medium text-white transition hover:bg-violet-700 disabled:opacity-60"
+                >
+                  {donating
+                    ? t('notesAIInsights.donateModalConfirming')
+                    : t('notesAIInsights.donateModalConfirm')}
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
