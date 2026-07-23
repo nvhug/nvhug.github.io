@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
-import { AUTH_COOKIE_NAME, isValidAuthCookie } from '@/lib/auth'
+
 import { matchProtectedPage } from '@/lib/permissions'
 
 export async function proxy(request: NextRequest) {
@@ -32,20 +32,9 @@ export async function proxy(request: NextRequest) {
   const matchedPage = matchProtectedPage(pathname)
   if (!matchedPage) return supabaseResponse
 
-  const pinCookie = request.cookies.get(AUTH_COOKIE_NAME)?.value
-  const hasPinCookie = isValidAuthCookie(pinCookie)
-
-  // Layer 1: no PIN → go enter PIN first
-  if (!hasPinCookie) {
-    const url = new URL('/login', request.url)
-    url.searchParams.set('redirect', pathname)
-    return NextResponse.redirect(url)
-  }
-
-  // Layer 2: PIN ok, no OAuth session → go login with Google/Facebook
+  // No OAuth session → go login with Google/Facebook
   if (!user) {
     const url = new URL('/login', request.url)
-    url.searchParams.set('step', 'oauth')
     url.searchParams.set('redirect', pathname)
     return NextResponse.redirect(url)
   }

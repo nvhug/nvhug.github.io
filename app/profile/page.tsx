@@ -14,7 +14,6 @@ type ProfileData = {
   bio: string
   skills: string
   interests: string
-  contact_email: string
 }
 
 export default function ProfilePage() {
@@ -25,13 +24,13 @@ export default function ProfilePage() {
     bio: t('profile.defaults.bio'),
     skills: t('profile.defaults.skills'),
     interests: t('profile.defaults.interests'),
-    contact_email: '',
   }
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<ProfileData>(defaultProfile)
   const [loading, setLoading] = useState(true)
   const [editMode, setEditMode] = useState(false)
   const [drafts, setDrafts] = useState<ProfileData>(defaultProfile)
+  const [draftUsername, setDraftUsername] = useState('')
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -39,6 +38,7 @@ export default function ProfilePage() {
       const { data: { user } } = await getSupabaseBrowserClient().auth.getUser()
       if (!user) { router.replace('/login'); return }
       setUser(user)
+      setDraftUsername((user.user_metadata?.full_name as string | undefined) ?? '')
 
       const { data } = await getSupabaseBrowserClient()
         .from('user_profiles')
@@ -57,6 +57,7 @@ export default function ProfilePage() {
 
   function enterEdit() {
     setDrafts({ ...profile })
+    setDraftUsername((user?.user_metadata?.full_name as string | undefined) ?? '')
     setEditMode(true)
   }
 
@@ -68,11 +69,20 @@ export default function ProfilePage() {
     if (!user) return
     setSaving(true)
     try {
-      const { error } = await getSupabaseBrowserClient()
+      const { error: profileError } = await getSupabaseBrowserClient()
         .from('user_profiles')
         .update({ profile_data: drafts })
         .eq('id', user.id)
-      if (error) throw error
+      if (profileError) throw profileError
+
+      const currentName = (user.user_metadata?.full_name as string | undefined) ?? ''
+      if (draftUsername.trim() !== currentName) {
+        const { data: updated, error: metaError } = await getSupabaseBrowserClient()
+          .auth.updateUser({ data: { full_name: draftUsername.trim() } })
+        if (metaError) throw metaError
+        if (updated.user) setUser(updated.user)
+      }
+
       setProfile({ ...drafts })
       setEditMode(false)
       toast.success(t('profile.saveSuccess'))
@@ -145,33 +155,42 @@ export default function ProfilePage() {
             <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-2xl font-bold text-white">
               {avatarLetter}
             </div>
-            <div className="min-w-0">
-              <h1 className="font-poppins text-2xl font-semibold text-zinc-900">{displayName ?? email}</h1>
-              <p className="text-sm text-zinc-500">{email}</p>
+            <div className="min-w-0 flex-1">
+              {editMode ? (
+                <div className="space-y-2">
+                  <div>
+                    <p className="mb-1 text-xs font-medium text-zinc-500">{t('profile.usernameLabel')}</p>
+                    <input
+                      type="text"
+                      value={draftUsername}
+                      onChange={(e) => setDraftUsername(e.target.value)}
+                      className={inputCls}
+                      placeholder={t('profile.usernamePlaceholder')}
+                    />
+                  </div>
+                  <div>
+                    <p className="mb-1 text-xs font-medium text-zinc-500">{t('profile.taglineLabel')}</p>
+                    <input
+                      type="text"
+                      value={drafts.tagline}
+                      onChange={(e) => set('tagline', e.target.value)}
+                      className={inputCls}
+                      placeholder={t('profile.taglinePlaceholder')}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <h1 className="font-poppins text-2xl font-semibold text-zinc-900">{displayName ?? email}</h1>
+                  {profile.tagline && (
+                    <p className="text-sm text-zinc-400">{profile.tagline}</p>
+                  )}
+                </>
+              )}
             </div>
           </div>
 
-          <div className="mt-5 space-y-4">
-            <div>
-              <p className="mb-1 text-xs font-medium text-zinc-500">{t('profile.taglineLabel')}</p>
-              {editMode ? (
-                <input
-                  type="text"
-                  value={drafts.tagline}
-                  onChange={(e) => set('tagline', e.target.value)}
-                  className={inputCls}
-                  placeholder={t('profile.taglinePlaceholder')}
-                />
-              ) : (
-                <span
-                  onDoubleClick={enterEdit}
-                  className={textCls('text-lg font-medium text-zinc-700')}
-                >
-                  {profile.tagline || <span className="italic text-zinc-400">{t('profile.emptyFieldHint')}</span>}
-                </span>
-              )}
-            </div>
-
+          <div className="mt-5">
             <div>
               <p className="mb-1 text-xs font-medium text-zinc-500">{t('profile.bioLabel')}</p>
               {editMode ? (
@@ -245,30 +264,7 @@ export default function ProfilePage() {
         <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-6">
           <h3 className="mb-3 font-poppins text-xl font-semibold text-zinc-900">{t('profile.contactTitle')}</h3>
           <p className="mb-1 text-xs font-medium text-zinc-500">{t('profile.contactEmailLabel')}</p>
-          {editMode ? (
-            <input
-              type="email"
-              value={drafts.contact_email}
-              onChange={(e) => set('contact_email', e.target.value)}
-              className={inputCls}
-              placeholder={t('profile.emailPlaceholder')}
-            />
-          ) : (
-            <span
-              onDoubleClick={enterEdit}
-              className={textCls('text-sm text-zinc-700')}
-            >
-              {profile.contact_email || <span className="italic text-zinc-400">{t('profile.emptyFieldHint')}</span>}
-            </span>
-          )}
-          {!editMode && profile.contact_email && (
-            <a
-              href={`mailto:${profile.contact_email}`}
-              className="mt-4 inline-flex w-full items-center justify-center rounded-xl bg-linear-to-r from-emerald-500 to-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:from-emerald-400 hover:to-emerald-500"
-            >
-              {t('profile.sendEmail')}
-            </a>
-          )}
+          <p className="text-sm text-zinc-700">{email}</p>
         </div>
       </section>
 
