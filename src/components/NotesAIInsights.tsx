@@ -7,7 +7,6 @@ import {
   Scale, Utensils, BookOpen, Crown, X,
 } from 'lucide-react'
 import { Note } from '@/types'
-import { supabase } from '@/lib/supabase'
 import { useLanguage } from '@/lib/i18n/language-context'
 import { getIntlLocale } from '@/lib/i18n/locale'
 import type { Lang } from '@/lib/i18n/language-context'
@@ -205,15 +204,19 @@ export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note
   const [donated,          setDonated]          = useState(false)
 
   useEffect(() => {
-    supabase
-      .from('ai_analysis_history')
-      .select('id, result, prompt_tokens, completion_tokens, total_tokens, period_label, period_from, period_to, created_at')
-      .order('created_at', { ascending: false })
-      .limit(10)
-      .then(({ data }: { data: Parameters<typeof rowToInsight>[0][] | null }) => {
-        if (data?.length) setHistory(data.map(rowToInsight))
-      })
-      .finally(() => setFetching(false))
+    async function load() {
+      const { data: { user } } = await getSupabaseBrowserClient().auth.getUser()
+      if (!user) { setFetching(false); return }
+      const { data } = await getSupabaseBrowserClient()
+        .from('ai_analysis_history')
+        .select('id, result, prompt_tokens, completion_tokens, total_tokens, period_label, period_from, period_to, created_at')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(10)
+      if (data?.length) setHistory((data as Parameters<typeof rowToInsight>[0][]).map(rowToInsight))
+      setFetching(false)
+    }
+    void load()
   }, [])
 
   const viewed          = history[viewIndex] ?? null

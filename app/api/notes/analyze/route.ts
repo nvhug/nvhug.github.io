@@ -324,9 +324,10 @@ export async function POST(request: Request) {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   )
 
-  const { data: latestAnalysis } = await db
+  const { data: latestAnalysis } = await supabaseAuth
     .from('ai_analysis_history')
     .select('created_at')
+    .eq('user_id', user!.id)
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle()
@@ -504,9 +505,10 @@ Trả về JSON với đúng cấu trúc sau (không thêm field nào, không b�
   const completionTokens = data.usage?.completion_tokens ?? 0
   const totalTokens      = data.usage?.total_tokens      ?? 0
 
-  const { data: saved, error: saveErr } = await db
+  const { data: saved, error: saveErr } = await supabaseAuth
     .from('ai_analysis_history')
     .insert({
+      user_id:           user!.id,
       result:            insights,
       prompt_tokens:     promptTokens,
       completion_tokens: completionTokens,
