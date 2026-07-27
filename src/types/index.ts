@@ -143,6 +143,16 @@ export interface WeightLog {
   created_at: string
 }
 
+export interface BowelLog {
+  id: string
+  date: string
+  time?: string
+  count: number
+  stool_type: 'hard' | 'normal' | 'soft' | 'loose' | 'watery'
+  notes?: string
+  created_at: string
+}
+
 export interface Meal {
   id: string
   date: string

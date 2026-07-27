@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { getSupabaseBrowserClient } from '@/lib/supabase-browser'
 import { useLanguage } from '@/lib/i18n/language-context'
@@ -27,7 +27,7 @@ function FacebookIcon() {
   )
 }
 
-// ── Step 2: OAuth buttons ─────────────────────────────────────
+// ── OAuth buttons ─────────────────────────────────────────────
 
 function OAuthStep({ redirect, onSignup, onEmailLogin, onForgot }: { redirect: string; onSignup: () => void; onEmailLogin: () => void; onForgot: () => void }) {
   const { t } = useLanguage()
@@ -128,94 +128,7 @@ function OAuthStep({ redirect, onSignup, onEmailLogin, onForgot }: { redirect: s
   )
 }
 
-// ── Step 1: PIN form ──────────────────────────────────────────
-
-function PinStep({ redirect, onSuccess }: { redirect: string; onSuccess: () => void }) {
-  const { t } = useLanguage()
-  const [pin, setPin] = useState('')
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
-  const lastAttemptedRef = useRef('')
-  const inFlightRef = useRef(false)
-
-  const loginWithPin = useCallback(async (pinValue: string, silentError = false) => {
-    const normalized = pinValue.trim()
-    if (!normalized || inFlightRef.current) return false
-
-    inFlightRef.current = true
-    setLoading(true)
-
-    const res = await fetch('/api/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pin: normalized }),
-    })
-
-    if (res.ok) {
-      onSuccess()
-      return true
-    }
-
-    inFlightRef.current = false
-    setLoading(false)
-    if (!silentError) setError(t('login.pinError'))
-    return false
-  }, [onSuccess])
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    setError('')
-    lastAttemptedRef.current = pin.trim()
-    await loginWithPin(pin)
-  }
-
-  useEffect(() => {
-    const normalized = pin.trim()
-    if (normalized.length !== 4 || normalized === lastAttemptedRef.current) return
-    const timer = window.setTimeout(async () => {
-      lastAttemptedRef.current = normalized
-      await loginWithPin(normalized, true)
-    }, 350)
-    return () => window.clearTimeout(timer)
-  }, [pin, loginWithPin])
-
-  return (
-    <div className="space-y-6">
-      <div className="text-center">
-        <h1 className="font-poppins text-2xl font-semibold text-zinc-900">{t('login.pinHeading')}</h1>
-        <p className="mt-1 text-sm text-zinc-500">{t('login.pinStep')}</p>
-      </div>
-
-      <form onSubmit={handleSubmit} className="space-y-3">
-        <input
-          type="password"
-          autoFocus
-          autoComplete="current-password"
-          placeholder="• • • •"
-          value={pin}
-          onChange={(e) => { setError(''); setPin(e.target.value) }}
-          className="h-14 w-full rounded-xl border border-emerald-200 bg-emerald-50/60 px-4 text-center font-semibold tracking-[0.65em] text-zinc-900 outline-none transition-colors placeholder:tracking-[0.2em] placeholder:text-zinc-400 focus-visible:border-emerald-500 focus-visible:bg-white"
-        />
-
-        {error && (
-          <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
-            {error}
-          </p>
-        )}
-
-        <button
-          type="submit"
-          disabled={!pin.trim() || loading}
-          className="inline-flex h-11 w-full items-center justify-center rounded-xl bg-linear-to-r from-emerald-500 to-emerald-600 text-sm font-semibold text-white transition-all hover:from-emerald-400 hover:to-emerald-500 disabled:cursor-not-allowed disabled:opacity-55"
-        >
-          {loading ? t('login.checking') : t('login.continue')}
-        </button>
-      </form>
-    </div>
-  )
-}
-
-// ── Step 3: Email/password login ─────────────────────────────
+// ── Email/password login ─────────────────────────────────────
 
 function EmailLoginStep({ redirect, onBack, onSignup, onForgot }: { redirect: string; onBack: () => void; onSignup: () => void; onForgot: () => void }) {
   const { t } = useLanguage()
@@ -304,7 +217,7 @@ function EmailLoginStep({ redirect, onBack, onSignup, onForgot }: { redirect: st
   )
 }
 
-// ── Step 4: Email/password signup ────────────────────────────
+// ── Email/password signup ────────────────────────────────────
 
 function SignupStep({ onBack }: { onBack: () => void }) {
   const { t } = useLanguage()
@@ -453,7 +366,7 @@ function SignupStep({ onBack }: { onBack: () => void }) {
   )
 }
 
-// ── Step 5: Forgot password ───────────────────────────────────
+// ── Forgot password ───────────────────────────────────────────
 
 function ForgotPasswordStep({ onBack }: { onBack: () => void }) {
   const { t } = useLanguage()
@@ -547,7 +460,7 @@ function ForgotPasswordStep({ onBack }: { onBack: () => void }) {
 
 export default function LoginForm() {
   const searchParams = useSearchParams()
-  const redirect = searchParams.get('redirect') || '/'
+  const redirect = searchParams.get('redirect') || '/notes'
   const [step, setStep] = useState<'oauth' | 'email' | 'signup' | 'forgot'>('oauth')
   const [signupKey, setSignupKey] = useState(0)
 

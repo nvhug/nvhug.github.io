@@ -742,6 +742,10 @@ button.btn-secondary:hover {
 .tpl-content blockquote { margin: 1.5rem 0; }
 .tpl-content hr { margin: 2rem 0; border: none; }
 
+/* Flow diagram — use <div class="diagram"> in blog post HTML */
+.tpl-content .diagram { text-align: center; margin: 1.5rem 0; line-height: 2; }
+.tpl-content .diagram p { margin: 0; line-height: 1.8; }
+
 /* ══════════════════════════════════════════
    PARCHMENT — warm personal journal
    Rounded card, drop cap, amber accents

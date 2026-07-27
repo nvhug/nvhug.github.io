@@ -37,6 +37,7 @@ import { NotesAnalytics } from '@/components/NotesAnalytics'
 import { NotesAIInsights } from '@/components/NotesAIInsights'
 import { MealScheduleTracker } from '@/components/MealScheduleTracker'
 import { WeightTracker } from '@/components/WeightTracker'
+import { BowelTracker } from '@/components/BowelTracker'
 import { DatePicker } from '@/components/ui/date-picker'
 import { useLanguage } from '@/lib/i18n/language-context'
 import { getIntlLocale } from '@/lib/i18n/locale'
@@ -1123,7 +1124,7 @@ export default function NotesPage() {
                 : 'text-zinc-600 hover:text-zinc-900'
             }`}
           >
-            <span className="text-base leading-none">⚖️</span>
+            <span className="text-base leading-none">📊</span>
             <span className="whitespace-nowrap text-center leading-tight">{t('notes.tabs.weight')}</span>
           </button>
           <button
@@ -2180,7 +2181,7 @@ export default function NotesPage() {
                               variant="ghost"
                               size="icon-sm"
                               onClick={() => startEditingGoal(goal)}
-                              className="text-emerald-400 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-emerald-100 hover:text-emerald-600"
+                              className="text-emerald-400 opacity-100 sm:opacity-0 transition-opacity sm:group-hover:opacity-100 hover:bg-emerald-100 hover:text-emerald-600"
                             >
                               <Pencil className="h-4 w-4" />
                             </Button>
@@ -2188,7 +2189,7 @@ export default function NotesPage() {
                               variant="ghost"
                               size="icon-sm"
                               onClick={() => setDeleteGoal(goal)}
-                              className="text-rose-300 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-rose-500/15"
+                              className="text-rose-300 opacity-100 sm:opacity-0 transition-opacity sm:group-hover:opacity-100 hover:bg-rose-500/15"
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
@@ -2524,15 +2525,27 @@ export default function NotesPage() {
         )}
 
         {currentTab === 'weight' && (
-        <section className="overflow-hidden rounded-2xl border border-emerald-200 bg-[linear-gradient(130deg,#f0fdf4_0%,#ffffff_100%)] shadow-[0_4px_20px_-8px_rgba(16,185,129,0.25)]">
-          <div className="flex items-center gap-2 border-b border-emerald-100 px-4 py-3">
-            <span className="text-xl">⚖️</span>
-            <span className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-600">{t('notes.weight.heading')}</span>
-          </div>
-          <div className="p-4">
-            <WeightTracker />
-          </div>
-        </section>
+        <div className="space-y-6">
+          <section className="overflow-hidden rounded-2xl border border-emerald-200 bg-[linear-gradient(130deg,#f0fdf4_0%,#ffffff_100%)] shadow-[0_4px_20px_-8px_rgba(16,185,129,0.25)]">
+            <div className="flex items-center gap-2 border-b border-emerald-100 px-4 py-3">
+              <span className="text-xl">⚖️</span>
+              <span className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-600">{t('notes.weight.heading')}</span>
+            </div>
+            <div className="p-4">
+              <WeightTracker />
+            </div>
+          </section>
+
+          <section className="overflow-hidden rounded-2xl border border-teal-200 bg-[linear-gradient(130deg,#f0fdfa_0%,#ffffff_100%)] shadow-[0_4px_20px_-8px_rgba(20,184,166,0.2)]">
+            <div className="flex items-center gap-2 border-b border-teal-100 px-4 py-3">
+              <span className="text-xl">🚽</span>
+              <span className="text-xs font-semibold uppercase tracking-[0.2em] text-teal-600">{t('notes.bowel.heading')}</span>
+            </div>
+            <div className="p-4">
+              <BowelTracker />
+            </div>
+          </section>
+        </div>
         )}
 
         {currentTab === 'stats' && (

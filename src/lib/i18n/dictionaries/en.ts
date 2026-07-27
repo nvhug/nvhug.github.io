@@ -113,18 +113,13 @@ export const en: Dictionary = {
 
   login: {
     oauthHeading: 'Choose an account',
-    oauthStep: 'Step 2/2 — Sign in to continue',
+    oauthStep: 'Sign in to continue',
     redirecting: 'Redirecting...',
     continueWithGoogle: 'Continue with Google',
     continueWithFacebook: 'Continue with Facebook',
     continueWithEmail: 'Sign in with Email',
     or: 'or',
     oauthError: 'Sign-in failed. Please try again.',
-    pinHeading: 'Access',
-    pinStep: 'Step 1/2 — Enter your PIN to continue',
-    pinError: 'Incorrect PIN',
-    checking: 'Checking...',
-    continue: 'Continue',
   },
 
   emailLogin: {
@@ -244,6 +239,44 @@ export const en: Dictionary = {
     emptyHistory: 'No data yet. Log your first weight!',
     deleteConfirmContent: 'Delete this weight record?',
     deleteConfirmMeta: 'This action cannot be undone.',
+  },
+
+  bowelTracker: {
+    invalidCount: 'Invalid count (1–20)',
+    saveFailed: 'Save failed',
+    updated: 'Updated',
+    saved: 'Saved',
+    deleteFailed: 'Delete failed',
+    deleted: 'Deleted',
+    latestLabel: 'Latest',
+    timesUnit: 'times',
+    dateLabel: 'Date',
+    timeLabel: 'Time',
+    countLabel: 'Count',
+    typeLabel: 'Stool type',
+    notesLabel: 'Notes',
+    notesPlaceholder: 'Additional notes...',
+    addHeading: "Log today's bowel movements",
+    editHeading: 'Edit record',
+    update: 'Update',
+    history: 'History',
+    emptyHistory: 'No data yet. Log your first entry!',
+    deleteConfirmContent: 'Delete this record?',
+    deleteConfirmMeta: 'This action cannot be undone.',
+    stoolTypes: {
+      hard:   'Hard',
+      normal: 'Normal',
+      soft:   'Soft',
+      loose:  'Loose',
+      watery: 'Watery',
+    },
+    stoolHints: {
+      hard:   'Constipation',
+      normal: 'Ideal',
+      soft:   'Good',
+      loose:  'Monitor',
+      watery: 'Diarrhea',
+    },
   },
 
   calorieTracker: {
@@ -404,7 +437,7 @@ export const en: Dictionary = {
       goals: 'Goals',
       calo: 'Calories',
       meals: 'Meal Plan',
-      weight: 'Weight',
+      weight: 'Tracker',
       health: 'Health',
       stats: 'Stats',
     },
@@ -542,6 +575,9 @@ export const en: Dictionary = {
     },
     weight: {
       heading: 'Weight tracking',
+    },
+    bowel: {
+      heading: 'Digestion tracking',
     },
     stats: {
       notesHeading: 'Notes Stats',

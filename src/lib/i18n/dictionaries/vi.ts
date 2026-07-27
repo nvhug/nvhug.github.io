@@ -111,18 +111,13 @@ export const vi = {
 
   login: {
     oauthHeading: 'Chọn tài khoản',
-    oauthStep: 'Bước 2/2 — Đăng nhập để truy cập',
+    oauthStep: 'Đăng nhập để truy cập',
     redirecting: 'Đang chuyển hướng...',
     continueWithGoogle: 'Tiếp tục với Google',
     continueWithFacebook: 'Tiếp tục với Facebook',
     continueWithEmail: 'Đăng nhập bằng Email',
     or: 'hoặc',
     oauthError: 'Đăng nhập thất bại. Vui lòng thử lại.',
-    pinHeading: 'Truy cập',
-    pinStep: 'Bước 1/2 — Nhập mã PIN để tiếp tục',
-    pinError: 'Sai mã PIN',
-    checking: 'Đang kiểm tra...',
-    continue: 'Tiếp tục',
   },
 
   emailLogin: {
@@ -242,6 +237,44 @@ export const vi = {
     emptyHistory: 'Chưa có dữ liệu. Hãy ghi cân nặng đầu tiên!',
     deleteConfirmContent: 'Xóa bản ghi cân nặng?',
     deleteConfirmMeta: 'Hành động này không thể hoàn tác.',
+  },
+
+  bowelTracker: {
+    invalidCount: 'Số lần không hợp lệ (1–20)',
+    saveFailed: 'Lưu thất bại',
+    updated: 'Đã cập nhật',
+    saved: 'Đã lưu',
+    deleteFailed: 'Xóa thất bại',
+    deleted: 'Đã xóa',
+    latestLabel: 'Gần nhất',
+    timesUnit: 'lần',
+    dateLabel: 'Ngày',
+    timeLabel: 'Giờ',
+    countLabel: 'Số lần',
+    typeLabel: 'Loại phân',
+    notesLabel: 'Ghi chú',
+    notesPlaceholder: 'Ghi chú thêm...',
+    addHeading: 'Ghi số lần đại tiện hôm nay',
+    editHeading: 'Sửa bản ghi',
+    update: 'Cập nhật',
+    history: 'Lịch sử',
+    emptyHistory: 'Chưa có dữ liệu. Hãy ghi lần đầu tiên!',
+    deleteConfirmContent: 'Xóa bản ghi này?',
+    deleteConfirmMeta: 'Hành động này không thể hoàn tác.',
+    stoolTypes: {
+      hard:   'Cứng',
+      normal: 'Bình thường',
+      soft:   'Mềm',
+      loose:  'Nát',
+      watery: 'Lỏng',
+    },
+    stoolHints: {
+      hard:   'Táo bón',
+      normal: 'Lý tưởng',
+      soft:   'Tốt',
+      loose:  'Cần chú ý',
+      watery: 'Tiêu chảy',
+    },
   },
 
   calorieTracker: {
@@ -402,7 +435,7 @@ export const vi = {
       goals: 'Mục tiêu',
       calo: 'Calo',
       meals: 'Meal Plan',
-      weight: 'Cân nặng',
+      weight: 'Theo dõi',
       health: 'Sức Khỏe',
       stats: 'Thống kê',
     },
@@ -540,6 +573,9 @@ export const vi = {
     },
     weight: {
       heading: 'Theo dõi cân nặng',
+    },
+    bowel: {
+      heading: 'Theo dõi tiêu hóa',
     },
     stats: {
       notesHeading: 'Thống kê Notes',
