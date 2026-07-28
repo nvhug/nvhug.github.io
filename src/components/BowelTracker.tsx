@@ -18,6 +18,11 @@ function todayDate() {
   return new Date().toISOString().slice(0, 10)
 }
 
+function currentTime() {
+  const now = new Date()
+  return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+}
+
 function formatDate(iso: string, lang: Lang) {
   const [y, m, d] = iso.split('-').map(Number)
   return new Intl.DateTimeFormat(getIntlLocale(lang), { day: 'numeric', month: 'numeric', year: 'numeric' })
@@ -45,7 +50,7 @@ export function BowelTracker() {
   const [logs, setLogs] = useState<BowelLog[]>([])
   const [loading, setLoading] = useState(true)
   const [date, setDate] = useState(todayDate())
-  const [time, setTime] = useState('')
+  const [time, setTime] = useState(currentTime)
   const [count, setCount] = useState('1')
   const [stoolType, setStoolType] = useState<StoolType>('normal')
   const [notes, setNotes] = useState('')
@@ -85,7 +90,7 @@ export function BowelTracker() {
   function resetForm() {
     setEditingId(null)
     setDate(todayDate())
-    setTime('')
+    setTime(currentTime())
     setCount('1')
     setStoolType('normal')
     setNotes('')
