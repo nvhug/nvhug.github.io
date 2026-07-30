@@ -504,7 +504,7 @@ export const en: Dictionary = {
       heading: 'Worth Buying',
       subheading: 'Trusted brands by category',
       empty: 'No picks yet. Add your first trusted brand!',
-      addCategory: 'Add category',
+      addCategory: 'Add',
       categoryPlaceholder: 'Category (e.g. Charger, Speaker...)',
       brandPlaceholder: 'Brand name, press Enter to add',
       notePlaceholder: 'Note (optional)...',

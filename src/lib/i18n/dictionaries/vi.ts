@@ -502,7 +502,7 @@ export const vi = {
       heading: 'Đáng Mua',
       subheading: 'Các hãng uy tín theo từng danh mục',
       empty: 'Chưa có gợi ý nào. Thêm hãng đáng mua đầu tiên!',
-      addCategory: 'Thêm danh mục',
+      addCategory: 'Thêm',
       categoryPlaceholder: 'Danh mục (VD: Sạc, Loa...)',
       brandPlaceholder: 'Tên hãng, Enter để thêm',
       notePlaceholder: 'Ghi chú (tùy chọn)...',
