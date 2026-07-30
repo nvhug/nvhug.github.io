@@ -1982,173 +1982,45 @@ export default function NotesPage() {
         )}
 
         {currentTab === 'todos' && (
-        <section className="overflow-hidden rounded-2xl border border-amber-200 bg-[linear-gradient(130deg,#fffbeb_0%,#ffffff_100%)] shadow-[0_4px_20px_-8px_rgba(245,158,11,0.15)]">
-          {/* Header */}
+        <section className="overflow-hidden rounded-2xl border border-amber-200 bg-white shadow-[0_2px_12px_-4px_rgba(245,158,11,0.15)]">
           <div className="flex items-center justify-between border-b border-amber-100 px-4 py-3">
             <div className="flex items-center gap-2">
-              <ShoppingBag className="h-3.5 w-3.5 text-amber-600" />
-              <div>
-                <span className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-600">{t('notes.buyPicks.heading')}</span>
-                <span className="ml-2 text-xs text-amber-400">{t('notes.buyPicks.subheading')}</span>
-              </div>
+              <ShoppingBag className="h-3.5 w-3.5 text-amber-500" />
+              <span className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-600">{t('notes.buyPicks.heading')}</span>
             </div>
             <button
               onClick={openAddBuyPick}
-              className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-amber-600 hover:bg-amber-100 transition-colors"
+              className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-amber-600 hover:bg-amber-50 transition-colors"
             >
               <Plus className="h-3 w-3" />
               {t('notes.buyPicks.addCategory')}
             </button>
           </div>
 
-          <div className="p-4">
-            {/* Empty state */}
-            {buyPicks.length === 0 && !addingBuyPick && (
-              <div className="flex flex-col items-center gap-3 py-8 text-center">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-100 text-2xl">🛍️</div>
-                <p className="text-sm text-zinc-400">{t('notes.buyPicks.empty')}</p>
-              </div>
-            )}
-
-            {/* Cards grid */}
-            {buyPicks.length > 0 && (
-              <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-                {buyPicks.map((pick) => (
-                  <div
-                    key={pick.id}
-                    className={`group relative rounded-xl border bg-white transition-all ${
-                      editingBuyPickId === pick.id
-                        ? 'border-amber-300 shadow-[0_0_0_3px_rgba(245,158,11,0.12)]'
-                        : 'border-amber-100 hover:border-amber-200 hover:shadow-sm'
-                    }`}
-                  >
-                    {editingBuyPickId === pick.id ? (
-                      /* Edit mode */
-                      <div className="space-y-2 p-3">
-                        <div className="flex gap-2">
-                          <input
-                            value={buyPickForm.emoji}
-                            onChange={(e) => setBuyPickForm((prev) => ({ ...prev, emoji: e.target.value }))}
-                            className="h-9 w-9 shrink-0 rounded-lg border border-amber-200 bg-amber-50 text-center text-lg outline-none focus:border-amber-400"
-                            maxLength={2}
-                          />
-                          <Input
-                            autoFocus
-                            value={buyPickForm.category}
-                            onChange={(e) => setBuyPickForm((prev) => ({ ...prev, category: e.target.value }))}
-                            onKeyDown={(e) => { if (e.key === 'Escape') cancelBuyPickForm() }}
-                            placeholder={t('notes.buyPicks.categoryPlaceholder')}
-                            className="h-9 flex-1 text-sm"
-                          />
-                        </div>
-
-                        {/* Brand chips */}
-                        <div className="flex min-h-5 flex-wrap gap-1">
-                          {buyPickForm.brands.map((brand, i) => (
-                            <span key={i} className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
-                              {brand}
-                              <button
-                                type="button"
-                                onClick={() => setBuyPickForm((prev) => ({ ...prev, brands: prev.brands.filter((_, j) => j !== i) }))}
-                                className="text-amber-500 transition-colors hover:text-rose-500"
-                              >
-                                <X className="h-2.5 w-2.5" />
-                              </button>
-                            </span>
-                          ))}
-                        </div>
-
-                        {/* Add brand input */}
-                        <Input
-                          value={buyPickForm.brandInput}
-                          onChange={(e) => setBuyPickForm((prev) => ({ ...prev, brandInput: e.target.value }))}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault()
-                              const newBrands = buyPickForm.brandInput.split(',').map(b => b.trim()).filter(b => b && !buyPickForm.brands.includes(b))
-                              if (newBrands.length > 0) {
-                                setBuyPickForm((prev) => ({ ...prev, brands: [...prev.brands, ...newBrands], brandInput: '' }))
-                              }
-                            }
-                          }}
-                          placeholder={t('notes.buyPicks.brandPlaceholder')}
-                          className="h-7 text-xs"
-                        />
-
-                        {/* Save / Cancel */}
-                        <div className="flex justify-end gap-1 pt-0.5">
-                          <Button variant="ghost" size="icon-sm" onClick={cancelBuyPickForm} className="text-zinc-400 hover:bg-zinc-100">
-                            <X />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            onClick={() => void saveBuyPick()}
-                            disabled={savingBuyPick || !buyPickForm.category.trim()}
-                            className="text-amber-600 hover:bg-amber-500/15"
-                          >
-                            <Check />
-                          </Button>
-                        </div>
-                      </div>
-                    ) : (
-                      /* Display mode */
-                      <div className="p-3">
-                        <div className="mb-2 flex items-start justify-between gap-1">
-                          <div className="flex min-w-0 items-center gap-1.5">
-                            <span className="shrink-0 text-xl leading-none">{pick.emoji}</span>
-                            <span className="truncate text-sm font-semibold text-zinc-800">{pick.category}</span>
-                          </div>
-                          <div className="flex shrink-0 gap-0.5">
-                            <button
-                              onClick={() => startEditBuyPick(pick)}
-                              className="flex h-6 w-6 items-center justify-center rounded-md text-zinc-300 transition-colors hover:bg-zinc-100 hover:text-zinc-600"
-                            >
-                              <Pencil className="h-3 w-3" />
-                            </button>
-                            <button
-                              onClick={() => setDeleteBuyPick(pick)}
-                              className="flex h-6 w-6 items-center justify-center rounded-md text-rose-200 transition-colors hover:bg-rose-50 hover:text-rose-500"
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </button>
-                          </div>
-                        </div>
-
-                        <div className="flex flex-wrap gap-1">
-                          {pick.brands.length > 0 ? (
-                            pick.brands.map((brand, i) => (
-                              <span
-                                key={i}
-                                className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700"
-                              >
-                                {brand}
-                              </span>
-                            ))
-                          ) : (
-                            <span className="text-xs italic text-zinc-400">{t('notes.buyPicks.noBrands')}</span>
-                          )}
-                        </div>
-
-                        {pick.note && (
-                          <p className="mt-2 text-xs leading-relaxed text-zinc-400">{pick.note}</p>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Add new category form */}
-            {addingBuyPick && (
-              <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-3 space-y-2.5">
+          <div className="px-4 py-3">
+            {/* Inline form — shared for both add and edit */}
+            {(addingBuyPick || editingBuyPickId) && (
+              <div className="mb-3 space-y-2 rounded-lg border border-amber-200 bg-amber-50/60 p-3">
+                {/* Emoji preset grid */}
+                <div className="flex flex-wrap gap-1">
+                  {['🔋','🔌','🔊','🎧','📱','💻','⌨️','🖥️','📷','🎮','👕','👖','👟','🩲','👜','🧴','💊','📚','🍎','🏠','🚗','✈️','🎨','🖊️','🧸'].map((e) => (
+                    <button
+                      key={e}
+                      type="button"
+                      onClick={() => setBuyPickForm((prev) => ({ ...prev, emoji: e }))}
+                      className={`flex h-7 w-7 items-center justify-center rounded-md text-sm transition-colors hover:bg-amber-100 ${buyPickForm.emoji === e ? 'bg-amber-200 ring-1 ring-amber-400' : ''}`}
+                    >
+                      {e}
+                    </button>
+                  ))}
+                </div>
                 <div className="flex gap-2">
                   <input
                     value={buyPickForm.emoji}
                     onChange={(e) => setBuyPickForm((prev) => ({ ...prev, emoji: e.target.value }))}
-                    className="h-9 w-9 shrink-0 rounded-lg border border-amber-200 bg-white text-center text-lg outline-none focus:border-amber-400"
+                    className="h-8 w-8 shrink-0 rounded-md border border-amber-200 bg-white text-center text-base outline-none focus:border-amber-400"
                     maxLength={2}
+                    title="Hoặc gõ emoji bất kỳ"
                   />
                   <Input
                     autoFocus
@@ -2156,65 +2028,84 @@ export default function NotesPage() {
                     onChange={(e) => setBuyPickForm((prev) => ({ ...prev, category: e.target.value }))}
                     onKeyDown={(e) => { if (e.key === 'Escape') cancelBuyPickForm() }}
                     placeholder={t('notes.buyPicks.categoryPlaceholder')}
-                    className="flex-1 text-sm"
+                    className="flex-1 h-8 text-sm"
                   />
                 </div>
-
-                {/* Brand chips */}
-                <div className="flex min-h-5 flex-wrap gap-1">
+                <div className="flex flex-wrap items-center gap-1">
                   {buyPickForm.brands.map((brand, i) => (
                     <span key={i} className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
                       {brand}
                       <button
                         type="button"
                         onClick={() => setBuyPickForm((prev) => ({ ...prev, brands: prev.brands.filter((_, j) => j !== i) }))}
-                        className="text-amber-500 transition-colors hover:text-rose-500"
+                        className="text-amber-400 transition-colors hover:text-rose-500"
                       >
                         <X className="h-2.5 w-2.5" />
                       </button>
                     </span>
                   ))}
-                </div>
-
-                {/* Add brand input */}
-                <Input
-                  value={buyPickForm.brandInput}
-                  onChange={(e) => setBuyPickForm((prev) => ({ ...prev, brandInput: e.target.value }))}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault()
-                      const brand = buyPickForm.brandInput.trim()
-                      if (brand && !buyPickForm.brands.includes(brand)) {
-                        setBuyPickForm((prev) => ({ ...prev, brands: [...prev.brands, brand], brandInput: '' }))
+                  <Input
+                    value={buyPickForm.brandInput}
+                    onChange={(e) => setBuyPickForm((prev) => ({ ...prev, brandInput: e.target.value }))}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault()
+                        const newBrands = buyPickForm.brandInput.split(',').map(b => b.trim()).filter(b => b && !buyPickForm.brands.includes(b))
+                        if (newBrands.length > 0) {
+                          setBuyPickForm((prev) => ({ ...prev, brands: [...prev.brands, ...newBrands], brandInput: '' }))
+                        }
                       }
-                    }
-                  }}
-                  placeholder={t('notes.buyPicks.brandPlaceholder')}
-                  className="text-sm"
-                />
-
-                {/* Optional note */}
-                <Input
-                  value={buyPickForm.note}
-                  onChange={(e) => setBuyPickForm((prev) => ({ ...prev, note: e.target.value }))}
-                  placeholder={t('notes.buyPicks.notePlaceholder')}
-                  className="text-sm text-zinc-500"
-                />
-
-                <div className="flex justify-end gap-2 pt-1">
-                  <Button variant="ghost" size="sm" onClick={cancelBuyPickForm} className="text-zinc-500">
+                    }}
+                    placeholder={t('notes.buyPicks.brandPlaceholder')}
+                    className="h-7 w-40 text-xs"
+                  />
+                </div>
+                <div className="flex justify-end gap-1.5">
+                  <Button variant="ghost" size="sm" onClick={cancelBuyPickForm} className="h-7 text-xs text-zinc-500">
                     {t('common.cancel')}
                   </Button>
                   <Button
                     size="sm"
                     onClick={() => void saveBuyPick()}
                     disabled={savingBuyPick || !buyPickForm.category.trim()}
-                    className="bg-amber-500 text-white hover:bg-amber-600"
+                    className="h-7 bg-amber-500 text-xs text-white hover:bg-amber-600"
                   >
-                    {savingBuyPick ? t('common.saving') : t('common.save')}
+                    {t('common.save')}
                   </Button>
                 </div>
               </div>
+            )}
+
+            {/* List */}
+            <div className="space-y-1">
+              {buyPicks.map((pick) => (
+                editingBuyPickId !== pick.id && (
+                  <div key={pick.id} className="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-amber-50 transition-colors">
+                    <span className="shrink-0 text-base leading-none">{pick.emoji}</span>
+                    <span className="w-20 shrink-0 text-sm font-medium text-zinc-700">{pick.category}</span>
+                    <div className="flex flex-1 flex-wrap gap-1">
+                      {pick.brands.map((brand, i) => (
+                        <span key={i} className="rounded-full bg-amber-50 px-2 py-0.5 text-xs text-amber-700 border border-amber-200">
+                          {brand}
+                        </span>
+                      ))}
+                      {pick.brands.length === 0 && (
+                        <span className="text-xs italic text-zinc-400">{t('notes.buyPicks.noBrands')}</span>
+                      )}
+                    </div>
+                    <Button variant="ghost" size="icon-sm" onClick={() => startEditBuyPick(pick)} className="text-zinc-300 hover:bg-zinc-100 hover:text-zinc-600">
+                      <Pencil />
+                    </Button>
+                    <Button variant="ghost" size="icon-sm" onClick={() => setDeleteBuyPick(pick)} className="text-rose-300 hover:bg-rose-500/15">
+                      <Trash2 />
+                    </Button>
+                  </div>
+                )
+              ))}
+            </div>
+
+            {buyPicks.length === 0 && !addingBuyPick && (
+              <p className="py-4 text-center text-sm text-zinc-400">{t('notes.buyPicks.empty')}</p>
             )}
           </div>
         </section>
