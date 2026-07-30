@@ -82,6 +82,7 @@ export interface Todo {
 
 export interface BuyPick {
   id: string
+  user_id: string
   category: string
   emoji: string
   brands: string[]

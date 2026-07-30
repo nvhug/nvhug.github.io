@@ -470,9 +470,10 @@ export default function NotesPage() {
         toast.success(t('notes.buyPicks.updateSuccess'))
         cancelBuyPickForm()
       } else {
+        const { data: { user } } = await getSupabaseBrowserClient().auth.getUser()
         const { data, error } = await supabase
           .from('buy_picks')
-          .insert([{ category: category.trim(), emoji: emoji || '🛒', brands: finalBrands, note: note.trim() || null, order_index: buyPicks.length }])
+          .insert([{ user_id: user?.id, category: category.trim(), emoji: emoji || '🛒', brands: finalBrands, note: note.trim() || null, order_index: buyPicks.length }])
           .select()
           .single()
         if (error || !data) { toast.error(t('notes.buyPicks.addError')); return }
