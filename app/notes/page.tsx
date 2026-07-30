@@ -11,6 +11,7 @@ import {
   Pencil,
   Pin,
   Plus,
+  ShoppingBag,
   Sparkles,
   Star,
   ThumbsDown,
@@ -26,7 +27,7 @@ import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import { getSupabaseBrowserClient } from '@/lib/supabase-browser'
 import { useCalorieGoal } from '@/lib/useCalorieGoal'
-import { Note, Todo, Goal, GoalItem, Post } from '@/types'
+import { Note, Todo, Goal, GoalItem, Post, BuyPick } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ConfirmModal } from '@/components/ui/confirm-modal'
@@ -166,6 +167,14 @@ export default function NotesPage() {
   const [editingTodoId, setEditingTodoId] = useState<string | null>(null)
   const [editingTodoDraft, setEditingTodoDraft] = useState('')
 
+  const [buyPicks, setBuyPicks] = useState<BuyPick[]>([])
+  const [addingBuyPick, setAddingBuyPick] = useState(false)
+  const [editingBuyPickId, setEditingBuyPickId] = useState<string | null>(null)
+  const [buyPickForm, setBuyPickForm] = useState({ category: '', emoji: '🛒', brands: [] as string[], note: '', brandInput: '' })
+  const [deleteBuyPick, setDeleteBuyPick] = useState<BuyPick | null>(null)
+  const [deletingBuyPick, setDeletingBuyPick] = useState(false)
+  const [savingBuyPick, setSavingBuyPick] = useState(false)
+
   const [healthPosts, setHealthPosts] = useState<Post[]>([])
 
   const [goals, setGoals] = useState<Goal[]>([])
@@ -279,6 +288,15 @@ export default function NotesPage() {
     } catch (error) {
       console.error('Error fetching todos:', error)
     }
+  }
+
+  async function fetchBuyPicks() {
+    const { data } = await supabase
+      .from('buy_picks')
+      .select('*')
+      .order('order_index', { ascending: true })
+      .order('created_at', { ascending: true })
+    if (data) setBuyPicks(data as BuyPick[])
   }
 
   async function fetchGoals() {
@@ -414,6 +432,68 @@ export default function NotesPage() {
     } finally {
       setDeletingTodo(false)
     }
+  }
+
+  function startEditBuyPick(pick: BuyPick) {
+    setAddingBuyPick(false)
+    setEditingBuyPickId(pick.id)
+    setBuyPickForm({ category: pick.category, emoji: pick.emoji, brands: [...pick.brands], note: pick.note ?? '', brandInput: '' })
+  }
+
+  function cancelBuyPickForm() {
+    setEditingBuyPickId(null)
+    setAddingBuyPick(false)
+    setBuyPickForm({ category: '', emoji: '🛒', brands: [], note: '', brandInput: '' })
+  }
+
+  function openAddBuyPick() {
+    setEditingBuyPickId(null)
+    setBuyPickForm({ category: '', emoji: '🛒', brands: [], note: '', brandInput: '' })
+    setAddingBuyPick(true)
+  }
+
+  async function saveBuyPick() {
+    const { category, emoji, brands, brandInput, note } = buyPickForm
+    if (!category.trim()) return
+    // Flush any uncommitted text in brandInput (supports comma-separated)
+    const pending = brandInput.split(',').map(b => b.trim()).filter(b => b && !brands.includes(b))
+    const finalBrands = [...brands, ...pending]
+    setSavingBuyPick(true)
+    try {
+      if (editingBuyPickId) {
+        const { error } = await supabase
+          .from('buy_picks')
+          .update({ category: category.trim(), emoji: emoji || '🛒', brands: finalBrands, note: note.trim() || null, updated_at: new Date().toISOString() })
+          .eq('id', editingBuyPickId)
+        if (error) { toast.error(t('notes.buyPicks.updateError')); return }
+        setBuyPicks(prev => prev.map(p => p.id === editingBuyPickId ? { ...p, category: category.trim(), emoji: emoji || '🛒', brands: finalBrands, note: note.trim() || undefined } : p))
+        toast.success(t('notes.buyPicks.updateSuccess'))
+        cancelBuyPickForm()
+      } else {
+        const { data, error } = await supabase
+          .from('buy_picks')
+          .insert([{ category: category.trim(), emoji: emoji || '🛒', brands: finalBrands, note: note.trim() || null, order_index: buyPicks.length }])
+          .select()
+          .single()
+        if (error || !data) { toast.error(t('notes.buyPicks.addError')); return }
+        setBuyPicks(prev => [...prev, data as BuyPick])
+        toast.success(t('notes.buyPicks.addSuccess'))
+        cancelBuyPickForm()
+      }
+    } finally {
+      setSavingBuyPick(false)
+    }
+  }
+
+  async function confirmDeleteBuyPick() {
+    if (!deleteBuyPick) return
+    setDeletingBuyPick(true)
+    const { error } = await supabase.from('buy_picks').delete().eq('id', deleteBuyPick.id)
+    setDeletingBuyPick(false)
+    if (error) { toast.error(t('notes.buyPicks.deleteError')); return }
+    setBuyPicks(prev => prev.filter(p => p.id !== deleteBuyPick.id))
+    toast.success(t('notes.buyPicks.deleteSuccess'))
+    setDeleteBuyPick(null)
   }
 
   function openGoalDraft() {
@@ -678,6 +758,7 @@ export default function NotesPage() {
       void fetchNotes(false)
       void fetchTodos()
       void fetchGoals()
+      void fetchBuyPicks()
       void fetchHealthPosts()
       void fetchTodayCalories()
     }, 0)
@@ -1900,6 +1981,245 @@ export default function NotesPage() {
         </section>
         )}
 
+        {currentTab === 'todos' && (
+        <section className="overflow-hidden rounded-2xl border border-amber-200 bg-[linear-gradient(130deg,#fffbeb_0%,#ffffff_100%)] shadow-[0_4px_20px_-8px_rgba(245,158,11,0.15)]">
+          {/* Header */}
+          <div className="flex items-center justify-between border-b border-amber-100 px-4 py-3">
+            <div className="flex items-center gap-2">
+              <ShoppingBag className="h-3.5 w-3.5 text-amber-600" />
+              <div>
+                <span className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-600">{t('notes.buyPicks.heading')}</span>
+                <span className="ml-2 text-xs text-amber-400">{t('notes.buyPicks.subheading')}</span>
+              </div>
+            </div>
+            <button
+              onClick={openAddBuyPick}
+              className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-amber-600 hover:bg-amber-100 transition-colors"
+            >
+              <Plus className="h-3 w-3" />
+              {t('notes.buyPicks.addCategory')}
+            </button>
+          </div>
+
+          <div className="p-4">
+            {/* Empty state */}
+            {buyPicks.length === 0 && !addingBuyPick && (
+              <div className="flex flex-col items-center gap-3 py-8 text-center">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-100 text-2xl">🛍️</div>
+                <p className="text-sm text-zinc-400">{t('notes.buyPicks.empty')}</p>
+              </div>
+            )}
+
+            {/* Cards grid */}
+            {buyPicks.length > 0 && (
+              <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                {buyPicks.map((pick) => (
+                  <div
+                    key={pick.id}
+                    className={`group relative rounded-xl border bg-white transition-all ${
+                      editingBuyPickId === pick.id
+                        ? 'border-amber-300 shadow-[0_0_0_3px_rgba(245,158,11,0.12)]'
+                        : 'border-amber-100 hover:border-amber-200 hover:shadow-sm'
+                    }`}
+                  >
+                    {editingBuyPickId === pick.id ? (
+                      /* Edit mode */
+                      <div className="space-y-2 p-3">
+                        <div className="flex gap-2">
+                          <input
+                            value={buyPickForm.emoji}
+                            onChange={(e) => setBuyPickForm((prev) => ({ ...prev, emoji: e.target.value }))}
+                            className="h-9 w-9 shrink-0 rounded-lg border border-amber-200 bg-amber-50 text-center text-lg outline-none focus:border-amber-400"
+                            maxLength={2}
+                          />
+                          <Input
+                            autoFocus
+                            value={buyPickForm.category}
+                            onChange={(e) => setBuyPickForm((prev) => ({ ...prev, category: e.target.value }))}
+                            onKeyDown={(e) => { if (e.key === 'Escape') cancelBuyPickForm() }}
+                            placeholder={t('notes.buyPicks.categoryPlaceholder')}
+                            className="h-9 flex-1 text-sm"
+                          />
+                        </div>
+
+                        {/* Brand chips */}
+                        <div className="flex min-h-5 flex-wrap gap-1">
+                          {buyPickForm.brands.map((brand, i) => (
+                            <span key={i} className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
+                              {brand}
+                              <button
+                                type="button"
+                                onClick={() => setBuyPickForm((prev) => ({ ...prev, brands: prev.brands.filter((_, j) => j !== i) }))}
+                                className="text-amber-500 transition-colors hover:text-rose-500"
+                              >
+                                <X className="h-2.5 w-2.5" />
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+
+                        {/* Add brand input */}
+                        <Input
+                          value={buyPickForm.brandInput}
+                          onChange={(e) => setBuyPickForm((prev) => ({ ...prev, brandInput: e.target.value }))}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault()
+                              const newBrands = buyPickForm.brandInput.split(',').map(b => b.trim()).filter(b => b && !buyPickForm.brands.includes(b))
+                              if (newBrands.length > 0) {
+                                setBuyPickForm((prev) => ({ ...prev, brands: [...prev.brands, ...newBrands], brandInput: '' }))
+                              }
+                            }
+                          }}
+                          placeholder={t('notes.buyPicks.brandPlaceholder')}
+                          className="h-7 text-xs"
+                        />
+
+                        {/* Save / Cancel */}
+                        <div className="flex justify-end gap-1 pt-0.5">
+                          <Button variant="ghost" size="icon-sm" onClick={cancelBuyPickForm} className="text-zinc-400 hover:bg-zinc-100">
+                            <X />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            onClick={() => void saveBuyPick()}
+                            disabled={savingBuyPick || !buyPickForm.category.trim()}
+                            className="text-amber-600 hover:bg-amber-500/15"
+                          >
+                            <Check />
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      /* Display mode */
+                      <div className="p-3">
+                        <div className="mb-2 flex items-start justify-between gap-1">
+                          <div className="flex min-w-0 items-center gap-1.5">
+                            <span className="shrink-0 text-xl leading-none">{pick.emoji}</span>
+                            <span className="truncate text-sm font-semibold text-zinc-800">{pick.category}</span>
+                          </div>
+                          <div className="flex shrink-0 gap-0.5">
+                            <button
+                              onClick={() => startEditBuyPick(pick)}
+                              className="flex h-6 w-6 items-center justify-center rounded-md text-zinc-300 transition-colors hover:bg-zinc-100 hover:text-zinc-600"
+                            >
+                              <Pencil className="h-3 w-3" />
+                            </button>
+                            <button
+                              onClick={() => setDeleteBuyPick(pick)}
+                              className="flex h-6 w-6 items-center justify-center rounded-md text-rose-200 transition-colors hover:bg-rose-50 hover:text-rose-500"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap gap-1">
+                          {pick.brands.length > 0 ? (
+                            pick.brands.map((brand, i) => (
+                              <span
+                                key={i}
+                                className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700"
+                              >
+                                {brand}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="text-xs italic text-zinc-400">{t('notes.buyPicks.noBrands')}</span>
+                          )}
+                        </div>
+
+                        {pick.note && (
+                          <p className="mt-2 text-xs leading-relaxed text-zinc-400">{pick.note}</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Add new category form */}
+            {addingBuyPick && (
+              <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-3 space-y-2.5">
+                <div className="flex gap-2">
+                  <input
+                    value={buyPickForm.emoji}
+                    onChange={(e) => setBuyPickForm((prev) => ({ ...prev, emoji: e.target.value }))}
+                    className="h-9 w-9 shrink-0 rounded-lg border border-amber-200 bg-white text-center text-lg outline-none focus:border-amber-400"
+                    maxLength={2}
+                  />
+                  <Input
+                    autoFocus
+                    value={buyPickForm.category}
+                    onChange={(e) => setBuyPickForm((prev) => ({ ...prev, category: e.target.value }))}
+                    onKeyDown={(e) => { if (e.key === 'Escape') cancelBuyPickForm() }}
+                    placeholder={t('notes.buyPicks.categoryPlaceholder')}
+                    className="flex-1 text-sm"
+                  />
+                </div>
+
+                {/* Brand chips */}
+                <div className="flex min-h-5 flex-wrap gap-1">
+                  {buyPickForm.brands.map((brand, i) => (
+                    <span key={i} className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
+                      {brand}
+                      <button
+                        type="button"
+                        onClick={() => setBuyPickForm((prev) => ({ ...prev, brands: prev.brands.filter((_, j) => j !== i) }))}
+                        className="text-amber-500 transition-colors hover:text-rose-500"
+                      >
+                        <X className="h-2.5 w-2.5" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+
+                {/* Add brand input */}
+                <Input
+                  value={buyPickForm.brandInput}
+                  onChange={(e) => setBuyPickForm((prev) => ({ ...prev, brandInput: e.target.value }))}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      const brand = buyPickForm.brandInput.trim()
+                      if (brand && !buyPickForm.brands.includes(brand)) {
+                        setBuyPickForm((prev) => ({ ...prev, brands: [...prev.brands, brand], brandInput: '' }))
+                      }
+                    }
+                  }}
+                  placeholder={t('notes.buyPicks.brandPlaceholder')}
+                  className="text-sm"
+                />
+
+                {/* Optional note */}
+                <Input
+                  value={buyPickForm.note}
+                  onChange={(e) => setBuyPickForm((prev) => ({ ...prev, note: e.target.value }))}
+                  placeholder={t('notes.buyPicks.notePlaceholder')}
+                  className="text-sm text-zinc-500"
+                />
+
+                <div className="flex justify-end gap-2 pt-1">
+                  <Button variant="ghost" size="sm" onClick={cancelBuyPickForm} className="text-zinc-500">
+                    {t('common.cancel')}
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={() => void saveBuyPick()}
+                    disabled={savingBuyPick || !buyPickForm.category.trim()}
+                    className="bg-amber-500 text-white hover:bg-amber-600"
+                  >
+                    {savingBuyPick ? t('common.saving') : t('common.save')}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
+        )}
+
         {currentTab === 'goals' && (
         <section className="overflow-hidden rounded-2xl border border-emerald-200 bg-[linear-gradient(130deg,#f0fdf4_0%,#ffffff_100%)] shadow-[0_4px_20px_-8px_rgba(16,185,129,0.25)]">
           <div className="flex items-center gap-2 border-b border-emerald-100 px-4 py-3">
@@ -2604,6 +2924,13 @@ export default function NotesPage() {
         loading={deletingGoalItem}
         onConfirm={confirmDeleteGoalItem}
         onCancel={() => setDeleteGoalItem(null)}
+      />
+      <ConfirmModal
+        open={!!deleteBuyPick}
+        itemContent={deleteBuyPick?.category}
+        loading={deletingBuyPick}
+        onConfirm={() => void confirmDeleteBuyPick()}
+        onCancel={() => setDeleteBuyPick(null)}
       />
     </main>
   )
