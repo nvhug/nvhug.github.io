@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ConfirmModal } from '@/components/ui/confirm-modal'
 import { DatePicker } from '@/components/ui/date-picker'
+import { useLanguage } from '@/lib/i18n/language-context'
 
 // ─── Preset exercises ─────────────────────────────────────────────────────────
 const PRESETS: { exercise: string; muscle_group: string }[] = [
@@ -53,10 +54,11 @@ const EMPTY_FORM: LogForm = {
 }
 
 // ─── ExerciseSuggest ──────────────────────────────────────────────────────────
-function ExerciseSuggest({ value, onChange, onSelect }: {
+function ExerciseSuggest({ value, onChange, onSelect, placeholder }: {
   value: string
   onChange: (v: string) => void
   onSelect: (preset: typeof PRESETS[0]) => void
+  placeholder: string
 }) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -80,7 +82,7 @@ function ExerciseSuggest({ value, onChange, onSelect }: {
         value={value}
         onChange={e => { onChange(e.target.value); setOpen(true) }}
         onFocus={() => setOpen(true)}
-        placeholder="Tên bài tập..."
+        placeholder={placeholder}
         className="text-sm"
       />
       {open && filtered.length > 0 && (
@@ -104,6 +106,7 @@ function ExerciseSuggest({ value, onChange, onSelect }: {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 export function GymTracker() {
+  const { t } = useLanguage()
   const [date,        setDate]        = useState(todayISO)
   const [logs,        setLogs]        = useState<GymLog[]>([])
   const [loading,     setLoading]     = useState(false)
@@ -129,7 +132,7 @@ export function GymTracker() {
       if (error) throw error
       setLogs((data ?? []) as GymLog[])
     } catch {
-      toast.error('Không thể tải dữ liệu')
+      toast.error(t('gymTracker.loadFailed'))
     } finally {
       setLoading(false)
     }
@@ -149,10 +152,10 @@ export function GymTracker() {
   }
 
   async function saveLog() {
-    if (!form.exercise.trim()) { toast.error('Nhập tên bài tập'); return }
+    if (!form.exercise.trim()) { toast.error(t('gymTracker.exerciseRequired')); return }
     const sets = parseInt(form.sets)
-    if (!sets || sets < 1) { toast.error('Số hiệp phải ≥ 1'); return }
-    if (!form.reps.trim()) { toast.error('Nhập số lần'); return }
+    if (!sets || sets < 1) { toast.error(t('gymTracker.setsMin')); return }
+    if (!form.reps.trim()) { toast.error(t('gymTracker.repsRequired')); return }
 
     setSaving(true)
     try {
@@ -169,12 +172,12 @@ export function GymTracker() {
         order_index:  logs.length,
       }])
       if (error) throw error
-      toast.success('Đã lưu bài tập')
+      toast.success(t('gymTracker.saved'))
       setForm(EMPTY_FORM)
       setShowForm(false)
       await fetchLogs(date)
     } catch {
-      toast.error('Có lỗi xảy ra')
+      toast.error(t('gymTracker.genericError'))
     } finally {
       setSaving(false)
     }
@@ -187,10 +190,10 @@ export function GymTracker() {
       const { error } = await supabase.from('gym_logs').delete().eq('id', deleteTarget.id)
       if (error) throw error
       setLogs(prev => prev.filter(l => l.id !== deleteTarget.id))
-      toast.success('Đã xoá bài tập')
+      toast.success(t('gymTracker.deleted'))
       setDeleteTarget(null)
     } catch {
-      toast.error('Có lỗi xảy ra')
+      toast.error(t('gymTracker.genericError'))
     } finally {
       setDeleting(false)
     }
@@ -216,9 +219,9 @@ export function GymTracker() {
 
   async function saveEdit(id: string) {
     const sets = parseInt(editForm.sets)
-    if (!editForm.exercise.trim()) { toast.error('Nhập tên bài tập'); return }
-    if (!sets || sets < 1) { toast.error('Số hiệp phải ≥ 1'); return }
-    if (!editForm.reps.trim()) { toast.error('Nhập số lần'); return }
+    if (!editForm.exercise.trim()) { toast.error(t('gymTracker.exerciseRequired')); return }
+    if (!sets || sets < 1) { toast.error(t('gymTracker.setsMin')); return }
+    if (!editForm.reps.trim()) { toast.error(t('gymTracker.repsRequired')); return }
 
     setSavingEdit(true)
     try {
@@ -240,10 +243,10 @@ export function GymTracker() {
         weight_kg:    editForm.weight_kg ? parseFloat(editForm.weight_kg) : undefined,
         note:         editForm.note.trim() || undefined,
       }))
-      toast.success('Đã cập nhật')
+      toast.success(t('gymTracker.updated'))
       cancelEdit()
     } catch {
-      toast.error('Có lỗi xảy ra')
+      toast.error(t('gymTracker.genericError'))
     } finally {
       setSavingEdit(false)
     }
@@ -267,7 +270,7 @@ export function GymTracker() {
       if (error) throw error
     } catch {
       setLogs(prev => prev.map(l => l.id === id ? { ...l, sets: currentLog.sets } : l))
-      toast.error('Không thể cập nhật số hiệp')
+      toast.error(t('gymTracker.quickUpdateFailed'))
     } finally {
       setSavingQuick(prev => prev === id ? null : prev)
     }
@@ -282,7 +285,7 @@ export function GymTracker() {
         <DatePicker value={date} onChange={d => { setDate(d); setShowForm(false) }} />
         {logs.length > 0 && (
           <span className="text-xs text-zinc-500">
-            {logs.length} bài tập · {totalSets} hiệp tổng
+            {t('gymTracker.summary', { exercises: logs.length, sets: totalSets })}
           </span>
         )}
         <Button
@@ -291,37 +294,38 @@ export function GymTracker() {
           onClick={() => { setShowForm(v => !v); setForm(EMPTY_FORM) }}
         >
           {showForm ? <X className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
-          {showForm ? 'Đóng' : 'Thêm bài tập'}
+          {showForm ? t('common.close') : t('gymTracker.addExercise')}
         </Button>
       </div>
 
       {/* Add exercise form */}
       {showForm && (
         <div className="rounded-xl border border-emerald-200 bg-emerald-50/40 p-4 space-y-3">
-          <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Thêm bài tập</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">{t('gymTracker.addHeading')}</p>
 
           <div>
-            <label className="mb-1 block text-xs font-medium text-zinc-600">Bài tập *</label>
+            <label className="mb-1 block text-xs font-medium text-zinc-600">{t('gymTracker.exerciseLabel')} *</label>
             <ExerciseSuggest
               value={form.exercise}
               onChange={v => patch('exercise', v)}
               onSelect={selectPreset}
+              placeholder={t('gymTracker.exercisePlaceholder')}
             />
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-medium text-zinc-600">Cơ chính</label>
+            <label className="mb-1 block text-xs font-medium text-zinc-600">{t('gymTracker.muscleLabel')}</label>
             <Input
               value={form.muscle_group}
               onChange={e => patch('muscle_group', e.target.value)}
-              placeholder="Ngực, vai, tay sau..."
+              placeholder={t('gymTracker.musclePlaceholder')}
               className="text-sm"
             />
           </div>
 
           <div className="flex gap-3">
             <div className="flex-1">
-              <label className="mb-1 block text-xs font-medium text-zinc-600">Số hiệp *</label>
+              <label className="mb-1 block text-xs font-medium text-zinc-600">{t('gymTracker.setsLabel')} *</label>
               <Input
                 type="number"
                 min={1}
@@ -332,34 +336,34 @@ export function GymTracker() {
               />
             </div>
             <div className="flex-1">
-              <label className="mb-1 block text-xs font-medium text-zinc-600">Số lần *</label>
+              <label className="mb-1 block text-xs font-medium text-zinc-600">{t('gymTracker.repsLabel')} *</label>
               <Input
                 value={form.reps}
                 onChange={e => patch('reps', e.target.value)}
-                placeholder="12 hoặc 10–12"
+                placeholder={t('gymTracker.repsPlaceholder')}
                 className="text-sm"
               />
             </div>
             <div className="flex-1">
-              <label className="mb-1 block text-xs font-medium text-zinc-600">Tạ (kg)</label>
+              <label className="mb-1 block text-xs font-medium text-zinc-600">{t('gymTracker.weightLabel')}</label>
               <Input
                 type="number"
                 min={0}
                 step={0.5}
                 value={form.weight_kg}
                 onChange={e => patch('weight_kg', e.target.value)}
-                placeholder="–"
+                placeholder={t('gymTracker.weightPlaceholder')}
                 className="text-sm"
               />
             </div>
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-medium text-zinc-600">Ghi chú</label>
+            <label className="mb-1 block text-xs font-medium text-zinc-600">{t('gymTracker.notesLabel')}</label>
             <Input
               value={form.note}
               onChange={e => patch('note', e.target.value)}
-              placeholder="Cảm nhận, mỗi tay..."
+              placeholder={t('gymTracker.notesPlaceholder')}
               className="text-sm"
             />
           </div>
@@ -369,10 +373,10 @@ export function GymTracker() {
               onClick={() => { setShowForm(false); setForm(EMPTY_FORM) }}
               className="rounded-lg px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-100"
             >
-              Huỷ
+              {t('common.cancel')}
             </button>
             <Button size="sm" disabled={saving} onClick={saveLog} className="h-7 text-xs">
-              {saving ? 'Đang lưu...' : 'Lưu'}
+              {saving ? t('common.saving') : t('common.save')}
             </Button>
           </div>
         </div>
@@ -380,16 +384,16 @@ export function GymTracker() {
 
       {/* Exercise list */}
       {loading ? (
-        <p className="py-4 text-center text-sm text-zinc-400">Đang tải...</p>
+        <p className="py-4 text-center text-sm text-zinc-400">{t('common.loading')}</p>
       ) : logs.length === 0 ? (
         <div className="py-8 text-center">
           <Dumbbell className="mx-auto mb-2 h-8 w-8 text-zinc-200" />
-          <p className="text-sm text-zinc-400">Chưa có bài tập nào hôm nay</p>
+          <p className="text-sm text-zinc-400">{t('gymTracker.emptyToday')}</p>
           <button
             onClick={() => setShowForm(true)}
             className="mt-2 text-xs font-medium text-emerald-600 hover:underline"
           >
-            + Thêm bài tập đầu tiên
+            + {t('gymTracker.addFirstExercise')}
           </button>
         </div>
       ) : (
@@ -406,14 +410,14 @@ export function GymTracker() {
                     <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-[11px] font-bold text-emerald-700">
                       {idx + 1}
                     </span>
-                    <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide">Chỉnh sửa</p>
+                    <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide">{t('gymTracker.editHeading')}</p>
                     <button onClick={cancelEdit} className="ml-auto rounded p-1 text-zinc-400 hover:bg-zinc-100">
                       <X className="h-3.5 w-3.5" />
                     </button>
                   </div>
 
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-zinc-600">Bài tập *</label>
+                    <label className="mb-1 block text-xs font-medium text-zinc-600">{t('gymTracker.exerciseLabel')} *</label>
                     <Input
                       autoFocus
                       value={editForm.exercise}
@@ -423,18 +427,18 @@ export function GymTracker() {
                   </div>
 
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-zinc-600">Cơ chính</label>
+                    <label className="mb-1 block text-xs font-medium text-zinc-600">{t('gymTracker.muscleLabel')}</label>
                     <Input
                       value={editForm.muscle_group}
                       onChange={e => setEditForm(f => ({ ...f, muscle_group: e.target.value }))}
-                      placeholder="Ngực, vai, tay sau..."
+                      placeholder={t('gymTracker.musclePlaceholder')}
                       className="text-sm"
                     />
                   </div>
 
                   <div className="flex gap-3">
                     <div className="flex-1">
-                      <label className="mb-1 block text-xs font-medium text-zinc-600">Số hiệp *</label>
+                      <label className="mb-1 block text-xs font-medium text-zinc-600">{t('gymTracker.setsLabel')} *</label>
                       <Input
                         type="number"
                         min={1}
@@ -445,34 +449,34 @@ export function GymTracker() {
                       />
                     </div>
                     <div className="flex-1">
-                      <label className="mb-1 block text-xs font-medium text-zinc-600">Số lần *</label>
+                      <label className="mb-1 block text-xs font-medium text-zinc-600">{t('gymTracker.repsLabel')} *</label>
                       <Input
                         value={editForm.reps}
                         onChange={e => setEditForm(f => ({ ...f, reps: e.target.value }))}
-                        placeholder="12 hoặc 10–12"
+                        placeholder={t('gymTracker.repsPlaceholder')}
                         className="text-sm"
                       />
                     </div>
                     <div className="flex-1">
-                      <label className="mb-1 block text-xs font-medium text-zinc-600">Tạ (kg)</label>
+                      <label className="mb-1 block text-xs font-medium text-zinc-600">{t('gymTracker.weightLabel')}</label>
                       <Input
                         type="number"
                         min={0}
                         step={0.5}
                         value={editForm.weight_kg}
                         onChange={e => setEditForm(f => ({ ...f, weight_kg: e.target.value }))}
-                        placeholder="–"
+                        placeholder={t('gymTracker.weightPlaceholder')}
                         className="text-sm"
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-zinc-600">Ghi chú</label>
+                    <label className="mb-1 block text-xs font-medium text-zinc-600">{t('gymTracker.notesLabel')}</label>
                     <Input
                       value={editForm.note}
                       onChange={e => setEditForm(f => ({ ...f, note: e.target.value }))}
-                      placeholder="Cảm nhận, mỗi tay..."
+                      placeholder={t('gymTracker.notesPlaceholder')}
                       className="text-sm"
                     />
                   </div>
@@ -482,10 +486,10 @@ export function GymTracker() {
                       onClick={cancelEdit}
                       className="rounded-lg px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-100"
                     >
-                      Huỷ
+                      {t('common.cancel')}
                     </button>
                     <Button size="sm" disabled={savingEdit} onClick={() => saveEdit(log.id)} className="h-7 text-xs">
-                      {savingEdit ? 'Đang lưu...' : 'Cập nhật'}
+                      {savingEdit ? t('common.saving') : t('gymTracker.update')}
                     </Button>
                   </div>
                 </div>
@@ -510,7 +514,7 @@ export function GymTracker() {
                         onClick={() => void adjustSetsQuick(log.id, 1)}
                         disabled={savingQuick === log.id}
                         className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 p-1.5 sm:p-1 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 disabled:opacity-50"
-                        aria-label="Tăng số hiệp"
+                        aria-label={t('gymTracker.increaseSetsAria')}
                       >
                         <ChevronUp className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
                       </button>
@@ -529,14 +533,14 @@ export function GymTracker() {
                     <button
                       onClick={() => startEdit(log)}
                       className="rounded p-1.5 sm:p-1 text-zinc-400 hover:bg-emerald-50 hover:text-emerald-600"
-                      aria-label="Chỉnh sửa"
+                      aria-label={t('common.edit')}
                     >
                       <Pencil className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
                     </button>
                     <button
                       onClick={() => setDeleteTarget(log)}
                       className="rounded p-1.5 sm:p-1 text-zinc-400 hover:bg-red-50 hover:text-red-500"
-                      aria-label="Xoá"
+                      aria-label={t('common.delete')}
                     >
                       <Trash2 className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
                     </button>
