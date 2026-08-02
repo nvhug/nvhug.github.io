@@ -628,12 +628,18 @@ export const en: Dictionary = {
     },
     tracker: {
       gymHeading: 'Gym Workout Log',
+      expand: 'Expand gym workout log',
+      collapse: 'Collapse gym workout log',
     },
     weight: {
       heading: 'Weight tracking',
+      expand: 'Expand weight tracker',
+      collapse: 'Collapse weight tracker',
     },
     bowel: {
       heading: 'Digestion tracking',
+      expand: 'Expand digestion tracker',
+      collapse: 'Collapse digestion tracker',
     },
     stats: {
       notesHeading: 'Notes Stats',

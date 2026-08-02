@@ -189,6 +189,7 @@ export default function NotesPage() {
   const [deleteGoal, setDeleteGoal] = useState<Goal | null>(null)
   const [deletingGoal, setDeletingGoal] = useState(false)
   const [expandedGoal, setExpandedGoal] = useState<string | null>(null)
+  const [collapsedGoalIds, setCollapsedGoalIds] = useState<string[]>([])
   const [goalItems, setGoalItems] = useState<{ [goalId: string]: GoalItem[] }>({})
   const [goalItemDraft, setGoalItemDraft] = useState<{ [goalId: string]: GoalItemDraft }>({})
   const [savingGoalItem, setSavingGoalItem] = useState(false)
@@ -223,6 +224,11 @@ export default function NotesPage() {
   const [editingHabitDraft, setEditingHabitDraft] = useState('')
   const [savingHabit, setSavingHabit] = useState(false)
   const habitInputRef = useRef<HTMLInputElement | null>(null)
+  const [isGymExpanded, setIsGymExpanded] = useState(true)
+  const [isWeightExpanded, setIsWeightExpanded] = useState(true)
+  const [isBowelExpanded, setIsBowelExpanded] = useState(false)
+  const [preferencesUserId, setPreferencesUserId] = useState<string | null>(null)
+  const [preferencesReady, setPreferencesReady] = useState(false)
 
   const [draft, setDraft] = useState<Draft | null>(null)
   const [savingDraft, setSavingDraft] = useState(false)
@@ -258,6 +264,133 @@ export default function NotesPage() {
     el.style.height = 'auto'
     el.style.height = `${el.scrollHeight}px`
   }, [editingGoalDraft?.description])
+
+  function getPreferenceKey(suffix: string) {
+    const scope = preferencesUserId ? `user:${preferencesUserId}` : 'user:anonymous'
+    return `notes:${scope}:${suffix}`
+  }
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const { data: { user } } = await getSupabaseBrowserClient().auth.getUser()
+        setPreferencesUserId(user?.id ?? null)
+      } finally {
+        setPreferencesReady(true)
+      }
+    })()
+  }, [])
+
+  useEffect(() => {
+    if (!preferencesReady) return
+    try {
+      const stored = window.localStorage.getItem(getPreferenceKey('tracker:gym:expanded'))
+      if (stored !== null) {
+        setIsGymExpanded(stored === 'true')
+      }
+    } catch {
+      // Ignore storage read errors.
+    }
+  }, [preferencesReady, preferencesUserId])
+
+  useEffect(() => {
+    if (!preferencesReady) return
+    try {
+      window.localStorage.setItem(getPreferenceKey('tracker:gym:expanded'), String(isGymExpanded))
+    } catch {
+      // Ignore storage write errors.
+    }
+  }, [isGymExpanded]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!preferencesReady) return
+    try {
+      const stored = window.localStorage.getItem(getPreferenceKey('tracker:weight:expanded'))
+      if (stored !== null) {
+        setIsWeightExpanded(stored === 'true')
+      }
+    } catch {
+      // Ignore storage read errors.
+    }
+  }, [preferencesReady, preferencesUserId])
+
+  useEffect(() => {
+    if (!preferencesReady) return
+    try {
+      window.localStorage.setItem(getPreferenceKey('tracker:weight:expanded'), String(isWeightExpanded))
+    } catch {
+      // Ignore storage write errors.
+    }
+  }, [isWeightExpanded]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!preferencesReady) return
+    try {
+      const stored = window.localStorage.getItem(getPreferenceKey('tracker:bowel:expanded'))
+      if (stored !== null) {
+        setIsBowelExpanded(stored === 'true')
+      }
+    } catch {
+      // Ignore storage read errors.
+    }
+  }, [preferencesReady, preferencesUserId])
+
+  useEffect(() => {
+    if (!preferencesReady) return
+    try {
+      window.localStorage.setItem(getPreferenceKey('tracker:bowel:expanded'), String(isBowelExpanded))
+    } catch {
+      // Ignore storage write errors.
+    }
+  }, [isBowelExpanded]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!preferencesReady) return
+    try {
+      const stored = window.localStorage.getItem(getPreferenceKey('goals:expanded:id'))
+      if (stored) {
+        setExpandedGoal(stored)
+      }
+    } catch {
+      // Ignore storage read errors.
+    }
+  }, [preferencesReady, preferencesUserId])
+
+  useEffect(() => {
+    if (!preferencesReady) return
+    try {
+      if (expandedGoal) {
+        window.localStorage.setItem(getPreferenceKey('goals:expanded:id'), expandedGoal)
+      } else {
+        window.localStorage.removeItem(getPreferenceKey('goals:expanded:id'))
+      }
+    } catch {
+      // Ignore storage write errors.
+    }
+  }, [expandedGoal]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!preferencesReady) return
+    try {
+      const stored = window.localStorage.getItem(getPreferenceKey('goals:collapsed:ids'))
+      if (!stored) return
+      const parsed = JSON.parse(stored)
+      if (Array.isArray(parsed)) {
+        setCollapsedGoalIds(parsed.filter((id): id is string => typeof id === 'string'))
+      }
+    } catch {
+      // Ignore storage read errors.
+    }
+  }, [preferencesReady, preferencesUserId])
+
+  useEffect(() => {
+    if (!preferencesReady) return
+    try {
+      window.localStorage.setItem(getPreferenceKey('goals:collapsed:ids'), JSON.stringify(collapsedGoalIds))
+    } catch {
+      // Ignore storage write errors.
+    }
+  }, [collapsedGoalIds]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function fetchNotes(withLoading = true) {
     if (withLoading) {
@@ -554,6 +687,10 @@ export default function NotesPage() {
       const { error } = await supabase.from('goals').delete().eq('id', deleteGoal.id)
       if (error) throw error
       setGoals((prev) => prev.filter((g) => g.id !== deleteGoal.id))
+      setCollapsedGoalIds((prev) => prev.filter((id) => id !== deleteGoal.id))
+      if (expandedGoal === deleteGoal.id) {
+        setExpandedGoal(null)
+      }
       setDeleteGoal(null)
       toast.success(t('notes.goals.deleteSuccess'))
     } catch {
@@ -722,6 +859,7 @@ export default function NotesPage() {
   }
 
   function startEditingGoal(goal: Goal) {
+    setCollapsedGoalIds((prev) => prev.filter((id) => id !== goal.id))
     setEditingGoalId(goal.id)
     setEditingGoalDraft({
       title: goal.title,
@@ -795,6 +933,15 @@ export default function NotesPage() {
       })()
     }
   }, [expandedGoal])
+
+  useEffect(() => {
+    if (goals.length === 0) return
+    const validIds = new Set(goals.map((g) => g.id))
+    setCollapsedGoalIds((prev) => {
+      const filtered = prev.filter((id) => validIds.has(id))
+      return filtered.length === prev.length ? prev : filtered
+    })
+  }, [goals])
 
   function openDraft() {
     setDraft({
@@ -2295,7 +2442,10 @@ export default function NotesPage() {
             <div className="space-y-2">
               {goals
                 .filter((goal) => goalFilter === 'all' || goal.status === goalFilter)
-                .map((goal) => (
+                .map((goal) => {
+                  const isGoalCollapsed = collapsedGoalIds.includes(goal.id)
+
+                  return (
                   <div key={goal.id} className="rounded-xl border border-emerald-100 bg-white p-3 sm:p-4 shadow-[0_1px_4px_0_rgba(16,185,129,0.06)] hover:shadow-[0_3px_10px_0_rgba(16,185,129,0.12)] transition-shadow group">
                     <div className="flex flex-col gap-3">
                       {/* Goal Header */}
@@ -2372,8 +2522,33 @@ export default function NotesPage() {
                             <div className="flex items-center gap-2 flex-wrap">
                               <h3 className="font-medium text-base text-zinc-900">{goal.title}</h3>
                               <span className="text-sm px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700 font-medium">{getGoalTypeLabel(goal.type, t)}</span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setCollapsedGoalIds((prev) => {
+                                    if (prev.includes(goal.id)) {
+                                      return prev.filter((id) => id !== goal.id)
+                                    }
+                                    return [...prev, goal.id]
+                                  })
+                                  if (!isGoalCollapsed && expandedGoal === goal.id) {
+                                    setExpandedGoal(null)
+                                  }
+                                }}
+                                aria-label={isGoalCollapsed ? t('notes.goals.showDetails') : t('notes.goals.hideDetails')}
+                                title={isGoalCollapsed ? t('notes.goals.showDetails') : t('notes.goals.hideDetails')}
+                                className="ml-auto rounded p-1.5 sm:p-1 text-emerald-600 hover:bg-emerald-100"
+                              >
+                                {isGoalCollapsed ? (
+                                  <ChevronDown className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
+                                ) : (
+                                  <ChevronUp className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
+                                )}
+                              </button>
                             </div>
 
+                            {!isGoalCollapsed && (
+                              <>
                             {/* Timeline */}
                             {(goal.start_date || goal.target_date) && (
                               <div className="text-sm text-zinc-600 space-y-1">
@@ -2418,12 +2593,14 @@ export default function NotesPage() {
                                 </div>
                               </div>
                             )}
+                              </>
+                            )}
                             </div>
                         )}
                       </div>
 
                       {/* Actions */}
-                      {editingGoalId !== goal.id && (
+                      {editingGoalId !== goal.id && !isGoalCollapsed && (
                         <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-emerald-50">
                           <select
                             value={goal.status}
@@ -2456,24 +2633,25 @@ export default function NotesPage() {
                       )}
                     </div>
 
-                    <button
-                      onClick={() => setExpandedGoal(expandedGoal === goal.id ? null : goal.id)}
-                      className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-emerald-600 hover:text-emerald-700"
-                    >
-                      {expandedGoal === goal.id ? (
-                        <>
-                          <ChevronUp className="h-4 w-4" />
-                          {t('notes.goals.hideDetails')}
-                        </>
-                      ) : (
-                        <>
-                          <ChevronDown className="h-4 w-4" />
-                          {t('notes.goals.showDetails')}
-                        </>
-                      )}
-                    </button>
+                    {!isGoalCollapsed && (
+                      <div className="mt-3 flex items-center justify-end">
+                        <button
+                          type="button"
+                          onClick={() => setExpandedGoal(expandedGoal === goal.id ? null : goal.id)}
+                          aria-label={expandedGoal === goal.id ? t('notes.goals.hideDetails') : t('notes.goals.showDetails')}
+                          title={expandedGoal === goal.id ? t('notes.goals.hideDetails') : t('notes.goals.showDetails')}
+                          className="rounded p-1.5 sm:p-1 text-emerald-600 hover:bg-emerald-100"
+                        >
+                          {expandedGoal === goal.id ? (
+                            <ChevronUp className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
+                          ) : (
+                            <ChevronDown className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
+                          )}
+                        </button>
+                      </div>
+                    )}
 
-                    {expandedGoal === goal.id && (
+                    {!isGoalCollapsed && expandedGoal === goal.id && (
                       <div className="mt-3 border-t border-emerald-100 pt-3">
                         <div className="space-y-2 mb-3">
                           {(goalItems[goal.id] || []).map((item, itemIndex) => (
@@ -2703,7 +2881,7 @@ export default function NotesPage() {
                       </div>
                     )}
                   </div>
-                ))}
+                )})}
 
               {goals.filter((goal) => goalFilter === 'all' || goal.status === goalFilter).length === 0 && (
                 <div className="text-center py-8 text-zinc-500">{t('notes.goals.empty')}</div>
@@ -2788,30 +2966,75 @@ export default function NotesPage() {
             <div className="flex items-center gap-2 border-b border-orange-100 px-4 py-3">
               <span className="text-xl">🏋️</span>
               <span className="text-sm font-semibold uppercase tracking-[0.2em] text-orange-600">{t('notes.tracker.gymHeading')}</span>
+              <button
+                type="button"
+                onClick={() => setIsGymExpanded((prev) => !prev)}
+                aria-label={isGymExpanded ? t('notes.tracker.collapse') : t('notes.tracker.expand')}
+                title={isGymExpanded ? t('notes.tracker.collapse') : t('notes.tracker.expand')}
+                className="ml-auto rounded p-1.5 sm:p-1 text-orange-600 hover:bg-orange-100"
+              >
+                {isGymExpanded ? (
+                  <ChevronUp className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
+                ) : (
+                  <ChevronDown className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
+                )}
+              </button>
             </div>
-            <div className="p-4">
-              <GymTracker />
-            </div>
+            {isGymExpanded && (
+              <div className="p-4">
+                <GymTracker />
+              </div>
+            )}
           </section>
 
           <section className="overflow-hidden rounded-2xl border border-emerald-200 bg-[linear-gradient(130deg,#f0fdf4_0%,#ffffff_100%)] shadow-[0_4px_20px_-8px_rgba(16,185,129,0.25)]">
             <div className="flex items-center gap-2 border-b border-emerald-100 px-4 py-3">
               <span className="text-xl">⚖️</span>
               <span className="text-sm font-semibold uppercase tracking-[0.2em] text-emerald-600">{t('notes.weight.heading')}</span>
+              <button
+                type="button"
+                onClick={() => setIsWeightExpanded((prev) => !prev)}
+                aria-label={isWeightExpanded ? t('notes.weight.collapse') : t('notes.weight.expand')}
+                title={isWeightExpanded ? t('notes.weight.collapse') : t('notes.weight.expand')}
+                className="ml-auto rounded p-1.5 sm:p-1 text-emerald-600 hover:bg-emerald-100"
+              >
+                {isWeightExpanded ? (
+                  <ChevronUp className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
+                ) : (
+                  <ChevronDown className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
+                )}
+              </button>
             </div>
-            <div className="p-4">
-              <WeightTracker />
-            </div>
+            {isWeightExpanded && (
+              <div className="p-4">
+                <WeightTracker />
+              </div>
+            )}
           </section>
 
           <section className="overflow-hidden rounded-2xl border border-teal-200 bg-[linear-gradient(130deg,#f0fdfa_0%,#ffffff_100%)] shadow-[0_4px_20px_-8px_rgba(20,184,166,0.2)]">
             <div className="flex items-center gap-2 border-b border-teal-100 px-4 py-3">
               <span className="text-xl">🚽</span>
               <span className="text-sm font-semibold uppercase tracking-[0.2em] text-teal-600">{t('notes.bowel.heading')}</span>
+              <button
+                type="button"
+                onClick={() => setIsBowelExpanded((prev) => !prev)}
+                aria-label={isBowelExpanded ? t('notes.bowel.collapse') : t('notes.bowel.expand')}
+                title={isBowelExpanded ? t('notes.bowel.collapse') : t('notes.bowel.expand')}
+                className="ml-auto rounded p-1.5 sm:p-1 text-teal-600 hover:bg-teal-100"
+              >
+                {isBowelExpanded ? (
+                  <ChevronUp className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
+                ) : (
+                  <ChevronDown className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
+                )}
+              </button>
             </div>
-            <div className="p-4">
-              <BowelTracker />
-            </div>
+            {isBowelExpanded && (
+              <div className="p-4">
+                <BowelTracker />
+              </div>
+            )}
           </section>
         </div>
         )}
