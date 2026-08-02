@@ -801,7 +801,7 @@ export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note
 
                   <span className="flex-1 text-zinc-400">{formatDateTime(item.analyzedAt, lang)}</span>
 
-                  {item.tokenUsage && (
+                  {item.tokenUsage && item.tokenUsage.total > 0 && (
                     <span className="text-zinc-400">🪙 {fmtN(item.tokenUsage.total, lang)}</span>
                   )}
                   {idx === viewIndex && (
