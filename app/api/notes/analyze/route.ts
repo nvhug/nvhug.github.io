@@ -146,7 +146,10 @@ function buildWeightSummary(logs: WeightLog[]) {
   const progressPct = Math.round(
     ((latest.weight - WEIGHT_START) / (WEIGHT_TARGET - WEIGHT_START)) * 100
   )
-  const logsPerWeek = parseFloat(((logs.length / daysDiff) * 7).toFixed(1))
+  // Avoid inflated rate when the span is shorter than one week
+  const logsPerWeek = daysDiff >= 7
+    ? parseFloat(((logs.length / daysDiff) * 7).toFixed(1))
+    : logs.length
 
   // Weekly average weight trend
   const weeklyMap: Record<string, number[]> = {}
@@ -183,6 +186,8 @@ interface MealRow   { date: string; meal_type: string; time: string; is_complete
 
 function buildCalorieSummary(foods: DailyFood[], meals: MealRow[]) {
   if (!foods.length && !meals.length) return null
+  // Only compute calorie stats when food data exists
+  if (!foods.length) return null
 
   // Aggregate calories by date
   const byDate: Record<string, number> = {}
@@ -320,12 +325,17 @@ function buildGymSummary(logs: GymLogRow[]) {
     ? Math.max(1, (new Date(dateArr.at(-1)!).getTime() - new Date(dateArr[0]).getTime()) / 86400000)
     : 1
 
+  // Avoid inflated rate when the span is shorter than one week
+  const workoutDaysPerWeek = spanDays >= 7
+    ? parseFloat(((workoutDays.size / spanDays) * 7).toFixed(1))
+    : workoutDays.size
+
   return {
     workout_days:            workoutDays.size,
     total_exercise_entries:  logs.length,
     total_sets:              totalSets,
     avg_sets_per_session:    parseFloat((totalSets / workoutDays.size).toFixed(1)),
-    workout_days_per_week:   parseFloat(((workoutDays.size / spanDays) * 7).toFixed(1)),
+    workout_days_per_week:   workoutDaysPerWeek,
     consistency_pct:         consistencyPct,
     top_exercises:           topExercises,
     top_muscle_groups:       topMuscles,
@@ -733,7 +743,7 @@ Trả về JSON hợp lệ với đúng cấu trúc sau (không thêm/bỏ field
       model: 'deepseek-chat',
       messages: [{ role: 'user', content: prompt }],
       response_format: { type: 'json_object' },
-      temperature: 0.7,
+      temperature: 0.3,
     }),
   })
 
