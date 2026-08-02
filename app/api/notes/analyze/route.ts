@@ -265,6 +265,170 @@ function buildCalorieSummary(foods: DailyFood[], meals: MealRow[]) {
   }
 }
 
+// ─── Gym summary ──────────────────────────────────────────────────────────────
+
+interface GymLogRow { log_date: string; exercise: string; muscle_group: string | null; sets: number }
+
+function buildGymSummary(logs: GymLogRow[]) {
+  if (!logs.length) return null
+
+  const workoutDays = new Set(logs.map(l => l.log_date))
+  const totalSets   = logs.reduce((s, l) => s + l.sets, 0)
+
+  // Exercise frequency
+  const exCount: Record<string, { sessions: number; sets: number }> = {}
+  logs.forEach(l => {
+    const e = exCount[l.exercise] ?? { sessions: 0, sets: 0 }
+    e.sessions++
+    e.sets += l.sets
+    exCount[l.exercise] = e
+  })
+  const topExercises = Object.entries(exCount)
+    .sort((a, b) => b[1].sessions - a[1].sessions)
+    .slice(0, 6)
+    .map(([name, { sessions, sets }]) => ({ name, sessions, total_sets: sets }))
+
+  // Muscle group frequency
+  const muscleCount: Record<string, number> = {}
+  logs.forEach(l => {
+    if (!l.muscle_group) return
+    l.muscle_group.split(',').map(m => m.trim()).forEach(m => {
+      muscleCount[m] = (muscleCount[m] ?? 0) + 1
+    })
+  })
+  const topMuscles = Object.entries(muscleCount)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 6)
+    .map(([m]) => m)
+
+  // Weekly workout-day count
+  const weeklyDaysMap: Record<string, Set<string>> = {}
+  logs.forEach(l => {
+    const w = isoMonday(l.log_date)
+    if (!weeklyDaysMap[w]) weeklyDaysMap[w] = new Set()
+    weeklyDaysMap[w].add(l.log_date)
+  })
+  const weeklyWorkoutDays = Object.fromEntries(
+    Object.entries(weeklyDaysMap).map(([w, days]) => [w, days.size])
+  )
+  const totalWeeks           = Object.keys(weeklyDaysMap).length
+  const weeksConsistent      = Object.values(weeklyDaysMap).filter(d => d.size >= 3).length
+  const consistencyPct       = totalWeeks > 0 ? Math.round((weeksConsistent / totalWeeks) * 100) : 0
+
+  const dateArr = [...workoutDays].sort()
+  const spanDays = dateArr.length > 1
+    ? Math.max(1, (new Date(dateArr.at(-1)!).getTime() - new Date(dateArr[0]).getTime()) / 86400000)
+    : 1
+
+  return {
+    workout_days:            workoutDays.size,
+    total_exercise_entries:  logs.length,
+    total_sets:              totalSets,
+    avg_sets_per_session:    parseFloat((totalSets / workoutDays.size).toFixed(1)),
+    workout_days_per_week:   parseFloat(((workoutDays.size / spanDays) * 7).toFixed(1)),
+    consistency_pct:         consistencyPct,
+    top_exercises:           topExercises,
+    top_muscle_groups:       topMuscles,
+    weekly_workout_days:     weeklyWorkoutDays,
+  }
+}
+
+// ─── Calendar summary ─────────────────────────────────────────────────────────
+
+interface CalEventRow { date: string; start_time: string; is_recurring: boolean }
+
+function buildCalendarSummary(events: CalEventRow[], periodFrom: string, periodTo: string) {
+  if (!events.length) return null
+
+  const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+  const dowCount: Record<string, number> = {}
+  const timeSlots = { morning: 0, afternoon: 0, evening: 0, night: 0 }
+
+  events.forEach(e => {
+    const [y, m, d] = e.date.split('-').map(Number)
+    const dow = new Date(y, m - 1, d).getDay()
+    dowCount[DOW[dow]] = (dowCount[DOW[dow]] ?? 0) + 1
+
+    const hour = parseInt(e.start_time.split(':')[0])
+    if      (hour >= 6  && hour < 12) timeSlots.morning++
+    else if (hour >= 12 && hour < 17) timeSlots.afternoon++
+    else if (hour >= 17 && hour < 22) timeSlots.evening++
+    else timeSlots.night++
+  })
+
+  const busiestDay = Object.entries(dowCount).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null
+  const spanDays   = Math.max(1,
+    (new Date(periodTo).getTime() - new Date(periodFrom).getTime()) / 86400000 + 1
+  )
+
+  return {
+    total_events:        events.length,
+    recurring_events:    events.filter(e => e.is_recurring).length,
+    one_time_events:     events.filter(e => !e.is_recurring).length,
+    events_per_week_avg: parseFloat(((events.length / spanDays) * 7).toFixed(1)),
+    busiest_day_of_week: busiestDay,
+    day_distribution:    dowCount,
+    time_distribution:   timeSlots,
+  }
+}
+
+// ─── Bowel/digestive summary ──────────────────────────────────────────────────
+
+interface BowelLogRow { date: string; stool_type: string }
+
+function buildBowelSummary(logs: BowelLogRow[]) {
+  if (!logs.length) return null
+
+  const trackedDays  = new Set(logs.map(l => l.date)).size
+  const typeCount: Record<string, number> = {}
+  logs.forEach(l => { typeCount[l.stool_type] = (typeCount[l.stool_type] ?? 0) + 1 })
+
+  const normalPct    = Math.round(((typeCount.normal ?? 0) / logs.length) * 100)
+  const abnormal     = Object.entries(typeCount)
+    .filter(([t]) => t !== 'normal')
+    .sort((a, b) => b[1] - a[1])
+    .map(([t, c]) => `${t}(${c})`)
+
+  return {
+    tracked_days:      trackedDays,
+    total_logs:        logs.length,
+    avg_per_day:       parseFloat((logs.length / trackedDays).toFixed(1)),
+    normal_pct:        normalPct,
+    type_distribution: typeCount,
+    abnormal_types:    abnormal.slice(0, 3),
+  }
+}
+
+// ─── Goals summary ────────────────────────────────────────────────────────────
+
+interface GoalRow { title: string; type: string; status: string; completion_percentage: number | null }
+
+function buildGoalsSummary(goals: GoalRow[]) {
+  if (!goals.length) return null
+
+  const active    = goals.filter(g => g.status === 'active')
+  const completed = goals.filter(g => g.status === 'completed')
+  const withPct   = active.filter(g => g.completion_percentage != null)
+  const avgPct    = withPct.length > 0
+    ? Math.round(withPct.reduce((s, g) => s + (g.completion_percentage ?? 0), 0) / withPct.length)
+    : null
+
+  const typeCount: Record<string, number> = {}
+  goals.forEach(g => { typeCount[g.type] = (typeCount[g.type] ?? 0) + 1 })
+
+  return {
+    total_goals:    goals.length,
+    active_goals:   active.length,
+    completed_goals: completed.length,
+    avg_active_completion_pct: avgPct,
+    goal_types:     Object.keys(typeCount),
+    top_active_goals: active
+      .sort((a, b) => (b.completion_percentage ?? 0) - (a.completion_percentage ?? 0))
+      .slice(0, 5)
+      .map(g => ({ title: g.title.slice(0, 60), type: g.type, pct: g.completion_percentage ?? 0 })),
+  }
+}
+
 // ─── Route handler ───────────────────────────────────────────────────────────
 
 interface Period { label: string; from: string; to: string }
@@ -350,7 +514,7 @@ export async function POST(request: Request) {
     }
   }
 
-  const [weightRes, foodRes, mealRes] = await Promise.all([
+  const [weightRes, foodRes, mealRes, gymRes, calRes, bowelRes, goalsRes] = await Promise.all([
     supabaseAuth.from('weight_logs')
       .select('date, weight')
       .eq('user_id', user!.id)
@@ -368,108 +532,192 @@ export async function POST(request: Request) {
       .eq('user_id', user!.id)
       .gte('date', period.from).lte('date', period.to)
       .order('date', { ascending: true }),
+
+    supabaseAuth.from('gym_logs')
+      .select('log_date, exercise, muscle_group, sets')
+      .eq('user_id', user!.id)
+      .gte('log_date', period.from).lte('log_date', period.to)
+      .order('log_date', { ascending: true }),
+
+    supabaseAuth.from('calendar_events')
+      .select('date, start_time, is_recurring')
+      .eq('user_id', user!.id)
+      .gte('date', period.from).lte('date', period.to)
+      .order('date', { ascending: true }),
+
+    supabaseAuth.from('bowel_logs')
+      .select('date, stool_type')
+      .eq('user_id', user!.id)
+      .gte('date', period.from).lte('date', period.to)
+      .order('date', { ascending: true }),
+
+    supabaseAuth.from('goals')
+      .select('title, type, status, completion_percentage')
+      .eq('user_id', user!.id),
   ])
 
-  const notesSummary   = buildNotesSummary(notes, habits ?? [])
-  const weightSummary  = buildWeightSummary(weightRes.data ?? [])
-  const calorieSummary = buildCalorieSummary(foodRes.data ?? [], mealRes.data ?? [])
+  const notesSummary    = buildNotesSummary(notes, habits ?? [])
+  const weightSummary   = buildWeightSummary(weightRes.data ?? [])
+  const calorieSummary  = buildCalorieSummary(foodRes.data ?? [], mealRes.data ?? [])
+  const gymSummary      = buildGymSummary(gymRes.data ?? [])
+  const calendarSummary = buildCalendarSummary(calRes.data ?? [], period.from, period.to)
+  const bowelSummary    = buildBowelSummary(bowelRes.data ?? [])
+  const goalsSummary    = buildGoalsSummary(goalsRes.data ?? [])
 
-  const prompt = activeLang === 'en' ? `You are an expert in personal productivity and health analytics. Analyze the data for period **${period.label}** (${period.from} → ${period.to}) and give an in-depth review in English.
+  const prompt = activeLang === 'en' ? `You are an expert personal health & productivity coach. Analyze all data for **${period.label}** (${period.from} → ${period.to}) and return a comprehensive in-depth review in English.
 
 === USER PROFILE ===
 ${USER_PROFILE.en}
 
-=== NOTES DATA ===
+=== NOTES & HABITS ===
 ${JSON.stringify(notesSummary, null, 2)}
 
-=== WEIGHT DATA ===
-${weightSummary ? JSON.stringify(weightSummary, null, 2) : 'No weight data in this period.'}
+=== WEIGHT TRACKING ===
+${weightSummary ? JSON.stringify(weightSummary, null, 2) : 'No weight data this period.'}
 
-=== NUTRITION DATA ===
-${calorieSummary ? JSON.stringify(calorieSummary, null, 2) : 'No nutrition data in this period.'}
+=== NUTRITION & MEALS ===
+${calorieSummary ? JSON.stringify(calorieSummary, null, 2) : 'No nutrition data this period.'}
 
-Field explanations:
-[NOTES] total_notes, good_pct/bad_pct, completion_rate_pct (done), avg_priority (1–5), avg_completion_pct (0–100), weekly_breakdown (good/bad per week), habits (name + reminder times), recent_content_samples.
-[WEIGHT] gain_per_week_kg (target 0.25–0.5 kg/week), progress_pct (% towards 75 kg), weekly_trend, logs_per_week (should be ≥3/week).
-[NUTRITION] total_calorie_deficit_kcal (>0=deficit), days_under_90pct (<2160 kcal), meal_completion_by_type, most_skipped_meal, weekly_calorie_trend, dow_avg_calories.
+=== GYM WORKOUTS ===
+${gymSummary ? JSON.stringify(gymSummary, null, 2) : 'No gym data this period.'}
 
-Return JSON with exactly this structure (do not add or omit any field):
+=== CALENDAR / SCHEDULE ===
+${calendarSummary ? JSON.stringify(calendarSummary, null, 2) : 'No calendar data this period.'}
+
+=== DIGESTIVE HEALTH ===
+${bowelSummary ? JSON.stringify(bowelSummary, null, 2) : 'No digestive tracking data this period.'}
+
+=== GOALS ===
+${goalsSummary ? JSON.stringify(goalsSummary, null, 2) : 'No goals data.'}
+
+FIELD GUIDE:
+[NOTES] total_notes, good_pct/bad_pct, completion_rate_pct, avg_priority(1–5), weekly_breakdown, habits, recent_content_samples.
+[WEIGHT] gain_per_week_kg (target 0.25–0.5), progress_pct (% to 75 kg), weekly_trend, logs_per_week.
+[NUTRITION] deficit_kcal(>0=under), days_under_90pct, meal_completion_by_type, weekly_calorie_trend, dow_avg_calories.
+[GYM] workout_days_per_week (ideal ≥3), consistency_pct (% weeks with ≥3 days), top_exercises, top_muscle_groups, avg_sets_per_session.
+[CALENDAR] events_per_week_avg, busiest_day_of_week, time_distribution(morning/afternoon/evening/night), recurring_events.
+[DIGESTIVE] normal_pct(target ≥80%), avg_per_day(ideal 1–2), abnormal_types.
+[GOALS] active_goals, avg_active_completion_pct, top_active_goals with completion %.
+
+Return ONLY valid JSON with exactly this structure (no extra fields, no markdown):
 {
-  "summary": "2-3 sentence overview of period ${period.label}, covering notes, weight, and nutrition",
+  "summary": "3-sentence overview: briefly mention progress across notes, weight, nutrition, gym, and scheduling this period",
   "weight": {
-    "verdict": "One of: On track | Too slow | Too fast | No data",
-    "points": [
-      "Observation 1 with concrete numbers (e.g. gained 0.3 kg/week, on track for lean bulk)",
-      "Observation 2 about weekly trend or logging frequency"
-    ],
-    "next_target": "Concrete numeric target for next period (e.g. reach 62.5 kg, log weight ≥3 times/week)"
+    "verdict": "On track | Too slow | Too fast | No data",
+    "points": ["insight with numbers", "insight about trend or logging frequency"],
+    "next_target": "concrete numeric target for next period"
   },
   "nutrition": {
-    "verdict": "One of: Sufficient calories | Calorie deficit | Calorie surplus | No data",
-    "points": [
-      "Observation 1 with numbers (e.g. avg 2200 kcal/day, 92% of the 2400 kcal target)",
-      "Observation 2 about weekly trend or best/worst calorie days"
-    ],
-    "worst_day": "Day of week with lowest calories + avg (e.g. Monday — avg 1950 kcal)",
-    "skip_habit": "Most-skipped meal + skip % + estimated missed kcal (e.g. mid_morning 60% → ~300 kcal/day)"
+    "verdict": "Sufficient calories | Calorie deficit | Calorie surplus | No data",
+    "points": ["insight with kcal numbers", "insight about weekly/dow pattern"],
+    "worst_day": "day of week with lowest avg calories + amount",
+    "skip_habit": "most skipped meal + skip % + estimated kcal impact"
+  },
+  "gym": {
+    "verdict": "Consistent | Inconsistent | Getting started | No data",
+    "points": ["insight about workout frequency and volume (sets, days/week)", "insight about muscle balance or exercise variety"],
+    "strongest_muscle": "most trained muscle group this period",
+    "next_challenge": "one concrete gym challenge/target for next period"
+  },
+  "calendar": {
+    "verdict": "Well scheduled | Lightly used | Not used",
+    "points": ["insight about planning patterns (frequency, recurring events)", "insight about time-of-day or day-of-week concentration"],
+    "busiest_day": "busiest day of week + event count",
+    "tip": "one scheduling improvement tip based on the data"
+  },
+  "digestive": {
+    "verdict": "Healthy | Needs attention | No data",
+    "points": ["insight about stool type distribution and normal%", "link to nutrition/fiber intake if possible"],
+    "tip": "one concrete diet or habit tip to improve digestive health"
+  },
+  "goals": {
+    "verdict": "On track | Needs focus | No goals set",
+    "points": ["insight about active goal count and avg completion %", "which goal type is most/least progressed"],
+    "focus": "the single most important goal to accelerate next period"
   },
   "notes_habits": {
-    "points": [
-      "Observation about productivity/note quality (completion rate, good/bad ratio)",
-      "Observation about habit compliance — which habits are strong, which are inconsistent"
-    ],
-    "habit_gap": "The most inconsistent habit + one practical improvement suggestion"
+    "points": ["insight about productivity/note quality (ratio, completion, priority)", "insight about habit consistency — strongest vs weakest habit"],
+    "habit_gap": "the most inconsistent habit + one practical improvement"
   },
-  "pattern": "The most notable correlation this period, with numbers (1 sentence)",
-  "recommendation": "3 action suggestions for next period, each with a clear numeric target"
-}` : `Bạn là chuyên gia phân tích năng suất và sức khỏe cá nhân. Phân tích dữ liệu kỳ **${period.label}** (${period.from} → ${period.to}) và đưa ra nhận xét chuyên sâu bằng tiếng Việt.
+  "pattern": "the most notable cross-domain correlation this period, with 2+ data points (1 sentence)",
+  "recommendation": "3 prioritized action items for next period, each with a clear numeric target. Format: '1. ... 2. ... 3. ...'"
+}` : `Bạn là chuyên gia huấn luyện sức khỏe và năng suất cá nhân. Phân tích toàn bộ dữ liệu kỳ **${period.label}** (${period.from} → ${period.to}) và trả về nhận xét chuyên sâu bằng tiếng Việt.
 
 === HỒ SƠ NGƯỜI DÙNG ===
 ${USER_PROFILE.vi}
 
-=== DỮ LIỆU GHI CHÚ ===
+=== GHI CHÚ & THÓI QUEN ===
 ${JSON.stringify(notesSummary, null, 2)}
 
-=== DỮ LIỆU CÂN NẶNG ===
-${weightSummary ? JSON.stringify(weightSummary, null, 2) : 'Chưa có dữ liệu cân nặng trong kỳ này.'}
+=== THEO DÕI CÂN NẶNG ===
+${weightSummary ? JSON.stringify(weightSummary, null, 2) : 'Chưa có dữ liệu cân nặng kỳ này.'}
 
-=== DỮ LIỆU DINH DƯỠNG ===
-${calorieSummary ? JSON.stringify(calorieSummary, null, 2) : 'Chưa có dữ liệu dinh dưỡng trong kỳ này.'}
+=== DINH DƯỠNG & BỮA ĂN ===
+${calorieSummary ? JSON.stringify(calorieSummary, null, 2) : 'Chưa có dữ liệu dinh dưỡng kỳ này.'}
 
-Giải thích trường dữ liệu:
-[GHI CHÚ] total_notes, good_pct/bad_pct, completion_rate_pct (done), avg_priority (1–5), avg_completion_pct (0–100), weekly_breakdown (good/bad theo tuần), habits (tên + giờ nhắc), recent_content_samples.
-[CÂN NẶNG] gain_per_week_kg (mục tiêu 0.25–0.5 kg/tuần), progress_pct (% đến 75 kg), weekly_trend, logs_per_week (nên ≥3/tuần).
-[DINH DƯỠNG] total_calorie_deficit_kcal (>0=thiếu), days_under_90pct (<2160 kcal), meal_completion_by_type, most_skipped_meal, weekly_calorie_trend, dow_avg_calories.
+=== TẬP GYM ===
+${gymSummary ? JSON.stringify(gymSummary, null, 2) : 'Chưa có dữ liệu tập gym kỳ này.'}
 
-Trả về JSON với đúng cấu trúc sau (không thêm field nào, không bỏ field nào):
+=== LỊCH CÁ NHÂN ===
+${calendarSummary ? JSON.stringify(calendarSummary, null, 2) : 'Chưa có dữ liệu lịch kỳ này.'}
+
+=== SỨC KHỎE TIÊU HÓA ===
+${bowelSummary ? JSON.stringify(bowelSummary, null, 2) : 'Chưa có dữ liệu tiêu hóa kỳ này.'}
+
+=== MỤC TIÊU ===
+${goalsSummary ? JSON.stringify(goalsSummary, null, 2) : 'Chưa có mục tiêu nào.'}
+
+HƯỚNG DẪN TRƯỜNG DỮ LIỆU:
+[GHI CHÚ] total_notes, good_pct/bad_pct, completion_rate_pct, avg_priority(1–5), weekly_breakdown, habits, recent_content_samples.
+[CÂN NẶNG] gain_per_week_kg (mục tiêu 0.25–0.5), progress_pct (% đến 75 kg), weekly_trend, logs_per_week.
+[DINH DƯỠNG] deficit_kcal(>0=thiếu), days_under_90pct, meal_completion_by_type, weekly_calorie_trend, dow_avg_calories.
+[GYM] workout_days_per_week (lý tưởng ≥3), consistency_pct (% tuần có ≥3 ngày tập), top_exercises, top_muscle_groups, avg_sets_per_session.
+[LỊCH] events_per_week_avg, busiest_day_of_week, time_distribution(morning/afternoon/evening/night), recurring_events.
+[TIÊU HÓA] normal_pct(mục tiêu ≥80%), avg_per_day(lý tưởng 1–2 lần/ngày), abnormal_types.
+[MỤC TIÊU] active_goals, avg_active_completion_pct, top_active_goals với % hoàn thành.
+
+Trả về JSON hợp lệ với đúng cấu trúc sau (không thêm/bỏ field, không markdown):
 {
-  "summary": "2-3 câu tổng quan kỳ ${period.label}, đề cập cả ghi chú, cân nặng, dinh dưỡng",
+  "summary": "3 câu tổng quan: đề cập tiến độ ghi chú, cân nặng, dinh dưỡng, gym và lập lịch trong kỳ này",
   "weight": {
-    "verdict": "Một trong: Đúng tiến độ | Quá chậm | Quá nhanh | Chưa có dữ liệu",
-    "points": [
-      "Nhận xét 1 có số liệu cụ thể (VD: tăng 0.3 kg/tuần, đúng mục tiêu lean bulk)",
-      "Nhận xét 2 về xu hướng tuần hoặc tần suất ghi cân"
-    ],
-    "next_target": "Mục tiêu số cụ thể kỳ tới (VD: đạt 62.5 kg, ghi cân ≥3 lần/tuần)"
+    "verdict": "Đúng tiến độ | Quá chậm | Quá nhanh | Chưa có dữ liệu",
+    "points": ["nhận xét có số liệu cụ thể", "nhận xét về xu hướng hoặc tần suất ghi cân"],
+    "next_target": "mục tiêu số cụ thể cho kỳ tới"
   },
   "nutrition": {
-    "verdict": "Một trong: Đủ calo | Thiếu calo | Dư calo | Chưa có dữ liệu",
-    "points": [
-      "Nhận xét 1 có số liệu (VD: avg 2200 kcal/ngày, đạt 92% mục tiêu 2400 kcal)",
-      "Nhận xét 2 về xu hướng tuần hoặc ngày calo tốt/tệ nhất"
-    ],
-    "worst_day": "Ngày trong tuần calo thấp nhất + avg (VD: Thứ 2 — avg 1950 kcal)",
-    "skip_habit": "Bữa hay bỏ nhất + % skip + ước kcal thiếu (VD: mid_morning 60% → ~300 kcal/ngày)"
+    "verdict": "Đủ calo | Thiếu calo | Dư calo | Chưa có dữ liệu",
+    "points": ["nhận xét có kcal cụ thể", "nhận xét về xu hướng tuần/ngày"],
+    "worst_day": "ngày trong tuần calo thấp nhất + avg cụ thể",
+    "skip_habit": "bữa hay bỏ nhất + % skip + kcal ảnh hưởng"
+  },
+  "gym": {
+    "verdict": "Đều đặn | Chưa đều | Mới bắt đầu | Chưa có dữ liệu",
+    "points": ["nhận xét về tần suất và khối lượng tập (số ngày/tuần, tổng hiệp)", "nhận xét về cân bằng nhóm cơ hoặc đa dạng bài tập"],
+    "strongest_muscle": "nhóm cơ được tập nhiều nhất kỳ này",
+    "next_challenge": "một thử thách/mục tiêu gym cụ thể cho kỳ tới"
+  },
+  "calendar": {
+    "verdict": "Lập lịch tốt | Ít sử dụng | Chưa dùng",
+    "points": ["nhận xét về tần suất lập kế hoạch (sự kiện/tuần, lặp lại)", "nhận xét về phân bố thời gian trong ngày hoặc ngày trong tuần"],
+    "busiest_day": "ngày bận nhất trong tuần + số sự kiện",
+    "tip": "một gợi ý cải thiện lịch trình dựa trên dữ liệu"
+  },
+  "digestive": {
+    "verdict": "Bình thường | Cần chú ý | Chưa có dữ liệu",
+    "points": ["nhận xét về tỉ lệ normal% và phân bố loại", "liên hệ với chế độ dinh dưỡng/chất xơ nếu phù hợp"],
+    "tip": "một gợi ý chế độ ăn hoặc thói quen cụ thể để cải thiện tiêu hóa"
+  },
+  "goals": {
+    "verdict": "Đang tốt | Cần tập trung | Chưa đặt mục tiêu",
+    "points": ["nhận xét về số lượng mục tiêu đang hoạt động và % hoàn thành trung bình", "loại mục tiêu nào đang tiến nhanh/chậm nhất"],
+    "focus": "mục tiêu quan trọng nhất cần tăng tốc kỳ tới"
   },
   "notes_habits": {
-    "points": [
-      "Nhận xét về năng suất/chất lượng ghi chú (completion rate, tỉ lệ good/bad)",
-      "Nhận xét về habit compliance — habit nào tốt, habit nào chưa đều"
-    ],
-    "habit_gap": "Habit cụ thể chưa đều nhất + 1 gợi ý cải thiện thực tế"
+    "points": ["nhận xét năng suất/chất lượng ghi chú (tỉ lệ, completion rate, priority)", "nhận xét habit compliance — habit tốt nhất vs yếu nhất"],
+    "habit_gap": "habit cụ thể chưa đều nhất + 1 gợi ý cải thiện thực tế"
   },
-  "pattern": "Tương quan nổi bật nhất kỳ này, dẫn số liệu (1 câu)",
-  "recommendation": "3 gợi ý hành động cho kỳ tới, mỗi gợi ý có con số mục tiêu rõ ràng"
+  "pattern": "tương quan nổi bật nhất xuyên nhiều domain kỳ này, dẫn ≥2 số liệu (1 câu)",
+  "recommendation": "3 hành động ưu tiên cho kỳ tới, mỗi hành động có con số mục tiêu rõ. Format: '1. ... 2. ... 3. ...'"
 }`
 
   const res = await fetch('https://api.deepseek.com/v1/chat/completions', {

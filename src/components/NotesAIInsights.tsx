@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react'
 import {
   Sparkles, RefreshCw, ChevronRight,
   AlertCircle, Lightbulb, History, ChevronDown, ChevronUp,
-  Scale, Utensils, BookOpen, Crown, X,
+  Scale, Utensils, BookOpen, Crown, X, Dumbbell, CalendarDays, Activity, Target,
 } from 'lucide-react'
 import { Note } from '@/types'
 import { useLanguage } from '@/lib/i18n/language-context'
@@ -34,6 +34,32 @@ interface NutritionInsight {
   skip_habit: string
 }
 
+interface GymInsight {
+  verdict:          string
+  points:           string[]
+  strongest_muscle: string
+  next_challenge:   string
+}
+
+interface CalendarInsight {
+  verdict:      string
+  points:       string[]
+  busiest_day:  string
+  tip:          string
+}
+
+interface DigestiveInsight {
+  verdict: string
+  points:  string[]
+  tip:     string
+}
+
+interface GoalsInsight {
+  verdict: string
+  points:  string[]
+  focus:   string
+}
+
 interface NotesHabitsInsight {
   points:    string[]
   habit_gap: string
@@ -44,6 +70,10 @@ interface AIInsights {
   summary:        string
   weight?:        WeightInsight
   nutrition?:     NutritionInsight
+  gym?:           GymInsight
+  calendar?:      CalendarInsight
+  digestive?:     DigestiveInsight
+  goals?:         GoalsInsight
   notes_habits?:  NotesHabitsInsight
   pattern:        string
   recommendation: string
@@ -406,7 +436,7 @@ export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note
             <p className="text-base leading-relaxed text-violet-900">{viewed.summary}</p>
           </div>
 
-          {/* Domain cards */}
+          {/* Domain cards — row 1: body metrics */}
           <div className="grid gap-3 sm:grid-cols-3">
             {/* Weight */}
             {viewed.weight && (
@@ -469,6 +499,134 @@ export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note
               </div>
             )}
 
+            {/* Digestive */}
+            {viewed.digestive && (
+              <div className="rounded-xl border border-teal-100 bg-teal-50 p-3.5">
+                <div className="mb-2 flex items-center justify-between gap-1">
+                  <div className="flex items-center gap-1.5">
+                    <Activity className="h-3.5 w-3.5 text-teal-600" />
+                    <h4 className="text-sm font-semibold uppercase tracking-wide text-teal-600">Tiêu hóa</h4>
+                  </div>
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium leading-tight ${verdictBadge(viewed.digestive.verdict)}`}>
+                    {viewed.digestive.verdict}
+                  </span>
+                </div>
+                <ul className="mb-2.5 space-y-1.5">
+                  {viewed.digestive.points.map((p, i) => (
+                    <li key={i} className="flex items-start gap-1.5 text-sm text-teal-800">
+                      <ChevronRight className="mt-0.5 h-3 w-3 shrink-0 text-teal-400" />{p}
+                    </li>
+                  ))}
+                </ul>
+                {viewed.digestive.tip && (
+                  <div className="rounded-lg bg-teal-100/70 px-2.5 py-1.5 text-sm text-teal-700">
+                    <span className="font-medium">Gợi ý: </span>{viewed.digestive.tip}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Domain cards — row 2: training & planning */}
+          <div className="grid gap-3 sm:grid-cols-3">
+            {/* Gym */}
+            {viewed.gym && (
+              <div className="rounded-xl border border-orange-100 bg-orange-50 p-3.5">
+                <div className="mb-2 flex items-center justify-between gap-1">
+                  <div className="flex items-center gap-1.5">
+                    <Dumbbell className="h-3.5 w-3.5 text-orange-600" />
+                    <h4 className="text-sm font-semibold uppercase tracking-wide text-orange-600">Gym</h4>
+                  </div>
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium leading-tight ${verdictBadge(viewed.gym.verdict)}`}>
+                    {viewed.gym.verdict}
+                  </span>
+                </div>
+                <ul className="mb-2.5 space-y-1.5">
+                  {viewed.gym.points.map((p, i) => (
+                    <li key={i} className="flex items-start gap-1.5 text-sm text-orange-800">
+                      <ChevronRight className="mt-0.5 h-3 w-3 shrink-0 text-orange-400" />{p}
+                    </li>
+                  ))}
+                </ul>
+                <div className="space-y-1">
+                  {viewed.gym.strongest_muscle && (
+                    <p className="text-sm text-orange-700">
+                      <span className="font-medium">Cơ chủ đạo: </span>{viewed.gym.strongest_muscle}
+                    </p>
+                  )}
+                  {viewed.gym.next_challenge && (
+                    <div className="rounded-lg bg-orange-100/70 px-2.5 py-1.5 text-sm text-orange-700">
+                      <span className="font-medium">Thử thách tới: </span>{viewed.gym.next_challenge}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Calendar */}
+            {viewed.calendar && (
+              <div className="rounded-xl border border-violet-100 bg-violet-50 p-3.5">
+                <div className="mb-2 flex items-center justify-between gap-1">
+                  <div className="flex items-center gap-1.5">
+                    <CalendarDays className="h-3.5 w-3.5 text-violet-600" />
+                    <h4 className="text-sm font-semibold uppercase tracking-wide text-violet-600">Lịch trình</h4>
+                  </div>
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium leading-tight ${verdictBadge(viewed.calendar.verdict)}`}>
+                    {viewed.calendar.verdict}
+                  </span>
+                </div>
+                <ul className="mb-2.5 space-y-1.5">
+                  {viewed.calendar.points.map((p, i) => (
+                    <li key={i} className="flex items-start gap-1.5 text-sm text-violet-800">
+                      <ChevronRight className="mt-0.5 h-3 w-3 shrink-0 text-violet-400" />{p}
+                    </li>
+                  ))}
+                </ul>
+                <div className="space-y-1">
+                  {viewed.calendar.busiest_day && (
+                    <p className="text-sm text-violet-700">
+                      <span className="font-medium">Ngày bận nhất: </span>{viewed.calendar.busiest_day}
+                    </p>
+                  )}
+                  {viewed.calendar.tip && (
+                    <div className="rounded-lg bg-violet-100/70 px-2.5 py-1.5 text-sm text-violet-700">
+                      <span className="font-medium">Gợi ý: </span>{viewed.calendar.tip}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Goals */}
+            {viewed.goals && (
+              <div className="rounded-xl border border-rose-100 bg-rose-50 p-3.5">
+                <div className="mb-2 flex items-center justify-between gap-1">
+                  <div className="flex items-center gap-1.5">
+                    <Target className="h-3.5 w-3.5 text-rose-600" />
+                    <h4 className="text-sm font-semibold uppercase tracking-wide text-rose-600">Mục tiêu</h4>
+                  </div>
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium leading-tight ${verdictBadge(viewed.goals.verdict)}`}>
+                    {viewed.goals.verdict}
+                  </span>
+                </div>
+                <ul className="mb-2.5 space-y-1.5">
+                  {viewed.goals.points.map((p, i) => (
+                    <li key={i} className="flex items-start gap-1.5 text-sm text-rose-800">
+                      <ChevronRight className="mt-0.5 h-3 w-3 shrink-0 text-rose-400" />{p}
+                    </li>
+                  ))}
+                </ul>
+                {viewed.goals.focus && (
+                  <div className="rounded-lg bg-rose-100/70 px-2.5 py-1.5 text-sm text-rose-700">
+                    <span className="font-medium">Ưu tiên: </span>{viewed.goals.focus}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Domain cards — row 3: notes & habits */}
+          <div className="grid gap-3 sm:grid-cols-1">
             {/* Notes & Habits */}
             {viewed.notes_habits && (
               <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-3.5">
@@ -476,7 +634,7 @@ export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note
                   <BookOpen className="h-3.5 w-3.5 text-emerald-600" />
                   <h4 className="text-sm font-semibold uppercase tracking-wide text-emerald-600">{t('notesAIInsights.notesHabitsCard')}</h4>
                 </div>
-                <ul className="mb-2.5 space-y-1.5">
+                <ul className="mb-2.5 grid gap-1.5 sm:grid-cols-2">
                   {viewed.notes_habits.points.map((p, i) => (
                     <li key={i} className="flex items-start gap-1.5 text-sm text-emerald-800">
                       <ChevronRight className="mt-0.5 h-3 w-3 shrink-0 text-emerald-400" />{p}
