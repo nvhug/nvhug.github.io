@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Plus, Trash2, Dumbbell, ChevronDown, X } from 'lucide-react'
+import { Plus, Trash2, Dumbbell, X, Pencil } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import { getSupabaseBrowserClient } from '@/lib/supabase-browser'
@@ -110,6 +110,9 @@ export function GymTracker() {
   const [showForm,    setShowForm]    = useState(false)
   const [form,        setForm]        = useState<LogForm>(EMPTY_FORM)
   const [saving,      setSaving]      = useState(false)
+  const [editingId,   setEditingId]   = useState<string | null>(null)
+  const [editForm,    setEditForm]    = useState<LogForm>(EMPTY_FORM)
+  const [savingEdit,  setSavingEdit]  = useState(false)
   const [deleteTarget,setDeleteTarget]= useState<GymLog | null>(null)
   const [deleting,    setDeleting]    = useState(false)
 
@@ -131,7 +134,10 @@ export function GymTracker() {
     }
   }
 
-  useEffect(() => { void fetchLogs(date) }, [date])
+  useEffect(() => {
+    void fetchLogs(date)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [date])
 
   function patch(key: keyof LogForm, value: string) {
     setForm(f => ({ ...f, [key]: value }))
@@ -186,6 +192,59 @@ export function GymTracker() {
       toast.error('Có lỗi xảy ra')
     } finally {
       setDeleting(false)
+    }
+  }
+
+  function startEdit(log: GymLog) {
+    setEditingId(log.id)
+    setEditForm({
+      exercise:     log.exercise,
+      muscle_group: log.muscle_group ?? '',
+      sets:         String(log.sets),
+      reps:         log.reps,
+      weight_kg:    log.weight_kg != null ? String(log.weight_kg) : '',
+      note:         log.note ?? '',
+    })
+    setShowForm(false)
+  }
+
+  function cancelEdit() {
+    setEditingId(null)
+    setEditForm(EMPTY_FORM)
+  }
+
+  async function saveEdit(id: string) {
+    const sets = parseInt(editForm.sets)
+    if (!editForm.exercise.trim()) { toast.error('Nhập tên bài tập'); return }
+    if (!sets || sets < 1) { toast.error('Số hiệp phải ≥ 1'); return }
+    if (!editForm.reps.trim()) { toast.error('Nhập số lần'); return }
+
+    setSavingEdit(true)
+    try {
+      const { error } = await supabase.from('gym_logs').update({
+        exercise:     editForm.exercise.trim(),
+        muscle_group: editForm.muscle_group.trim() || null,
+        sets,
+        reps:         editForm.reps.trim(),
+        weight_kg:    editForm.weight_kg ? parseFloat(editForm.weight_kg) : null,
+        note:         editForm.note.trim() || null,
+      }).eq('id', id)
+      if (error) throw error
+      setLogs(prev => prev.map(l => l.id !== id ? l : {
+        ...l,
+        exercise:     editForm.exercise.trim(),
+        muscle_group: editForm.muscle_group.trim() || undefined,
+        sets,
+        reps:         editForm.reps.trim(),
+        weight_kg:    editForm.weight_kg ? parseFloat(editForm.weight_kg) : undefined,
+        note:         editForm.note.trim() || undefined,
+      }))
+      toast.success('Đã cập nhật')
+      cancelEdit()
+    } catch {
+      toast.error('Có lỗi xảy ra')
+    } finally {
+      setSavingEdit(false)
     }
   }
 
@@ -313,40 +372,143 @@ export function GymTracker() {
           {logs.map((log, idx) => (
             <div
               key={log.id}
-              className="group flex items-start gap-3 rounded-xl border border-zinc-100 bg-white px-4 py-3 shadow-[0_1px_4px_0_rgba(0,0,0,0.04)] transition-shadow hover:shadow-[0_3px_10px_0_rgba(0,0,0,0.07)]"
+              className="group rounded-xl border border-zinc-100 bg-white shadow-[0_1px_4px_0_rgba(0,0,0,0.04)] transition-shadow hover:shadow-[0_3px_10px_0_rgba(0,0,0,0.07)]"
             >
-              {/* Index badge */}
-              <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-[11px] font-bold text-emerald-700">
-                {idx + 1}
-              </span>
-
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-zinc-900 leading-tight">{log.exercise}</p>
-                {log.muscle_group && (
-                  <p className="text-[11px] text-zinc-400 mt-0.5">{log.muscle_group}</p>
-                )}
-                <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-xs font-semibold text-emerald-700">
-                    {log.sets} hiệp × {log.reps} lần
-                  </span>
-                  {log.weight_kg && (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 border border-blue-200 px-2 py-0.5 text-xs font-medium text-blue-700">
-                      {log.weight_kg} kg
+              {editingId === log.id ? (
+                /* ── Inline edit form ── */
+                <div className="space-y-3 p-4">
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-[11px] font-bold text-emerald-700">
+                      {idx + 1}
                     </span>
-                  )}
-                  {log.note && (
-                    <span className="text-[11px] italic text-zinc-400">{log.note}</span>
-                  )}
-                </div>
-              </div>
+                    <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide">Chỉnh sửa</p>
+                    <button onClick={cancelEdit} className="ml-auto rounded p-1 text-zinc-400 hover:bg-zinc-100">
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
 
-              <button
-                onClick={() => setDeleteTarget(log)}
-                className="mt-0.5 shrink-0 rounded p-1 text-zinc-300 opacity-0 transition-opacity hover:bg-red-50 hover:text-red-500 group-hover:opacity-100"
-                aria-label="Xoá"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </button>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-zinc-600">Bài tập *</label>
+                    <Input
+                      autoFocus
+                      value={editForm.exercise}
+                      onChange={e => setEditForm(f => ({ ...f, exercise: e.target.value }))}
+                      className="text-sm"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-zinc-600">Cơ chính</label>
+                    <Input
+                      value={editForm.muscle_group}
+                      onChange={e => setEditForm(f => ({ ...f, muscle_group: e.target.value }))}
+                      placeholder="Ngực, vai, tay sau..."
+                      className="text-sm"
+                    />
+                  </div>
+
+                  <div className="flex gap-3">
+                    <div className="flex-1">
+                      <label className="mb-1 block text-xs font-medium text-zinc-600">Số hiệp *</label>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={20}
+                        value={editForm.sets}
+                        onChange={e => setEditForm(f => ({ ...f, sets: e.target.value }))}
+                        className="text-sm"
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <label className="mb-1 block text-xs font-medium text-zinc-600">Số lần *</label>
+                      <Input
+                        value={editForm.reps}
+                        onChange={e => setEditForm(f => ({ ...f, reps: e.target.value }))}
+                        placeholder="12 hoặc 10–12"
+                        className="text-sm"
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <label className="mb-1 block text-xs font-medium text-zinc-600">Tạ (kg)</label>
+                      <Input
+                        type="number"
+                        min={0}
+                        step={0.5}
+                        value={editForm.weight_kg}
+                        onChange={e => setEditForm(f => ({ ...f, weight_kg: e.target.value }))}
+                        placeholder="–"
+                        className="text-sm"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-zinc-600">Ghi chú</label>
+                    <Input
+                      value={editForm.note}
+                      onChange={e => setEditForm(f => ({ ...f, note: e.target.value }))}
+                      placeholder="Cảm nhận, mỗi tay..."
+                      className="text-sm"
+                    />
+                  </div>
+
+                  <div className="flex justify-end gap-2">
+                    <button
+                      onClick={cancelEdit}
+                      className="rounded-lg px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-100"
+                    >
+                      Huỷ
+                    </button>
+                    <Button size="sm" disabled={savingEdit} onClick={() => saveEdit(log.id)} className="h-7 text-xs">
+                      {savingEdit ? 'Đang lưu...' : 'Cập nhật'}
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                /* ── Display row ── */
+                <div className="flex items-start gap-3 px-4 py-3">
+                  <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-[11px] font-bold text-emerald-700">
+                    {idx + 1}
+                  </span>
+
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-zinc-900 leading-tight">{log.exercise}</p>
+                    {log.muscle_group && (
+                      <p className="text-[11px] text-zinc-400 mt-0.5">{log.muscle_group}</p>
+                    )}
+                    <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-xs font-semibold text-emerald-700">
+                        {log.sets} hiệp × {log.reps} lần
+                      </span>
+                      {log.weight_kg && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 border border-blue-200 px-2 py-0.5 text-xs font-medium text-blue-700">
+                          {log.weight_kg} kg
+                        </span>
+                      )}
+                      {log.note && (
+                        <span className="text-[11px] italic text-zinc-400">{log.note}</span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="mt-0.5 flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                    <button
+                      onClick={() => startEdit(log)}
+                      className="rounded p-1 text-zinc-300 hover:bg-emerald-50 hover:text-emerald-600"
+                      aria-label="Chỉnh sửa"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      onClick={() => setDeleteTarget(log)}
+                      className="rounded p-1 text-zinc-300 hover:bg-red-50 hover:text-red-500"
+                      aria-label="Xoá"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           ))}
         </div>
