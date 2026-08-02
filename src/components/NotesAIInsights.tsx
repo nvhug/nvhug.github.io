@@ -667,17 +667,35 @@ export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note
           </div>
 
           {/* Pattern + Recommendation */}
-          <div className="rounded-xl border border-blue-100 bg-blue-50 p-4">
-            <div className="mb-1.5 flex items-center gap-1.5">
-              <Lightbulb className="h-3.5 w-3.5 text-blue-600" />
-              <h4 className="text-sm font-semibold uppercase tracking-wide text-blue-600">{t('notesAIInsights.recommendationCard')}</h4>
+          <div className="rounded-xl border border-blue-100 bg-blue-50 p-4 space-y-3">
+            <div>
+              <div className="mb-1.5 flex items-center gap-1.5">
+                <Lightbulb className="h-3.5 w-3.5 text-blue-600" />
+                <h4 className="text-sm font-semibold uppercase tracking-wide text-blue-600">Tương quan nổi bật</h4>
+              </div>
+              <p className="text-sm text-blue-900 leading-relaxed">{viewed.pattern}</p>
             </div>
-            <p className="text-base font-medium text-blue-900">{viewed.pattern}</p>
-            <p className="mt-2 text-base text-blue-700">{viewed.recommendation}</p>
+            <div className="border-t border-blue-100 pt-3">
+              <p className="mb-2 text-sm font-semibold uppercase tracking-wide text-blue-600">{t('notesAIInsights.recommendationCard')}</p>
+              <ol className="space-y-1.5">
+                {viewed.recommendation
+                  .split(/(?=\d+\.\s)/)
+                  .map(s => s.replace(/^\d+\.\s*/, '').trim())
+                  .filter(Boolean)
+                  .map((item, i) => (
+                    <li key={i} className="flex items-start gap-2 text-sm text-blue-800">
+                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-200 text-[11px] font-bold text-blue-700">
+                        {i + 1}
+                      </span>
+                      {item}
+                    </li>
+                  ))}
+              </ol>
+            </div>
           </div>
 
-          {/* Token + timestamp footer */}
-          {viewed.tokenUsage && (
+          {/* Token + timestamp footer — only shown when token data is available */}
+          {viewed.tokenUsage && viewed.tokenUsage.total > 0 && (
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-zinc-100 bg-zinc-50 px-3 py-2 text-sm text-zinc-500">
               <span className="font-medium text-zinc-700">
                 {t('notesAIInsights.tokensLabel', { n: fmtN(viewed.tokenUsage.total, lang) })}
