@@ -180,9 +180,16 @@ function formatRemainingCooldown(ms: number, t: (key: string, vars?: Record<stri
 }
 
 function verdictBadge(verdict: string) {
-  if (/Đúng|Đủ|On track|Sufficient/i.test(verdict))    return 'bg-emerald-100 text-emerald-700'
-  if (/Chậm|Thiếu|Too slow|deficit/i.test(verdict)) return 'bg-amber-100 text-amber-700'
-  if (/Nhanh|Dư|Too fast|surplus/i.test(verdict))   return 'bg-sky-100 text-sky-700'
+  // positive verdicts → green
+  if (/Đúng|Đủ|Bình thường|Đều đặn|Đang tốt|Lập lịch tốt|Khỏe mạnh|On track|Sufficient|Consistent|Well scheduled|Healthy/i.test(verdict))
+    return 'bg-emerald-100 text-emerald-700'
+  // warning / under-performing → amber
+  if (/Chậm|Thiếu|Chưa đều|Cần chú ý|Cần tập trung|Ít sử dụng|Too slow|deficit|Inconsistent|Lightly used|Needs attention|Needs focus/i.test(verdict))
+    return 'bg-amber-100 text-amber-700'
+  // over-performing or just started → sky/blue
+  if (/Nhanh|Dư|Mới bắt đầu|Too fast|surplus|Getting started/i.test(verdict))
+    return 'bg-sky-100 text-sky-700'
+  // no data / not used → zinc
   return 'bg-zinc-100 text-zinc-500'
 }
 
@@ -359,6 +366,8 @@ export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note
         {/* Note count hint */}
         <span className="text-sm text-zinc-400">
           {t('notesAIInsights.notesCount', { n: totalItems })}
+          {' '}
+          <span className="text-zinc-300 text-xs">(+ cân, gym, lịch…)</span>
         </span>
 
         {/* Analyze button — visible to everyone; users without permission get a donate modal on click */}
@@ -404,14 +413,21 @@ export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note
         </div>
       )}
 
-      {/* Loading skeleton */}
+      {/* Loading skeleton — matches 2 rows of 3 cards + notes row */}
       {(fetching || (loading && !viewed)) && (
         <div className="animate-pulse space-y-3">
           <div className="h-16 rounded-xl bg-violet-50" />
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="h-24 rounded-xl bg-emerald-50" />
-            <div className="h-24 rounded-xl bg-amber-50" />
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="h-28 rounded-xl bg-indigo-50" />
+            <div className="h-28 rounded-xl bg-amber-50" />
+            <div className="h-28 rounded-xl bg-teal-50" />
           </div>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="h-28 rounded-xl bg-orange-50" />
+            <div className="h-28 rounded-xl bg-violet-50" />
+            <div className="h-28 rounded-xl bg-rose-50" />
+          </div>
+          <div className="h-20 rounded-xl bg-emerald-50" />
           <div className="h-14 rounded-xl bg-blue-50" />
         </div>
       )}

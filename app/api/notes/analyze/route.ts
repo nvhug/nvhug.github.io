@@ -547,13 +547,11 @@ export async function POST(request: Request) {
 
     supabaseAuth.from('bowel_logs')
       .select('date, stool_type')
-      .eq('user_id', user!.id)
       .gte('date', period.from).lte('date', period.to)
       .order('date', { ascending: true }),
 
     supabaseAuth.from('goals')
-      .select('title, type, status, completion_percentage')
-      .eq('user_id', user!.id),
+      .select('title, type, status, completion_percentage'),
   ])
 
   const notesSummary    = buildNotesSummary(notes, habits ?? [])
