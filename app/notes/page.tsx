@@ -1220,14 +1220,14 @@ export default function NotesPage() {
           </button>
           <button
             onClick={() => handleTabChange('tracker')}
-            className={`shrink-0 flex w-20 flex-col items-center justify-center gap-1.5 py-4 text-sm font-medium transition-colors sm:w-auto sm:flex-1 sm:gap-1 sm:px-3 sm:py-3 ${
+            className={`shrink-0 flex w-20 flex-col items-center justify-center gap-1.5 py-4 text-base font-medium transition-colors sm:w-auto sm:flex-1 sm:gap-1 sm:px-3 sm:py-3 ${
               currentTab === 'tracker'
                 ? 'border-b-2 border-emerald-600 text-emerald-600'
                 : 'text-zinc-600 hover:text-zinc-900'
             }`}
           >
             <span className="text-base leading-none">📊</span>
-            <span className="whitespace-nowrap text-center leading-tight">{t('notes.tabs.tracker')}</span>
+            <span className="whitespace-nowrap text-center text-sm leading-tight">{t('notes.tabs.tracker')}</span>
           </button>
           <button
             onClick={() => handleTabChange('calendar')}
@@ -2787,7 +2787,7 @@ export default function NotesPage() {
           <section className="overflow-hidden rounded-2xl border border-orange-200 bg-[linear-gradient(130deg,#fff7ed_0%,#ffffff_100%)] shadow-[0_4px_20px_-8px_rgba(234,88,12,0.2)]">
             <div className="flex items-center gap-2 border-b border-orange-100 px-4 py-3">
               <span className="text-xl">🏋️</span>
-              <span className="text-xs font-semibold uppercase tracking-[0.2em] text-orange-600">{t('notes.tracker.gymHeading')}</span>
+              <span className="text-sm font-semibold uppercase tracking-[0.2em] text-orange-600">{t('notes.tracker.gymHeading')}</span>
             </div>
             <div className="p-4">
               <GymTracker />
@@ -2797,7 +2797,7 @@ export default function NotesPage() {
           <section className="overflow-hidden rounded-2xl border border-emerald-200 bg-[linear-gradient(130deg,#f0fdf4_0%,#ffffff_100%)] shadow-[0_4px_20px_-8px_rgba(16,185,129,0.25)]">
             <div className="flex items-center gap-2 border-b border-emerald-100 px-4 py-3">
               <span className="text-xl">⚖️</span>
-              <span className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-600">{t('notes.weight.heading')}</span>
+              <span className="text-sm font-semibold uppercase tracking-[0.2em] text-emerald-600">{t('notes.weight.heading')}</span>
             </div>
             <div className="p-4">
               <WeightTracker />
@@ -2807,7 +2807,7 @@ export default function NotesPage() {
           <section className="overflow-hidden rounded-2xl border border-teal-200 bg-[linear-gradient(130deg,#f0fdfa_0%,#ffffff_100%)] shadow-[0_4px_20px_-8px_rgba(20,184,166,0.2)]">
             <div className="flex items-center gap-2 border-b border-teal-100 px-4 py-3">
               <span className="text-xl">🚽</span>
-              <span className="text-xs font-semibold uppercase tracking-[0.2em] text-teal-600">{t('notes.bowel.heading')}</span>
+              <span className="text-sm font-semibold uppercase tracking-[0.2em] text-teal-600">{t('notes.bowel.heading')}</span>
             </div>
             <div className="p-4">
               <BowelTracker />
