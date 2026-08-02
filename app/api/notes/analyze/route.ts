@@ -439,12 +439,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'DEEPSEEK_API_KEY not configured' }, { status: 500 })
   }
 
-  const { notes, habits, period, lang } = (await request.json()) as {
-    notes:   Note[]
-    habits:  Note[]
-    period:  Period
-    lang?:   Lang
+  let body: { notes: Note[]; habits: Note[]; period: Period; lang?: Lang }
+  try {
+    body = await request.json()
+  } catch {
+    return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
   }
+  const { notes, habits, period, lang } = body
   const activeLang: Lang = lang === 'en' ? 'en' : 'vi'
 
   // AI analysis is a paid feature — gate it server-side too, since the
@@ -453,9 +454,13 @@ export async function POST(request: Request) {
   // /admin/settings/pages, not a hardcoded role list, so it stays configurable.
   const supabaseAuth = await createSupabaseServerClient()
   const { data: { user } } = await supabaseAuth.auth.getUser()
-  const { data: profile } = user
-    ? await supabaseAuth.from('user_profiles').select('role').eq('id', user.id).single()
-    : { data: null }
+
+  // Reject unauthenticated requests before any DB work
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const { data: profile } = await supabaseAuth.from('user_profiles').select('role').eq('id', user.id).single()
   const role = profile?.role ?? 'user'
   const { data: permission } = await supabaseAuth
     .from('page_permissions')
