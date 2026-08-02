@@ -626,12 +626,18 @@ export const vi = {
     },
     tracker: {
       gymHeading: 'Nhật ký tập gym',
+      expand: 'Mở rộng nhật ký tập gym',
+      collapse: 'Thu gọn nhật ký tập gym',
     },
     weight: {
       heading: 'Theo dõi cân nặng',
+      expand: 'Mở rộng theo dõi cân nặng',
+      collapse: 'Thu gọn theo dõi cân nặng',
     },
     bowel: {
       heading: 'Theo dõi tiêu hóa',
+      expand: 'Mở rộng theo dõi tiêu hóa',
+      collapse: 'Thu gọn theo dõi tiêu hóa',
     },
     stats: {
       notesHeading: 'Thống kê Notes',
