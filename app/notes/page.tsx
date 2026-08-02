@@ -6,6 +6,7 @@ import {
   Check,
   CheckCircle2,
   Circle,
+  CalendarDays,
   ListTodo,
   NotebookPen,
   Pencil,
@@ -28,7 +29,8 @@ import { getTagColor } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 import { getSupabaseBrowserClient } from '@/lib/supabase-browser'
 import { useCalorieGoal } from '@/lib/useCalorieGoal'
-import { Note, Todo, Goal, GoalItem, Post, BuyPick } from '@/types'
+import { Note, Todo, Goal, GoalItem, Post, BuyPick, CalendarEvent } from '@/types'
+import { CalendarView } from '@/components/CalendarView'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ConfirmModal } from '@/components/ui/confirm-modal'
@@ -39,6 +41,7 @@ import { NotesAnalytics } from '@/components/NotesAnalytics'
 import { NotesAIInsights } from '@/components/NotesAIInsights'
 import { MealScheduleTracker } from '@/components/MealScheduleTracker'
 import { WeightTracker } from '@/components/WeightTracker'
+import { GymTracker } from '@/components/GymTracker'
 import { BowelTracker } from '@/components/BowelTracker'
 import { DatePicker } from '@/components/ui/date-picker'
 import { useLanguage } from '@/lib/i18n/language-context'
@@ -46,9 +49,9 @@ import { getIntlLocale } from '@/lib/i18n/locale'
 import type { Lang } from '@/lib/i18n/language-context'
 
 type TypeFilter = 'all' | 'good' | 'bad'
-type TabType = 'notes' | 'todos' | 'goals' | 'calo' | 'meals' | 'health' | 'stats' | 'weight'
+type TabType = 'notes' | 'todos' | 'goals' | 'calo' | 'meals' | 'health' | 'stats' | 'tracker' | 'calendar'
 
-const VALID_TABS: TabType[] = ['notes', 'todos', 'goals', 'calo', 'meals', 'health', 'stats', 'weight']
+const VALID_TABS: TabType[] = ['notes', 'todos', 'goals', 'calo', 'meals', 'health', 'stats', 'tracker', 'calendar']
 const TAB_CHANGE_EVENT = 'tab-hash-change'
 
 function subscribeToTabHash(callback: () => void) {
@@ -177,6 +180,7 @@ export default function NotesPage() {
   const [savingBuyPick, setSavingBuyPick] = useState(false)
 
   const [healthPosts, setHealthPosts] = useState<Post[]>([])
+  const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([])
 
   const [goals, setGoals] = useState<Goal[]>([])
   const [goalDraft, setGoalDraft] = useState<GoalDraft | null>(null)
@@ -334,6 +338,20 @@ export default function NotesPage() {
       setHealthPosts(filtered)
     } catch (error) {
       console.error('Error fetching health posts:', error)
+    }
+  }
+
+  async function fetchCalendarEvents() {
+    try {
+      const { data, error } = await supabase
+        .from('calendar_events')
+        .select('*')
+        .order('date', { ascending: true })
+        .order('start_time', { ascending: true })
+      if (error) throw error
+      setCalendarEvents((data || []) as CalendarEvent[])
+    } catch (error) {
+      console.error('Error fetching calendar events:', error)
     }
   }
 
@@ -762,6 +780,7 @@ export default function NotesPage() {
       void fetchGoals()
       void fetchBuyPicks()
       void fetchHealthPosts()
+      void fetchCalendarEvents()
       void fetchTodayCalories()
     }, 0)
 
@@ -1200,15 +1219,26 @@ export default function NotesPage() {
             <span className="whitespace-nowrap text-center leading-tight">{t('notes.tabs.meals')}</span>
           </button>
           <button
-            onClick={() => handleTabChange('weight')}
+            onClick={() => handleTabChange('tracker')}
             className={`shrink-0 flex w-20 flex-col items-center justify-center gap-1.5 py-4 text-sm font-medium transition-colors sm:w-auto sm:flex-1 sm:gap-1 sm:px-3 sm:py-3 ${
-              currentTab === 'weight'
+              currentTab === 'tracker'
                 ? 'border-b-2 border-emerald-600 text-emerald-600'
                 : 'text-zinc-600 hover:text-zinc-900'
             }`}
           >
             <span className="text-base leading-none">📊</span>
-            <span className="whitespace-nowrap text-center leading-tight">{t('notes.tabs.weight')}</span>
+            <span className="whitespace-nowrap text-center leading-tight">{t('notes.tabs.tracker')}</span>
+          </button>
+          <button
+            onClick={() => handleTabChange('calendar')}
+            className={`shrink-0 flex w-20 flex-col items-center justify-center gap-1.5 py-4 text-sm font-medium transition-colors sm:w-auto sm:flex-1 sm:gap-1 sm:px-3 sm:py-3 ${
+              currentTab === 'calendar'
+                ? 'border-b-2 border-emerald-600 text-emerald-600'
+                : 'text-zinc-600 hover:text-zinc-900'
+            }`}
+          >
+            <CalendarDays className="h-4 w-4" />
+            <span className="whitespace-nowrap text-center leading-tight">{t('notes.tabs.calendar')}</span>
           </button>
           <button
             onClick={() => handleTabChange('health')}
@@ -2752,8 +2782,18 @@ export default function NotesPage() {
         </section>
         )}
 
-        {currentTab === 'weight' && (
+        {currentTab === 'tracker' && (
         <div className="space-y-6">
+          <section className="overflow-hidden rounded-2xl border border-orange-200 bg-[linear-gradient(130deg,#fff7ed_0%,#ffffff_100%)] shadow-[0_4px_20px_-8px_rgba(234,88,12,0.2)]">
+            <div className="flex items-center gap-2 border-b border-orange-100 px-4 py-3">
+              <span className="text-xl">🏋️</span>
+              <span className="text-xs font-semibold uppercase tracking-[0.2em] text-orange-600">{t('notes.tracker.gymHeading')}</span>
+            </div>
+            <div className="p-4">
+              <GymTracker />
+            </div>
+          </section>
+
           <section className="overflow-hidden rounded-2xl border border-emerald-200 bg-[linear-gradient(130deg,#f0fdf4_0%,#ffffff_100%)] shadow-[0_4px_20px_-8px_rgba(16,185,129,0.25)]">
             <div className="flex items-center gap-2 border-b border-emerald-100 px-4 py-3">
               <span className="text-xl">⚖️</span>
@@ -2802,6 +2842,18 @@ export default function NotesPage() {
             <NotesAIInsights notes={notes} habits={pinnedNotes} />
           </section>
         </div>
+        )}
+
+        {currentTab === 'calendar' && (
+        <section className="overflow-hidden rounded-2xl border border-emerald-200 bg-[linear-gradient(130deg,#f0fdf4_0%,#ffffff_100%)] shadow-[0_4px_20px_-8px_rgba(16,185,129,0.25)] sm:w-[66vw] sm:relative sm:left-1/2 sm:-translate-x-1/2">
+          <div className="flex items-center gap-2 border-b border-emerald-100 px-4 py-3">
+            <CalendarDays className="h-4 w-4 text-emerald-600" />
+            <span className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-600">{t('notes.calendar.heading')}</span>
+          </div>
+          <div className="p-4">
+            <CalendarView events={calendarEvents} onEventsChange={fetchCalendarEvents} />
+          </div>
+        </section>
         )}
       </div>
 

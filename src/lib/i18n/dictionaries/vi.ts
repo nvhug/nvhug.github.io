@@ -436,8 +436,13 @@ export const vi = {
       calo: 'Calo',
       meals: 'Meal Plan',
       weight: 'Theo dõi',
+      tracker: 'Theo dõi',
       health: 'Sức Khỏe',
       stats: 'Thống kê',
+      calendar: 'Lịch',
+    },
+    calendar: {
+      heading: 'Lịch cá nhân',
     },
     typeFilters: {
       all: 'Tất cả',
@@ -586,6 +591,9 @@ export const vi = {
       heading: 'Bài viết sức khỏe',
       newPost: 'Tạo bài',
       empty: 'Chưa có bài viết nào.',
+    },
+    tracker: {
+      gymHeading: 'Nhật ký tập gym',
     },
     weight: {
       heading: 'Theo dõi cân nặng',

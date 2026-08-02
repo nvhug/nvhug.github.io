@@ -438,8 +438,13 @@ export const en: Dictionary = {
       calo: 'Calories',
       meals: 'Meal Plan',
       weight: 'Tracker',
+      tracker: 'Tracker',
       health: 'Health',
       stats: 'Stats',
+      calendar: 'Calendar',
+    },
+    calendar: {
+      heading: 'Personal Calendar',
     },
     typeFilters: {
       all: 'All',
@@ -588,6 +593,9 @@ export const en: Dictionary = {
       heading: 'Health articles',
       newPost: 'New post',
       empty: 'No articles yet.',
+    },
+    tracker: {
+      gymHeading: 'Gym Workout Log',
     },
     weight: {
       heading: 'Weight tracking',

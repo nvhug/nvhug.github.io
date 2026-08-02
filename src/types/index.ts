@@ -99,6 +99,21 @@ export interface Quote {
   created_at: string
 }
 
+export interface CalendarEvent {
+  id: string
+  user_id: string
+  title: string
+  description?: string
+  date: string         // YYYY-MM-DD
+  start_time: string   // HH:MM
+  end_time: string     // HH:MM
+  color: string        // preset color id
+  recurrence_id?: string
+  is_recurring: boolean
+  created_at: string
+  updated_at: string
+}
+
 export interface Goal {
   id: string
   title: string
@@ -123,6 +138,20 @@ export interface GoalItem {
   order?: number // For drag-drop sorting
   created_at: string
   updated_at?: string
+}
+
+export interface GymLog {
+  id: string
+  user_id: string
+  log_date: string
+  exercise: string
+  muscle_group?: string
+  sets: number
+  reps: string
+  weight_kg?: number
+  note?: string
+  order_index: number
+  created_at: string
 }
 
 export interface FoodTemplate {
