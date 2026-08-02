@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Plus, Trash2, Dumbbell, X, Pencil } from 'lucide-react'
+import { Plus, Trash2, Dumbbell, X, Pencil, ChevronUp } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import { getSupabaseBrowserClient } from '@/lib/supabase-browser'
@@ -49,7 +49,7 @@ type LogForm = {
 }
 
 const EMPTY_FORM: LogForm = {
-  exercise: '', muscle_group: '', sets: '3', reps: '12', weight_kg: '', note: '',
+  exercise: '', muscle_group: '', sets: '3', reps: '12', weight_kg: '10', note: '',
 }
 
 // ─── ExerciseSuggest ──────────────────────────────────────────────────────────
@@ -113,6 +113,7 @@ export function GymTracker() {
   const [editingId,   setEditingId]   = useState<string | null>(null)
   const [editForm,    setEditForm]    = useState<LogForm>(EMPTY_FORM)
   const [savingEdit,  setSavingEdit]  = useState(false)
+  const [savingQuick, setSavingQuick] = useState<string | null>(null)
   const [deleteTarget,setDeleteTarget]= useState<GymLog | null>(null)
   const [deleting,    setDeleting]    = useState(false)
 
@@ -245,6 +246,30 @@ export function GymTracker() {
       toast.error('Có lỗi xảy ra')
     } finally {
       setSavingEdit(false)
+    }
+  }
+
+  async function adjustSetsQuick(id: string, delta: 1 | -1) {
+    const currentLog = logs.find(l => l.id === id)
+    if (!currentLog) return
+
+    const nextSets = Math.max(1, Math.min(20, currentLog.sets + delta))
+    if (nextSets === currentLog.sets) return
+
+    setSavingQuick(id)
+    setLogs(prev => prev.map(l => l.id === id ? { ...l, sets: nextSets } : l))
+
+    try {
+      const { error } = await supabase
+        .from('gym_logs')
+        .update({ sets: nextSets })
+        .eq('id', id)
+      if (error) throw error
+    } catch {
+      setLogs(prev => prev.map(l => l.id === id ? { ...l, sets: currentLog.sets } : l))
+      toast.error('Không thể cập nhật số hiệp')
+    } finally {
+      setSavingQuick(prev => prev === id ? null : prev)
     }
   }
 
@@ -480,6 +505,15 @@ export function GymTracker() {
                       <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-xs font-semibold text-emerald-700">
                         {log.sets} hiệp × {log.reps} lần
                       </span>
+                      <button
+                        type="button"
+                        onClick={() => void adjustSetsQuick(log.id, 1)}
+                        disabled={savingQuick === log.id}
+                        className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 p-1.5 sm:p-1 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 disabled:opacity-50"
+                        aria-label="Tăng số hiệp"
+                      >
+                        <ChevronUp className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
+                      </button>
                       {log.weight_kg && (
                         <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 border border-blue-200 px-2 py-0.5 text-xs font-medium text-blue-700">
                           {log.weight_kg} kg
