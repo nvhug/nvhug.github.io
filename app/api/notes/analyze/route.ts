@@ -591,7 +591,7 @@ ${goalsSummary ? JSON.stringify(goalsSummary, null, 2) : 'No goals data.'}
 FIELD GUIDE:
 [NOTES] total_notes, good_pct/bad_pct, completion_rate_pct, avg_priority(1–5), weekly_breakdown, habits, recent_content_samples.
 [WEIGHT] gain_per_week_kg (target 0.25–0.5), progress_pct (% to 75 kg), weekly_trend, logs_per_week.
-[NUTRITION] deficit_kcal(>0=under), days_under_90pct, meal_completion_by_type, weekly_calorie_trend, dow_avg_calories.
+[NUTRITION] total_calorie_deficit_kcal(>0=under), days_under_90pct, meal_completion_by_type, weekly_calorie_trend, dow_avg_calories.
 [GYM] workout_days_per_week (ideal ≥3), consistency_pct (% weeks with ≥3 days), top_exercises, top_muscle_groups, avg_sets_per_session.
 [CALENDAR] events_per_week_avg, busiest_day_of_week, time_distribution(morning/afternoon/evening/night), recurring_events.
 [DIGESTIVE] normal_pct(target ≥80%), avg_per_day(ideal 1–2), abnormal_types.
@@ -668,7 +668,7 @@ ${goalsSummary ? JSON.stringify(goalsSummary, null, 2) : 'Chưa có mục tiêu 
 HƯỚNG DẪN TRƯỜNG DỮ LIỆU:
 [GHI CHÚ] total_notes, good_pct/bad_pct, completion_rate_pct, avg_priority(1–5), weekly_breakdown, habits, recent_content_samples.
 [CÂN NẶNG] gain_per_week_kg (mục tiêu 0.25–0.5), progress_pct (% đến 75 kg), weekly_trend, logs_per_week.
-[DINH DƯỠNG] deficit_kcal(>0=thiếu), days_under_90pct, meal_completion_by_type, weekly_calorie_trend, dow_avg_calories.
+[DINH DƯỠNG] total_calorie_deficit_kcal(>0=thiếu), days_under_90pct, meal_completion_by_type, weekly_calorie_trend, dow_avg_calories.
 [GYM] workout_days_per_week (lý tưởng ≥3), consistency_pct (% tuần có ≥3 ngày tập), top_exercises, top_muscle_groups, avg_sets_per_session.
 [LỊCH] events_per_week_avg, busiest_day_of_week, time_distribution(morning/afternoon/evening/night), recurring_events.
 [TIÊU HÓA] normal_pct(mục tiêu ≥80%), avg_per_day(lý tưởng 1–2 lần/ngày), abnormal_types.
@@ -743,7 +743,12 @@ Trả về JSON hợp lệ với đúng cấu trúc sau (không thêm/bỏ field
     return NextResponse.json({ error: 'Empty response from DeepSeek' }, { status: 502 })
   }
 
-  const insights         = JSON.parse(content)
+  let insights: Record<string, unknown>
+  try {
+    insights = JSON.parse(content)
+  } catch {
+    return NextResponse.json({ error: 'DeepSeek returned invalid JSON', raw: content.slice(0, 200) }, { status: 502 })
+  }
   const promptTokens     = data.usage?.prompt_tokens     ?? 0
   const completionTokens = data.usage?.completion_tokens ?? 0
   const totalTokens      = data.usage?.total_tokens      ?? 0
