@@ -491,20 +491,20 @@ export function GymTracker() {
                     </div>
                   </div>
 
-                  <div className="mt-0.5 flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                  <div className="mt-0.5 flex shrink-0 items-center gap-0.5">
                     <button
                       onClick={() => startEdit(log)}
-                      className="rounded p-1 text-zinc-300 hover:bg-emerald-50 hover:text-emerald-600"
+                      className="rounded p-1.5 sm:p-1 text-zinc-400 hover:bg-emerald-50 hover:text-emerald-600"
                       aria-label="Chỉnh sửa"
                     >
-                      <Pencil className="h-3.5 w-3.5" />
+                      <Pencil className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
                     </button>
                     <button
                       onClick={() => setDeleteTarget(log)}
-                      className="rounded p-1 text-zinc-300 hover:bg-red-50 hover:text-red-500"
+                      className="rounded p-1.5 sm:p-1 text-zinc-400 hover:bg-red-50 hover:text-red-500"
                       aria-label="Xoá"
                     >
-                      <Trash2 className="h-3.5 w-3.5" />
+                      <Trash2 className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
                     </button>
                   </div>
                 </div>
