@@ -160,7 +160,7 @@ export function BuyPicksSection({
                 key={pick.id}
                 onClick={() => setActiveMobileActionsId((prev) => prev === pick.id ? null : pick.id)}
                 className={`group rounded-xl border p-3 shadow-sm transition-all ${
-                  pick.is_purchased
+                  pick.purchase_count > 0
                     ? 'border-green-300 bg-green-50 hover:border-green-400 hover:shadow-md'
                     : 'border-zinc-200 bg-white hover:border-zinc-300 hover:shadow-md'
                 }`}
@@ -169,6 +169,11 @@ export function BuyPicksSection({
                   <div className="flex min-w-0 items-center gap-1.5">
                     <span className="shrink-0 text-base leading-none">{pick.emoji}</span>
                     <span className="truncate text-xs font-bold text-zinc-800">{pick.category}</span>
+                    {pick.purchase_count > 0 && (
+                      <span className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity inline-flex items-center justify-center rounded-full bg-green-100 px-1.5 py-0.5 text-[10px] font-semibold text-green-700">
+                        {pick.purchase_count}
+                      </span>
+                    )}
                   </div>
                   <div className={`flex shrink-0 items-center gap-0.5 transition-opacity ${activeMobileActionsId === pick.id ? 'opacity-100' : 'pointer-events-none opacity-0'} sm:pointer-events-auto sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100`}>
                     <button
@@ -177,7 +182,7 @@ export function BuyPicksSection({
                         void toggleBuyPickPurchased(pick)
                       }}
                       className={`rounded p-1.5 transition-colors ${
-                        pick.is_purchased
+                        pick.purchase_count > 0
                           ? 'text-green-600 hover:bg-green-100'
                           : 'text-zinc-400 hover:bg-zinc-100 hover:text-green-600'
                       }`}

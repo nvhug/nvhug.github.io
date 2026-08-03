@@ -106,11 +106,11 @@ export function useBuyPicksActions(params: UseBuyPicksActionsParams) {
   }, [buyPickForm, buyPicks.length, cancelBuyPickForm, editingBuyPickId, setBuyPicks, setSavingBuyPick, t])
 
   const toggleBuyPickPurchased = useCallback(async (pick: BuyPick) => {
-    const next = !pick.is_purchased
-    setBuyPicks((prev) => prev.map((p) => p.id === pick.id ? { ...p, is_purchased: next } : p))
-    const { error } = await supabase.from('buy_picks').update({ is_purchased: next }).eq('id', pick.id)
+    const next = pick.purchase_count + 1
+    setBuyPicks((prev) => prev.map((p) => p.id === pick.id ? { ...p, purchase_count: next } : p))
+    const { error } = await supabase.from('buy_picks').update({ purchase_count: next }).eq('id', pick.id)
     if (error) {
-      setBuyPicks((prev) => prev.map((p) => p.id === pick.id ? { ...p, is_purchased: pick.is_purchased } : p))
+      setBuyPicks((prev) => prev.map((p) => p.id === pick.id ? { ...p, purchase_count: pick.purchase_count } : p))
       toast.error(t('notes.buyPicks.updateError'))
     }
   }, [setBuyPicks, t])
