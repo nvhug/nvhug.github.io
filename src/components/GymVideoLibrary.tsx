@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { ExternalLink, PlayCircle, Trash2 } from 'lucide-react'
+import { ChevronDown, ChevronUp, ExternalLink, PlayCircle, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { supabase } from '@/lib/supabase'
@@ -132,6 +132,9 @@ export function GymVideoLibrary() {
   const [urlDraft, setUrlDraft] = useState('')
   const [noteDraft, setNoteDraft] = useState('')
   const [backupFile, setBackupFile] = useState<File | null>(null)
+  const [isSavePanelExpanded, setIsSavePanelExpanded] = useState(true)
+  const [preferencesUserId, setPreferencesUserId] = useState<string | null>(null)
+  const [preferencesReady, setPreferencesReady] = useState(false)
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(true)
   const [deleteTarget, setDeleteTarget] = useState<GymVideo | null>(null)
@@ -155,9 +158,49 @@ export function GymVideoLibrary() {
   }
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void fetchVideos()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const {
+          data: { user },
+        } = await getSupabaseBrowserClient().auth.getUser()
+        setPreferencesUserId(user?.id ?? null)
+      } finally {
+        setPreferencesReady(true)
+      }
+    })()
+  }, [])
+
+  useEffect(() => {
+    if (!preferencesReady) return
+    try {
+      const scope = preferencesUserId ? `user:${preferencesUserId}` : 'user:anonymous'
+      const key = `notes:${scope}:tracker:videos:save-panel:expanded`
+      const stored = window.localStorage.getItem(key)
+      if (stored !== null) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setIsSavePanelExpanded(stored === 'true')
+      }
+    } catch {
+      // Ignore storage read errors.
+    }
+  }, [preferencesReady, preferencesUserId])
+
+  useEffect(() => {
+    if (!preferencesReady) return
+    try {
+      const scope = preferencesUserId ? `user:${preferencesUserId}` : 'user:anonymous'
+      const key = `notes:${scope}:tracker:videos:save-panel:expanded`
+      window.localStorage.setItem(key, String(isSavePanelExpanded))
+    } catch {
+      // Ignore storage write errors.
+    }
+  }, [isSavePanelExpanded, preferencesReady, preferencesUserId])
 
   async function addVideo() {
     const parsed = parseVideoUrl(urlDraft)
@@ -167,6 +210,7 @@ export function GymVideoLibrary() {
     }
 
     setSaving(true)
+    let uploadedBackupPath: string | null = null
     try {
       const {
         data: { user },
@@ -195,6 +239,7 @@ export function GymVideoLibrary() {
         }
 
         backupStoragePath = path
+        uploadedBackupPath = path
         const { data: publicUrlData } = supabase.storage(GYM_VIDEOS_BUCKET).getPublicUrl(path)
         backupPublicUrl = publicUrlData.publicUrl
       }
@@ -221,8 +266,16 @@ export function GymVideoLibrary() {
       setUrlDraft('')
       setNoteDraft('')
       setBackupFile(null)
+      uploadedBackupPath = null
       toast.success(t('notes.trackerVideos.addSuccess'))
     } catch {
+      if (uploadedBackupPath) {
+        try {
+          await supabase.storage(GYM_VIDEOS_BUCKET).remove([uploadedBackupPath])
+        } catch {
+          // Best-effort cleanup: avoid masking original insert failure.
+        }
+      }
       toast.error(t('notes.trackerVideos.addError'))
     } finally {
       setSaving(false)
@@ -234,6 +287,13 @@ export function GymVideoLibrary() {
 
     setDeleting(true)
     try {
+      if (deleteTarget.backup_storage_path) {
+        const { error: storageError } = await supabase
+          .storage(GYM_VIDEOS_BUCKET)
+          .remove([deleteTarget.backup_storage_path])
+        if (storageError) throw storageError
+      }
+
       const { error } = await supabase.from('gym_videos').delete().eq('id', deleteTarget.id)
       if (error) throw error
 
@@ -264,43 +324,59 @@ export function GymVideoLibrary() {
   return (
     <div className="space-y-4">
       <section className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-[0_16px_36px_-30px_rgba(15,23,42,0.38)] sm:p-5">
-        <div className="grid gap-2">
+        <div className="flex items-center justify-between gap-2">
           <label className="text-xs font-semibold uppercase tracking-[0.14em] text-zinc-600">{t('notes.trackerVideos.formLabel')}</label>
-          <Input
-            value={urlDraft}
-            onChange={(e) => setUrlDraft(e.target.value)}
-            placeholder={t('notes.trackerVideos.urlPlaceholder')}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault()
-                void addVideo()
-              }
-            }}
-          />
-          <Input
-            value={noteDraft}
-            onChange={(e) => setNoteDraft(e.target.value)}
-            placeholder={t('notes.trackerVideos.notePlaceholder')}
-          />
-          <label className="mt-1 text-xs font-medium text-zinc-600">{t('notes.trackerVideos.backupLabel')}</label>
-          <Input
-            type="file"
-            accept="video/*"
-            onChange={(e) => setBackupFile(e.target.files?.[0] ?? null)}
-          />
-          <p className="text-xs text-zinc-500">{t('notes.trackerVideos.backupHint')}</p>
-          {backupFile && (
-            <p className="text-xs font-medium text-emerald-700">{t('notes.trackerVideos.backupReady', { name: backupFile.name })}</p>
-          )}
+          <button
+            type="button"
+            onClick={() => setIsSavePanelExpanded((prev) => !prev)}
+            aria-label={isSavePanelExpanded ? t('notes.trackerVideos.collapseForm') : t('notes.trackerVideos.expandForm')}
+            title={isSavePanelExpanded ? t('notes.trackerVideos.collapseForm') : t('notes.trackerVideos.expandForm')}
+            className="inline-flex h-7 w-7 items-center justify-center rounded-md text-zinc-600 transition-colors hover:bg-zinc-100"
+          >
+            {isSavePanelExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+          </button>
         </div>
 
-        <div className="mt-3 flex items-center justify-between gap-2">
-          <p className="text-xs text-zinc-500">{t('notes.trackerVideos.supportHint')} {t('notes.trackerVideos.shortLayoutHint')}</p>
-          <Button size="sm" onClick={() => void addVideo()} disabled={saving || !urlDraft.trim()} className="gap-1.5">
-            <PlayCircle className="h-4 w-4" />
-            {saving ? t('common.saving') : t('notes.trackerVideos.addButton')}
-          </Button>
-        </div>
+        {isSavePanelExpanded && (
+        <>
+          <div className="mt-2 grid gap-2">
+            <Input
+              value={urlDraft}
+              onChange={(e) => setUrlDraft(e.target.value)}
+              placeholder={t('notes.trackerVideos.urlPlaceholder')}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  void addVideo()
+                }
+              }}
+            />
+            <Input
+              value={noteDraft}
+              onChange={(e) => setNoteDraft(e.target.value)}
+              placeholder={t('notes.trackerVideos.notePlaceholder')}
+            />
+            <label className="mt-1 text-xs font-medium text-zinc-600">{t('notes.trackerVideos.backupLabel')}</label>
+            <Input
+              type="file"
+              accept="video/*"
+              onChange={(e) => setBackupFile(e.target.files?.[0] ?? null)}
+            />
+            <p className="text-xs text-zinc-500">{t('notes.trackerVideos.backupHint')}</p>
+            {backupFile && (
+              <p className="text-xs font-medium text-emerald-700">{t('notes.trackerVideos.backupReady', { name: backupFile.name })}</p>
+            )}
+          </div>
+
+          <div className="mt-3 flex items-center justify-between gap-2">
+            <p className="text-xs text-zinc-500">{t('notes.trackerVideos.supportHint')} {t('notes.trackerVideos.shortLayoutHint')}</p>
+            <Button size="sm" onClick={() => void addVideo()} disabled={saving || !urlDraft.trim()} className="gap-1.5">
+              <PlayCircle className="h-4 w-4" />
+              {saving ? t('common.saving') : t('notes.trackerVideos.addButton')}
+            </Button>
+          </div>
+        </>
+        )}
       </section>
 
       {loading ? (
@@ -311,12 +387,12 @@ export function GymVideoLibrary() {
           <p className="mt-1 text-xs text-zinc-500">{t('notes.trackerVideos.emptySubtext')}</p>
         </section>
       ) : (
-        <div className="overflow-x-auto pb-1">
-          <div className="flex snap-x snap-mandatory gap-3 sm:gap-5">
+        <div className="-mx-4 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
+          <div className="flex snap-x snap-mandatory gap-0 sm:gap-5">
           {cards.map((video) => (
             <article
               key={video.id}
-              className="w-screen min-w-115 max-w-3xl snap-start overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-[0_12px_28px_-24px_rgba(15,23,42,0.4)]"
+              className="min-w-full snap-center overflow-hidden rounded-none border border-zinc-200 bg-white shadow-[0_12px_28px_-24px_rgba(15,23,42,0.4)] sm:w-screen sm:min-w-115 sm:max-w-3xl sm:snap-start sm:rounded-2xl"
             >
               <div className="flex items-start gap-2 border-b border-zinc-100 px-3 py-2.5">
                 <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold ${video.badge.className}`}>
