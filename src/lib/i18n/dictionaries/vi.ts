@@ -634,6 +634,8 @@ export const vi = {
     trackerVideos: {
       heading: 'Thư viện video tập luyện',
       formLabel: 'Dán link video',
+      collapseForm: 'Thu gọn',
+      expandForm: 'Mở rộng',
       urlPlaceholder: 'YouTube / TikTok / Facebook Reel',
       notePlaceholder: 'Ghi chú ngắn cho video này (tuỳ chọn)',
       backupLabel: 'Backup video cá nhân (tuỳ chọn)',

@@ -636,6 +636,8 @@ export const en: Dictionary = {
     trackerVideos: {
       heading: 'Workout Video Library',
       formLabel: 'Paste video link',
+      collapseForm: 'Collapse',
+      expandForm: 'Expand',
       urlPlaceholder: 'YouTube / TikTok / Facebook Reel',
       notePlaceholder: 'Add a short note for this video (optional)',
       backupLabel: 'Optional personal backup file',
