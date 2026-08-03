@@ -3,6 +3,7 @@
 import { useCallback, useState } from 'react'
 
 import { supabase } from '@/lib/supabase'
+import { getSupabaseBrowserClient } from '@/lib/supabase-browser'
 import type { BuyPick, CalendarEvent, Goal, GoalItem, Note, Post, Todo } from '@/types'
 
 export function useNotesData() {
@@ -78,6 +79,30 @@ export function useNotesData() {
 
   const fetchHealthPosts = useCallback(async () => {
     try {
+        const { data: tagData, error: tagError } = await supabase
+          .from('tags')
+          .select('id, name')
+
+        if (tagError) throw tagError
+        const tags = (tagData || []) as { id: string; name: string }[]
+        const healthTagIds = new Set(
+          tags
+            .filter((tag) => {
+              const normalized = tag.name
+                .normalize('NFD')
+                .replace(/\p{Mn}/gu, '')
+                .toLowerCase()
+                .trim()
+              return normalized === 'suc khoe' || normalized === 'suc-khoe' || normalized === 'health'
+            })
+            .map((tag) => tag.id)
+        )
+
+        if (healthTagIds.size === 0) {
+          setHealthPosts([])
+          return
+        }
+
       const { data, error } = await supabase
         .from('posts')
         .select('*, post_tags(tags(id, name))')
@@ -92,7 +117,7 @@ export function useNotesData() {
           .filter((tag): tag is { id: string; name: string } => tag !== null)
           .map((tag) => ({ id: tag.id, name: tag.name })),
       }))
-      const filtered = posts.filter((post) => post.tags?.some((tag) => tag.name === 'Sức Khỏe'))
+      const filtered = posts.filter((post) => post.tags?.some((tag) => healthTagIds.has(tag.id)))
       setHealthPosts(filtered)
     } catch (error) {
       console.error('Error fetching health posts:', error)
@@ -147,6 +172,25 @@ export function useNotesData() {
     }
   }, [])
 
+  const initializeData = useCallback(async () => {
+    setLoading(true)
+    try {
+      // Ensure session cookies are loaded before queries to respect RLS.
+      await getSupabaseBrowserClient().auth.getSession()
+      await Promise.all([
+        fetchNotes(false),
+        fetchTodos(),
+        fetchGoals(),
+        fetchBuyPicks(),
+        fetchHealthPosts(),
+        fetchCalendarEvents(),
+        fetchTodayCalories(),
+      ])
+    } finally {
+      setLoading(false)
+    }
+  }, [fetchBuyPicks, fetchCalendarEvents, fetchGoals, fetchHealthPosts, fetchNotes, fetchTodayCalories, fetchTodos])
+
   return {
     buyPicks,
     calendarEvents,
@@ -161,6 +205,7 @@ export function useNotesData() {
     goalItems,
     goals,
     healthPosts,
+    initializeData,
     loading,
     notes,
     pinnedNotes,

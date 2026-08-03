@@ -154,17 +154,15 @@ export default function NotesPage() {
   const {
     buyPicks,
     calendarEvents,
-    fetchBuyPicks,
     fetchCalendarEvents,
     fetchGoalItems,
     fetchGoals,
-    fetchHealthPosts,
     fetchNotes,
-    fetchTodayCalories,
     fetchTodos,
     goalItems,
     goals,
     healthPosts,
+    initializeData,
     loading,
     notes,
     pinnedNotes,
@@ -466,10 +464,26 @@ export default function NotesPage() {
   }
 
   async function toggleGoalItem(item: GoalItem) {
+    const previousIsCompleted = !!item.is_completed
+    const nextIsCompleted = !previousIsCompleted
+
+    setGoalItems((prev) => ({
+      ...prev,
+      [item.goal_id]: (prev[item.goal_id] || []).map((i) =>
+        i.id === item.id ? { ...i, is_completed: nextIsCompleted } : i
+      ),
+    }))
+
     try {
-      const { error } = await supabase.from('goal_items').update({ is_completed: !item.is_completed }).eq('id', item.id)
+      const { error } = await supabase.from('goal_items').update({ is_completed: nextIsCompleted }).eq('id', item.id)
       if (error) throw error
     } catch {
+      setGoalItems((prev) => ({
+        ...prev,
+        [item.goal_id]: (prev[item.goal_id] || []).map((i) =>
+          i.id === item.id ? { ...i, is_completed: previousIsCompleted } : i
+        ),
+      }))
       toast.error(t('notes.toasts.updateError'))
     }
   }
@@ -485,25 +499,30 @@ export default function NotesPage() {
     // Update local state immediately
     setGoalItems((prev) => ({ ...prev, [goalId]: newItems }))
 
-    // Update order in database
+    // Persist order updates concurrently to reduce total drag/drop latency.
     try {
-      const updates = newItems.map((item, idx) => ({
-        id: item.id,
-        order: idx + 1
-      }))
+      const updates = newItems
+        .map((goalItem, idx) => ({ id: goalItem.id, order: idx + 1 }))
+        .filter((update, idx) => items[idx]?.order !== update.order)
 
-      for (const update of updates) {
-        const { error } = await supabase
-          .from('goal_items')
-          .update({ order: update.order })
-          .eq('id', update.id)
-        if (error) throw error
-      }
+      if (updates.length === 0) return
+
+      const results = await Promise.all(
+        updates.map((update) =>
+          supabase
+            .from('goal_items')
+            .update({ order: update.order })
+            .eq('id', update.id)
+        )
+      )
+
+      const firstError = results.find((result) => result.error)?.error
+      if (firstError) throw firstError
     } catch {
       toast.error(t('notes.goals.reorderError'))
-      // Revert to previous state on error
-      const items = await fetchGoalItems(goalId)
-      setGoalItems((prev) => ({ ...prev, [goalId]: items }))
+      // Revert to server order on error
+      const refreshedItems = await fetchGoalItems(goalId)
+      setGoalItems((prev) => ({ ...prev, [goalId]: refreshedItems }))
     }
   }
 
@@ -512,7 +531,9 @@ export default function NotesPage() {
     setEditingGoalItemDraft({
       content: item.content,
       item_type: item.item_type,
-      metadata: item.metadata || {}
+      metadata: item.metadata || {},
+      result: item.result || '',
+      is_completed: !!item.is_completed,
     })
   }
 
@@ -527,7 +548,6 @@ export default function NotesPage() {
       return
     }
 
-    // Validate metadata JSON
     try {
       if (editingGoalItemDraft.metadata && typeof editingGoalItemDraft.metadata === 'object') {
         JSON.stringify(editingGoalItemDraft.metadata)
@@ -544,18 +564,24 @@ export default function NotesPage() {
         item_type: editingGoalItemDraft.item_type,
         result: editingGoalItemDraft.result || null,
         metadata: editingGoalItemDraft.metadata || {},
-        is_completed: editingGoalItemDraft.is_completed || false
+        is_completed: editingGoalItemDraft.is_completed || false,
       }).eq('id', item.id)
       if (error) throw error
 
-      // Update local state only (no full reload)
       setGoalItems((prev) => ({
         ...prev,
         [item.goal_id]: prev[item.goal_id]?.map((i) =>
           i.id === item.id
-            ? { ...i, content: editingGoalItemDraft.content, item_type: editingGoalItemDraft.item_type, result: editingGoalItemDraft.result, metadata: editingGoalItemDraft.metadata, is_completed: editingGoalItemDraft.is_completed }
+            ? {
+                ...i,
+                content: editingGoalItemDraft.content,
+                item_type: editingGoalItemDraft.item_type,
+                result: editingGoalItemDraft.result,
+                metadata: editingGoalItemDraft.metadata,
+                is_completed: editingGoalItemDraft.is_completed,
+              }
             : i
-        ) || []
+        ) || [],
       }))
 
       setEditingGoalItemId(null)
@@ -578,7 +604,7 @@ export default function NotesPage() {
       start_date: goal.start_date || '',
       target_date: goal.target_date || '',
       status: goal.status,
-      completion_percentage: goal.completion_percentage || 0
+      completion_percentage: goal.completion_percentage || 0,
     })
   }
 
@@ -601,12 +627,11 @@ export default function NotesPage() {
         description: editingGoalDraft.description,
         start_date: editingGoalDraft.start_date,
         target_date: editingGoalDraft.target_date,
-        completion_percentage: editingGoalDraft.completion_percentage
+        completion_percentage: editingGoalDraft.completion_percentage,
       }).eq('id', goal.id)
       if (error) throw error
 
-      // Update local state only (no full reload)
-      setGoals((prev) => prev.map((g) => g.id === goal.id ? { ...g, ...editingGoalDraft } : g))
+      setGoals((prev) => prev.map((g) => (g.id === goal.id ? { ...g, ...editingGoalDraft } : g)))
 
       setEditingGoalId(null)
       setEditingGoalDraft(null)
@@ -619,21 +644,8 @@ export default function NotesPage() {
   }
 
   useEffect(() => {
-    const timer = window.setTimeout(async () => {
-      // Ensure Supabase session is loaded from cookies before any query.
-      // Without this, queries may fire with anon role and bypass RLS isolation.
-      await getSupabaseBrowserClient().auth.getSession()
-      void fetchNotes(false)
-      void fetchTodos()
-      void fetchGoals()
-      void fetchBuyPicks()
-      void fetchHealthPosts()
-      void fetchCalendarEvents()
-      void fetchTodayCalories()
-    }, 0)
-
-    return () => window.clearTimeout(timer)
-  }, [fetchBuyPicks, fetchCalendarEvents, fetchGoals, fetchHealthPosts, fetchNotes, fetchTodayCalories, fetchTodos])
+    void initializeData()
+  }, [initializeData])
 
   useEffect(() => {
     if (expandedGoal && !goalItems[expandedGoal]) {
