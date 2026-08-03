@@ -281,9 +281,9 @@ export default function QuotesPage() {
                   ) : (
                     <>
                       <div className="min-w-0 flex-1">
-                        <p className="whitespace-pre-wrap text-sm text-zinc-800">&ldquo;{quote.content}&rdquo;</p>
+                        <p className="whitespace-pre-wrap text-base leading-relaxed text-zinc-800">&ldquo;{quote.content}&rdquo;</p>
                         {quote.author && (
-                          <p className="mt-1 text-xs text-zinc-600">— {quote.author}</p>
+                          <p className="mt-1 text-sm text-zinc-600">— {quote.author}</p>
                         )}
                       </div>
                       <div className="flex shrink-0 items-center gap-2 sm:gap-1">

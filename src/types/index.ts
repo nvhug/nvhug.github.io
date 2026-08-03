@@ -154,6 +154,19 @@ export interface GymLog {
   created_at: string
 }
 
+export interface GymVideo {
+  id: string
+  user_id: string
+  source_url: string
+  platform: 'youtube' | 'tiktok' | 'facebook'
+  video_id?: string
+  note?: string
+  backup_storage_path?: string
+  backup_public_url?: string
+  created_at: string
+  updated_at?: string
+}
+
 export interface FoodTemplate {
   id: string
   name: string
