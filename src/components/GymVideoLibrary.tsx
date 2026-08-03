@@ -129,6 +129,7 @@ function getFileExtension(file: File) {
 export function GymVideoLibrary() {
   const { t, lang } = useLanguage()
   const [videos, setVideos] = useState<GymVideo[]>([])
+  const [backupPlaybackUrls, setBackupPlaybackUrls] = useState<Record<string, string>>({})
   const [urlDraft, setUrlDraft] = useState('')
   const [noteDraft, setNoteDraft] = useState('')
   const [backupFile, setBackupFile] = useState<File | null>(null)
@@ -202,6 +203,40 @@ export function GymVideoLibrary() {
     }
   }, [isSavePanelExpanded, preferencesReady, preferencesUserId])
 
+  useEffect(() => {
+    const backupPaths = videos
+      .map((video) => video.backup_storage_path)
+      .filter((path): path is string => typeof path === 'string' && path.length > 0)
+
+    if (backupPaths.length === 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setBackupPlaybackUrls({})
+      return
+    }
+
+    let cancelled = false
+    void (async () => {
+      const { data, error } = await supabase.storage(GYM_VIDEOS_BUCKET).createSignedUrls(backupPaths, 60 * 60 * 24 * 7)
+      if (error) {
+        console.error('Failed to create signed URLs for gym video backups:', error)
+        return
+      }
+
+      if (cancelled) return
+
+      const nextMap: Record<string, string> = {}
+      for (const item of data || []) {
+        if (!item.path || !item.signedUrl) continue
+        nextMap[item.path] = item.signedUrl
+      }
+      setBackupPlaybackUrls(nextMap)
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [videos])
+
   async function addVideo() {
     const parsed = parseVideoUrl(urlDraft)
     if (!parsed) {
@@ -240,8 +275,7 @@ export function GymVideoLibrary() {
 
         backupStoragePath = path
         uploadedBackupPath = path
-        const { data: publicUrlData } = supabase.storage(GYM_VIDEOS_BUCKET).getPublicUrl(path)
-        backupPublicUrl = publicUrlData.publicUrl
+        backupPublicUrl = null
       }
 
       const { data, error } = await supabase
@@ -272,8 +306,9 @@ export function GymVideoLibrary() {
       if (uploadedBackupPath) {
         try {
           await supabase.storage(GYM_VIDEOS_BUCKET).remove([uploadedBackupPath])
-        } catch {
+        } catch (cleanupError) {
           // Best-effort cleanup: avoid masking original insert failure.
+          console.error('Failed to cleanup orphaned backup video:', cleanupError)
         }
       }
       toast.error(t('notes.trackerVideos.addError'))
@@ -287,15 +322,16 @@ export function GymVideoLibrary() {
 
     setDeleting(true)
     try {
-      if (deleteTarget.backup_storage_path) {
-        const { error: storageError } = await supabase
-          .storage(GYM_VIDEOS_BUCKET)
-          .remove([deleteTarget.backup_storage_path])
-        if (storageError) throw storageError
-      }
-
+      const backupPath = deleteTarget.backup_storage_path
       const { error } = await supabase.from('gym_videos').delete().eq('id', deleteTarget.id)
       if (error) throw error
+
+      if (backupPath) {
+        const { error: storageError } = await supabase.storage(GYM_VIDEOS_BUCKET).remove([backupPath])
+        if (storageError) {
+          console.error('Failed to delete backup video file after DB deletion:', storageError)
+        }
+      }
 
       setVideos((prev) => prev.filter((video) => video.id !== deleteTarget.id))
       setDeleteTarget(null)
@@ -310,6 +346,9 @@ export function GymVideoLibrary() {
   const cards = useMemo(() => {
     return videos.map((video) => ({
       ...video,
+      backupPlaybackUrl: video.backup_storage_path
+        ? backupPlaybackUrls[video.backup_storage_path] || video.backup_public_url
+        : video.backup_public_url,
       embedUrl: buildEmbedUrl(video),
       isShort: isShortStyle(video),
       badge: getPlatformBadge(video.platform),
@@ -319,7 +358,7 @@ export function GymVideoLibrary() {
         year: 'numeric',
       }),
     }))
-  }, [videos, lang])
+  }, [videos, lang, backupPlaybackUrls])
 
   return (
     <div className="space-y-4">
@@ -422,12 +461,12 @@ export function GymVideoLibrary() {
               </div>
 
               <div className="p-3">
-                {video.backup_public_url ? (
+                {video.backupPlaybackUrl ? (
                   <div className="overflow-hidden rounded-xl border border-emerald-200 bg-zinc-950">
                     <video
                       controls
                       preload="metadata"
-                      src={video.backup_public_url}
+                      src={video.backupPlaybackUrl}
                       className={video.isShort ? 'mx-auto aspect-9/16 w-full max-w-115' : 'aspect-video w-full'}
                     />
                   </div>
@@ -450,7 +489,7 @@ export function GymVideoLibrary() {
                   </div>
                 )}
 
-                {video.backup_public_url && (
+                {video.backupPlaybackUrl && (
                   <p className="mt-2 text-xs text-emerald-700">{t('notes.trackerVideos.sourceUnavailable')}</p>
                 )}
 
