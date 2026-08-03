@@ -239,7 +239,7 @@ export default function NotesPage() {
     todoDraft,
   })
 
-  const { cancelBuyPickForm, confirmDeleteBuyPick, openAddBuyPick, saveBuyPick, startEditBuyPick } = useBuyPicksActions({
+  const { cancelBuyPickForm, confirmDeleteBuyPick, openAddBuyPick, saveBuyPick, startEditBuyPick, toggleBuyPickPurchased } = useBuyPicksActions({
     buyPickForm,
     buyPicks,
     deleteBuyPick,
@@ -696,6 +696,7 @@ export default function NotesPage() {
             setTodoDraft,
             setTodoFilter,
             startEditBuyPick,
+            toggleBuyPickPurchased,
             toggleTodo,
           }}
           refs={{}}

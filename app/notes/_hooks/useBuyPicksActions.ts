@@ -105,6 +105,16 @@ export function useBuyPicksActions(params: UseBuyPicksActionsParams) {
     }
   }, [buyPickForm, buyPicks.length, cancelBuyPickForm, editingBuyPickId, setBuyPicks, setSavingBuyPick, t])
 
+  const toggleBuyPickPurchased = useCallback(async (pick: BuyPick) => {
+    const next = !pick.is_purchased
+    setBuyPicks((prev) => prev.map((p) => p.id === pick.id ? { ...p, is_purchased: next } : p))
+    const { error } = await supabase.from('buy_picks').update({ is_purchased: next }).eq('id', pick.id)
+    if (error) {
+      setBuyPicks((prev) => prev.map((p) => p.id === pick.id ? { ...p, is_purchased: pick.is_purchased } : p))
+      toast.error(t('notes.buyPicks.updateError'))
+    }
+  }, [setBuyPicks, t])
+
   const confirmDeleteBuyPick = useCallback(async () => {
     if (!deleteBuyPick) return
 
@@ -128,6 +138,7 @@ export function useBuyPicksActions(params: UseBuyPicksActionsParams) {
   }, [deleteBuyPick, setBuyPicks, setDeleteBuyPick, setDeletingBuyPick, t])
 
   return {
+    toggleBuyPickPurchased,
     cancelBuyPickForm,
     confirmDeleteBuyPick,
     openAddBuyPick,

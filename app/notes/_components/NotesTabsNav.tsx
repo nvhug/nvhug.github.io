@@ -31,15 +31,6 @@ export function NotesTabsNav({ currentTab, onTabChange, t }: NotesTabsNavProps) 
         <span className="whitespace-nowrap text-center leading-tight">{t('notes.tabs.todos')}</span>
       </button>
       <button
-        onClick={() => onTabChange('goals')}
-        className={`shrink-0 flex w-20 flex-col items-center justify-center gap-1.5 py-4 text-sm font-medium transition-colors sm:w-auto sm:flex-1 sm:gap-1 sm:px-3 sm:py-3 ${
-          currentTab === 'goals' ? 'border-b-2 border-emerald-600 text-emerald-600' : 'text-zinc-600 hover:text-zinc-900'
-        }`}
-      >
-        <Target className="h-4 w-4" />
-        <span className="whitespace-nowrap text-center leading-tight">{t('notes.tabs.goals')}</span>
-      </button>
-      <button
         onClick={() => onTabChange('calo')}
         className={`shrink-0 flex w-20 flex-col items-center justify-center gap-1.5 py-4 text-sm font-medium transition-colors sm:w-auto sm:flex-1 sm:gap-1 sm:px-3 sm:py-3 ${
           currentTab === 'calo' ? 'border-b-2 border-emerald-600 text-emerald-600' : 'text-zinc-600 hover:text-zinc-900'
@@ -56,6 +47,15 @@ export function NotesTabsNav({ currentTab, onTabChange, t }: NotesTabsNavProps) 
       >
         <span className="text-base leading-none">📊</span>
         <span className="whitespace-nowrap text-center text-sm leading-tight">{t('notes.tabs.tracker')}</span>
+      </button>
+      <button
+        onClick={() => onTabChange('goals')}
+        className={`shrink-0 flex w-20 flex-col items-center justify-center gap-1.5 py-4 text-sm font-medium transition-colors sm:w-auto sm:flex-1 sm:gap-1 sm:px-3 sm:py-3 ${
+          currentTab === 'goals' ? 'border-b-2 border-emerald-600 text-emerald-600' : 'text-zinc-600 hover:text-zinc-900'
+        }`}
+      >
+        <Target className="h-4 w-4" />
+        <span className="whitespace-nowrap text-center leading-tight">{t('notes.tabs.goals')}</span>
       </button>
       <button
         onClick={() => onTabChange('calendar')}

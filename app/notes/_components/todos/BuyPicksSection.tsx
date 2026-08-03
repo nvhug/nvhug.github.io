@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import type { Dispatch, SetStateAction } from 'react'
 
-import { Pencil, Plus, Trash2, X } from 'lucide-react'
+import { Check, Pencil, Plus, Trash2, X } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -32,6 +32,7 @@ type BuyPicksSectionProps = {
   setBuyPickForm: Dispatch<SetStateAction<BuyPickFormState>>
   setDeleteBuyPick: (pick: BuyPick) => void
   startEditBuyPick: (pick: BuyPick) => void
+  toggleBuyPickPurchased: (pick: BuyPick) => Promise<void>
   t: Translate
 }
 
@@ -47,6 +48,7 @@ export function BuyPicksSection({
   setBuyPickForm,
   setDeleteBuyPick,
   startEditBuyPick,
+  toggleBuyPickPurchased,
   t,
 }: BuyPicksSectionProps) {
   const [activeMobileActionsId, setActiveMobileActionsId] = useState<string | null>(null)
@@ -157,14 +159,32 @@ export function BuyPicksSection({
               <div
                 key={pick.id}
                 onClick={() => setActiveMobileActionsId((prev) => prev === pick.id ? null : pick.id)}
-                className="group rounded-xl border border-zinc-200 bg-white p-3 shadow-sm transition-all hover:border-zinc-300 hover:shadow-md"
+                className={`group rounded-xl border p-3 shadow-sm transition-all ${
+                  pick.is_purchased
+                    ? 'border-green-300 bg-green-50 hover:border-green-400 hover:shadow-md'
+                    : 'border-zinc-200 bg-white hover:border-zinc-300 hover:shadow-md'
+                }`}
               >
                 <div className="mb-2 flex items-start justify-between gap-1">
                   <div className="flex min-w-0 items-center gap-1.5">
                     <span className="shrink-0 text-base leading-none">{pick.emoji}</span>
                     <span className="truncate text-xs font-bold text-zinc-800">{pick.category}</span>
                   </div>
-                  <div className={`flex shrink-0 transition-opacity ${activeMobileActionsId === pick.id ? 'opacity-100' : 'pointer-events-none opacity-0'} sm:pointer-events-auto sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100`}>
+                  <div className={`flex shrink-0 items-center gap-0.5 transition-opacity ${activeMobileActionsId === pick.id ? 'opacity-100' : 'pointer-events-none opacity-0'} sm:pointer-events-auto sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100`}>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        void toggleBuyPickPurchased(pick)
+                      }}
+                      className={`rounded p-1.5 transition-colors ${
+                        pick.is_purchased
+                          ? 'text-green-600 hover:bg-green-100'
+                          : 'text-zinc-400 hover:bg-zinc-100 hover:text-green-600'
+                      }`}
+                      title="Đánh dấu đã mua"
+                    >
+                      <Check className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
+                    </button>
                     <button
                       onClick={(e) => {
                         e.stopPropagation()
