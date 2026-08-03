@@ -1,19 +1,22 @@
 'use client'
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 
 import { toast } from 'sonner'
 
 import { supabase } from '@/lib/supabase'
-import { getSupabaseBrowserClient } from '@/lib/supabase-browser'
 import { useCalorieGoal } from '@/lib/useCalorieGoal'
 import { Note, Todo, Goal, GoalItem, BuyPick } from '@/types'
 import { ConfirmModal } from '@/components/ui/confirm-modal'
 import { useLanguage } from '@/lib/i18n/language-context'
 import { NotesPageHeader } from './_components/NotesPageHeader'
 import { NotesTabsNav } from './_components/NotesTabsNav'
+import { useBuyPicksActions } from './_hooks/useBuyPicksActions'
+import { useGoalsActions } from './_hooks/useGoalsActions'
 import { useNotesData } from './_hooks/useNotesData'
 import { useNotesPreferences } from './_hooks/useNotesPreferences'
+import { useNotesViewModel } from './_hooks/useNotesViewModel'
+import { useTodosActions } from './_hooks/useTodosActions'
 import { CaloTab } from './_components/tabs/CaloTab'
 import { CalendarTab } from './_components/tabs/CalendarTab'
 import { GoalsTab } from './_components/tabs/GoalsTab'
@@ -22,7 +25,7 @@ import { NotesTab } from './_components/tabs/NotesTab'
 import { StatsTab } from './_components/tabs/StatsTab'
 import { TrackerTab } from './_components/tabs/TrackerTab'
 import { TodosTab } from './_components/tabs/TodosTab'
-import type { GoalDraft, GoalItemDraft, NoteEditDraft, NotesDraft, TabType, TypeFilter, TypeTabCount } from './_components/tabs/types'
+import type { BuyPickFormState, GoalDraft, GoalItemDraft, NoteEditDraft, NotesDraft, TabType, TodoFilter } from './_components/tabs/types'
 
 type Draft = NotesDraft
 type EditDraft = NoteEditDraft
@@ -96,12 +99,11 @@ export default function NotesPage() {
   const [deletingPinnedId, setDeletingPinnedId] = useState<string | null>(null)
   const [notifyEditId, setNotifyEditId] = useState<string | null>(null)
   const [notifyDraftTime, setNotifyDraftTime] = useState('')
-  const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
   const { goal: dailyCalorieGoal } = useCalorieGoal()
 
   const [todoDraft, setTodoDraft] = useState('')
   const [savingTodo, setSavingTodo] = useState(false)
-  const [todoFilter, setTodoFilter] = useState<'all' | 'pending' | 'done'>('all')
+  const [todoFilter, setTodoFilter] = useState<TodoFilter>('all')
   const [deleteTodo, setDeleteTodo] = useState<Todo | null>(null)
   const [deletingTodo, setDeletingTodo] = useState(false)
   const [editingTodoId, setEditingTodoId] = useState<string | null>(null)
@@ -109,7 +111,7 @@ export default function NotesPage() {
 
   const [addingBuyPick, setAddingBuyPick] = useState(false)
   const [editingBuyPickId, setEditingBuyPickId] = useState<string | null>(null)
-  const [buyPickForm, setBuyPickForm] = useState({ category: '', emoji: '🛒', brands: [] as string[], note: '', brandInput: '' })
+  const [buyPickForm, setBuyPickForm] = useState<BuyPickFormState>({ category: '', emoji: '🛒', brands: [], note: '', brandInput: '' })
   const [deleteBuyPick, setDeleteBuyPick] = useState<BuyPick | null>(null)
   const [deletingBuyPick, setDeletingBuyPick] = useState(false)
   const [savingBuyPick, setSavingBuyPick] = useState(false)
@@ -156,7 +158,6 @@ export default function NotesPage() {
     calendarEvents,
     fetchCalendarEvents,
     fetchGoalItems,
-    fetchGoals,
     fetchNotes,
     fetchTodos,
     goalItems,
@@ -175,23 +176,6 @@ export default function NotesPage() {
     todayCalories,
     todos,
   } = useNotesData()
-
-  // Count consecutive days from today (or yesterday) that have at least one note
-  const notesStreak = useMemo(() => {
-    const dates = new Set(notes.map((n) => n.note_date))
-    let streak = 0
-    const cursor = new Date()
-    cursor.setHours(0, 0, 0, 0)
-    const todayStr = cursor.toISOString().slice(0, 10)
-    if (!dates.has(todayStr)) cursor.setDate(cursor.getDate() - 1)
-    while (true) {
-      const d = cursor.toISOString().slice(0, 10)
-      if (!dates.has(d)) break
-      streak++
-      cursor.setDate(cursor.getDate() - 1)
-    }
-    return streak
-  }, [notes])
 
   const [draft, setDraft] = useState<Draft | null>(null)
   const [savingDraft, setSavingDraft] = useState(false)
@@ -228,420 +212,92 @@ export default function NotesPage() {
     el.style.height = `${el.scrollHeight}px`
   }, [editingGoalDraft?.description])
 
+  const {
+    allTags,
+    counts,
+    noteGroups,
+    notesStreak,
+    searchQuery,
+    setSearchQuery,
+    setTypeFilter,
+    typeFilter,
+    typeTabs,
+  } = useNotesViewModel({ notes, t, todos })
 
-  async function addTodo() {
-    const content = todoDraft.trim()
-    if (!content) return
 
-    setSavingTodo(true)
-    try {
-      const { error } = await supabase.from('todos').insert([{
-        content,
-        is_done: false,
-        priority: 3,
-      }])
-      if (error) throw error
-      setTodoDraft('')
-      await fetchTodos()
-      toast.success(t('notes.todos.addSuccess'))
-    } catch {
-      toast.error(t('notes.todos.addError'))
-    } finally {
-      setSavingTodo(false)
-    }
-  }
+  const { addTodo, confirmDeleteTodo, saveEditingTodo, toggleTodo } = useTodosActions({
+    deleteTodo,
+    editingTodoDraft,
+    fetchTodos,
+    setDeleteTodo,
+    setDeletingTodo,
+    setEditingTodoId,
+    setSavingTodo,
+    setTodoDraft,
+    setTodos,
+    t,
+    todoDraft,
+  })
 
-  async function toggleTodo(todo: Todo) {
-    try {
-      const { error } = await supabase
-        .from('todos')
-        .update({ is_done: !todo.is_done })
-        .eq('id', todo.id)
+  const { cancelBuyPickForm, confirmDeleteBuyPick, openAddBuyPick, saveBuyPick, startEditBuyPick } = useBuyPicksActions({
+    buyPickForm,
+    buyPicks,
+    deleteBuyPick,
+    editingBuyPickId,
+    setAddingBuyPick,
+    setBuyPickForm,
+    setBuyPicks,
+    setDeleteBuyPick,
+    setDeletingBuyPick,
+    setEditingBuyPickId,
+    setSavingBuyPick,
+    t,
+  })
 
-      if (error) throw error
-      setTodos((prev) => prev.map((t) => (t.id === todo.id ? { ...t, is_done: !todo.is_done } : t)))
-    } catch {
-      toast.error(t('notes.toasts.updateError'))
-    }
-  }
-
-  async function saveEditingTodo(id: string) {
-    const content = editingTodoDraft.trim()
-    if (!content) return
-    try {
-      const { error } = await supabase.from('todos').update({ content }).eq('id', id)
-      if (error) throw error
-      setTodos((prev) => prev.map((t) => (t.id === id ? { ...t, content } : t)))
-      setEditingTodoId(null)
-    } catch {
-      toast.error(t('notes.toasts.updateError'))
-    }
-  }
-
-  async function confirmDeleteTodo() {
-    if (!deleteTodo) return
-    setDeletingTodo(true)
-    try {
-      const { error } = await supabase.from('todos').delete().eq('id', deleteTodo.id)
-      if (error) throw error
-      setTodos((prev) => prev.filter((t) => t.id !== deleteTodo.id))
-      setDeleteTodo(null)
-      toast.success(t('notes.todos.deleted'))
-    } catch {
-      toast.error(t('notes.toasts.deleteError'))
-    } finally {
-      setDeletingTodo(false)
-    }
-  }
-
-  function startEditBuyPick(pick: BuyPick) {
-    setAddingBuyPick(false)
-    setEditingBuyPickId(pick.id)
-    setBuyPickForm({ category: pick.category, emoji: pick.emoji, brands: [...pick.brands], note: pick.note ?? '', brandInput: '' })
-  }
-
-  function cancelBuyPickForm() {
-    setEditingBuyPickId(null)
-    setAddingBuyPick(false)
-    setBuyPickForm({ category: '', emoji: '🛒', brands: [], note: '', brandInput: '' })
-  }
-
-  function openAddBuyPick() {
-    setEditingBuyPickId(null)
-    setBuyPickForm({ category: '', emoji: '🛒', brands: [], note: '', brandInput: '' })
-    setAddingBuyPick(true)
-  }
-
-  async function saveBuyPick() {
-    const { category, emoji, brands, brandInput, note } = buyPickForm
-    if (!category.trim()) return
-    // Flush any uncommitted text in brandInput (supports comma-separated)
-    const pending = brandInput.split(',').map(b => b.trim()).filter(b => b && !brands.includes(b))
-    const finalBrands = [...brands, ...pending]
-    setSavingBuyPick(true)
-    try {
-      if (editingBuyPickId) {
-        const { error } = await supabase
-          .from('buy_picks')
-          .update({ category: category.trim(), emoji: emoji || '🛒', brands: finalBrands, note: note.trim() || null, updated_at: new Date().toISOString() })
-          .eq('id', editingBuyPickId)
-        if (error) { toast.error(t('notes.buyPicks.updateError')); return }
-        setBuyPicks(prev => prev.map(p => p.id === editingBuyPickId ? { ...p, category: category.trim(), emoji: emoji || '🛒', brands: finalBrands, note: note.trim() || undefined } : p))
-        toast.success(t('notes.buyPicks.updateSuccess'))
-        cancelBuyPickForm()
-      } else {
-        const { data: { user } } = await getSupabaseBrowserClient().auth.getUser()
-        const { data, error } = await supabase
-          .from('buy_picks')
-          .insert([{ user_id: user?.id, category: category.trim(), emoji: emoji || '🛒', brands: finalBrands, note: note.trim() || null, order_index: buyPicks.length }])
-          .select()
-          .single()
-        if (error || !data) { toast.error(t('notes.buyPicks.addError')); return }
-        setBuyPicks(prev => [...prev, data as BuyPick])
-        toast.success(t('notes.buyPicks.addSuccess'))
-        cancelBuyPickForm()
-      }
-    } finally {
-      setSavingBuyPick(false)
-    }
-  }
-
-  async function confirmDeleteBuyPick() {
-    if (!deleteBuyPick) return
-    setDeletingBuyPick(true)
-    const { error } = await supabase.from('buy_picks').delete().eq('id', deleteBuyPick.id)
-    setDeletingBuyPick(false)
-    if (error) { toast.error(t('notes.buyPicks.deleteError')); return }
-    setBuyPicks(prev => prev.filter(p => p.id !== deleteBuyPick.id))
-    toast.success(t('notes.buyPicks.deleteSuccess'))
-    setDeleteBuyPick(null)
-  }
-
-  function openGoalDraft() {
-    setGoalDraft({
-      title: '',
-      type: 'health',
-      description: '',
-      target_date: '',
-      status: 'active',
-      completion_percentage: 0,
-    })
-  }
-
-  function cancelGoalDraft() {
-    setGoalDraft(null)
-  }
-
-  async function addGoal() {
-    if (!goalDraft || !goalDraft.title.trim()) return
-    setSavingGoal(true)
-    try {
-      const { error } = await supabase.from('goals').insert([goalDraft])
-      if (error) throw error
-      setGoalDraft(null)
-      await fetchGoals()
-      toast.success(t('notes.goals.addSuccess'))
-    } catch {
-      toast.error(t('notes.goals.addError'))
-    } finally {
-      setSavingGoal(false)
-    }
-  }
-
-  async function confirmDeleteGoal() {
-    if (!deleteGoal) return
-    setDeletingGoal(true)
-    try {
-      const { error } = await supabase.from('goals').delete().eq('id', deleteGoal.id)
-      if (error) throw error
-      setGoals((prev) => prev.filter((g) => g.id !== deleteGoal.id))
-      setCollapsedGoalIds((prev) => prev.filter((id) => id !== deleteGoal.id))
-      if (expandedGoal === deleteGoal.id) {
-        setExpandedGoal(null)
-      }
-      setDeleteGoal(null)
-      toast.success(t('notes.goals.deleteSuccess'))
-    } catch {
-      toast.error(t('notes.toasts.deleteError'))
-    } finally {
-      setDeletingGoal(false)
-    }
-  }
-
-  async function updateGoalStatus(goal: Goal, newStatus: Goal['status']) {
-    try {
-      const { error } = await supabase.from('goals').update({ status: newStatus }).eq('id', goal.id)
-      if (error) throw error
-      setGoals((prev) => prev.map((g) => (g.id === goal.id ? { ...g, status: newStatus } : g)))
-      toast.success(t('notes.goals.statusUpdateSuccess'))
-    } catch {
-      toast.error(t('notes.goals.statusUpdateError'))
-    }
-  }
-
-  async function addGoalItem(goal: Goal) {
-    const draft = goalItemDraft[goal.id]
-    if (!draft || !draft.content?.trim()) return
-
-    setSavingGoalItem(true)
-    try {
-      const { error } = await supabase.from('goal_items').insert([{
-        goal_id: goal.id,
-        content: draft.content,
-        item_type: draft.item_type,
-        metadata: draft.metadata || {},
-        is_completed: false,
-      }])
-      if (error) throw error
-      const items = await fetchGoalItems(goal.id)
-      setGoalItems((prev) => ({ ...prev, [goal.id]: items }))
-      setGoalItemDraft((prev) => ({ ...prev, [goal.id]: { content: '', item_type: draft.item_type, metadata: {} } }))
-      toast.success(t('notes.goals.itemAddSuccess'))
-    } catch {
-      toast.error(t('notes.goals.itemAddError'))
-    } finally {
-      setSavingGoalItem(false)
-    }
-  }
-
-  async function confirmDeleteGoalItem() {
-    if (!deleteGoalItem) return
-    setDeletingGoalItem(true)
-    try {
-      const { error } = await supabase.from('goal_items').delete().eq('id', deleteGoalItem.id)
-      if (error) throw error
-      setGoalItems((prev) => ({
-        ...prev,
-        [deleteGoalItem.goal_id]: prev[deleteGoalItem.goal_id]?.filter((i) => i.id !== deleteGoalItem.id) || []
-      }))
-      setDeleteGoalItem(null)
-      toast.success(t('notes.toasts.deleteSuccess'))
-    } catch {
-      toast.error(t('notes.toasts.deleteError'))
-    } finally {
-      setDeletingGoalItem(false)
-    }
-  }
-
-  async function toggleGoalItem(item: GoalItem) {
-    const previousIsCompleted = !!item.is_completed
-    const nextIsCompleted = !previousIsCompleted
-
-    setGoalItems((prev) => ({
-      ...prev,
-      [item.goal_id]: (prev[item.goal_id] || []).map((i) =>
-        i.id === item.id ? { ...i, is_completed: nextIsCompleted } : i
-      ),
-    }))
-
-    try {
-      const { error } = await supabase.from('goal_items').update({ is_completed: nextIsCompleted }).eq('id', item.id)
-      if (error) throw error
-    } catch {
-      setGoalItems((prev) => ({
-        ...prev,
-        [item.goal_id]: (prev[item.goal_id] || []).map((i) =>
-          i.id === item.id ? { ...i, is_completed: previousIsCompleted } : i
-        ),
-      }))
-      toast.error(t('notes.toasts.updateError'))
-    }
-  }
-
-  async function reorderGoalItems(goalId: string, fromIndex: number, toIndex: number) {
-    const items = goalItems[goalId]
-    if (!items || fromIndex === toIndex) return
-
-    const newItems = [...items]
-    const [movedItem] = newItems.splice(fromIndex, 1)
-    newItems.splice(toIndex, 0, movedItem)
-
-    // Update local state immediately
-    setGoalItems((prev) => ({ ...prev, [goalId]: newItems }))
-
-    // Persist order updates concurrently to reduce total drag/drop latency.
-    try {
-      const updates = newItems
-        .map((goalItem, idx) => ({ id: goalItem.id, order: idx + 1 }))
-        .filter((update, idx) => items[idx]?.order !== update.order)
-
-      if (updates.length === 0) return
-
-      const results = await Promise.all(
-        updates.map((update) =>
-          supabase
-            .from('goal_items')
-            .update({ order: update.order })
-            .eq('id', update.id)
-        )
-      )
-
-      const firstError = results.find((result) => result.error)?.error
-      if (firstError) throw firstError
-    } catch {
-      toast.error(t('notes.goals.reorderError'))
-      // Revert to server order on error
-      const refreshedItems = await fetchGoalItems(goalId)
-      setGoalItems((prev) => ({ ...prev, [goalId]: refreshedItems }))
-    }
-  }
-
-  function startEditingGoalItem(item: GoalItem) {
-    setEditingGoalItemId(item.id)
-    setEditingGoalItemDraft({
-      content: item.content,
-      item_type: item.item_type,
-      metadata: item.metadata || {},
-      result: item.result || '',
-      is_completed: !!item.is_completed,
-    })
-  }
-
-  function cancelEditingGoalItem() {
-    setEditingGoalItemId(null)
-    setEditingGoalItemDraft(null)
-  }
-
-  async function saveEditingGoalItem(item: GoalItem) {
-    if (!editingGoalItemDraft || !editingGoalItemDraft.content.trim()) {
-      toast.error(t('notes.toasts.contentEmptyError'))
-      return
-    }
-
-    try {
-      if (editingGoalItemDraft.metadata && typeof editingGoalItemDraft.metadata === 'object') {
-        JSON.stringify(editingGoalItemDraft.metadata)
-      }
-    } catch {
-      toast.error(t('notes.goals.itemMetadataInvalid'))
-      return
-    }
-
-    setSavingGoalItem(true)
-    try {
-      const { error } = await supabase.from('goal_items').update({
-        content: editingGoalItemDraft.content,
-        item_type: editingGoalItemDraft.item_type,
-        result: editingGoalItemDraft.result || null,
-        metadata: editingGoalItemDraft.metadata || {},
-        is_completed: editingGoalItemDraft.is_completed || false,
-      }).eq('id', item.id)
-      if (error) throw error
-
-      setGoalItems((prev) => ({
-        ...prev,
-        [item.goal_id]: prev[item.goal_id]?.map((i) =>
-          i.id === item.id
-            ? {
-                ...i,
-                content: editingGoalItemDraft.content,
-                item_type: editingGoalItemDraft.item_type,
-                result: editingGoalItemDraft.result,
-                metadata: editingGoalItemDraft.metadata,
-                is_completed: editingGoalItemDraft.is_completed,
-              }
-            : i
-        ) || [],
-      }))
-
-      setEditingGoalItemId(null)
-      setEditingGoalItemDraft(null)
-      toast.success(t('notes.toasts.updateSuccess'))
-    } catch {
-      toast.error(t('notes.toasts.updateError'))
-    } finally {
-      setSavingGoalItem(false)
-    }
-  }
-
-  function startEditingGoal(goal: Goal) {
-    setCollapsedGoalIds((prev) => prev.filter((id) => id !== goal.id))
-    setEditingGoalId(goal.id)
-    setEditingGoalDraft({
-      title: goal.title,
-      type: goal.type,
-      description: goal.description || '',
-      start_date: goal.start_date || '',
-      target_date: goal.target_date || '',
-      status: goal.status,
-      completion_percentage: goal.completion_percentage || 0,
-    })
-  }
-
-  function cancelEditingGoal() {
-    setEditingGoalId(null)
-    setEditingGoalDraft(null)
-  }
-
-  async function saveEditingGoal(goal: Goal) {
-    if (!editingGoalDraft || !editingGoalDraft.title.trim()) {
-      toast.error(t('notes.goals.nameEmptyError'))
-      return
-    }
-
-    setSavingGoal(true)
-    try {
-      const { error } = await supabase.from('goals').update({
-        title: editingGoalDraft.title,
-        type: editingGoalDraft.type,
-        description: editingGoalDraft.description,
-        start_date: editingGoalDraft.start_date,
-        target_date: editingGoalDraft.target_date,
-        completion_percentage: editingGoalDraft.completion_percentage,
-      }).eq('id', goal.id)
-      if (error) throw error
-
-      setGoals((prev) => prev.map((g) => (g.id === goal.id ? { ...g, ...editingGoalDraft } : g)))
-
-      setEditingGoalId(null)
-      setEditingGoalDraft(null)
-      toast.success(t('notes.goals.updateSuccess'))
-    } catch {
-      toast.error(t('notes.goals.updateError'))
-    } finally {
-      setSavingGoal(false)
-    }
-  }
+  const {
+    addGoal,
+    addGoalItem,
+    cancelEditingGoal,
+    cancelEditingGoalItem,
+    cancelGoalDraft,
+    confirmDeleteGoal,
+    confirmDeleteGoalItem,
+    openGoalDraft,
+    reorderGoalItems,
+    saveEditingGoal,
+    saveEditingGoalItem,
+    startEditingGoal,
+    startEditingGoalItem,
+    toggleGoalItem,
+    updateGoalStatus,
+  } = useGoalsActions({
+    deleteGoal,
+    deleteGoalItem,
+    editingGoalDraft,
+    editingGoalItemDraft,
+    expandedGoal,
+    fetchGoalItems,
+    goalDraft,
+    goalItemDraft,
+    goalItems,
+    setCollapsedGoalIds,
+    setDeleteGoal,
+    setDeleteGoalItem,
+    setDeletingGoal,
+    setDeletingGoalItem,
+    setEditingGoalDraft,
+    setEditingGoalId,
+    setEditingGoalItemDraft,
+    setEditingGoalItemId,
+    setExpandedGoal,
+    setGoalDraft,
+    setGoalItemDraft,
+    setGoalItems,
+    setGoals,
+    setSavingGoal,
+    setSavingGoalItem,
+    t,
+  })
 
   useEffect(() => {
     void initializeData()
@@ -929,68 +585,6 @@ export default function NotesPage() {
     }
   }
 
-  const counts = useMemo(
-    () => ({
-      all: notes.length,
-      good: notes.filter((n) => n.type === 'good').length,
-      bad: notes.filter((n) => n.type === 'bad').length,
-      todos: todos.length,
-      pendingTodos: todos.filter((t) => !t.is_done).length,
-    }),
-    [notes, todos]
-  )
-
-  const [searchQuery, setSearchQuery] = useState('')
-
-  // Strip Vietnamese diacritics so "an" matches "ăn", "ân", etc.
-  function normalize(s: string) {
-    return s.normalize('NFD').replace(/\p{Mn}/gu, '').toLowerCase()
-  }
-
-  const filteredNotes = notes.filter((note) => {
-    if (typeFilter !== 'all' && note.type !== typeFilter) return false
-    if (searchQuery.trim()) {
-      const q = normalize(searchQuery)
-      const matchContent = normalize(note.content).includes(q)
-      const matchTag = (note.tags ?? []).some((t) => normalize(t).includes(q))
-      if (!matchContent && !matchTag) return false
-    }
-    return true
-  })
-
-  const sortedNotes = useMemo(() => {
-    return [...filteredNotes].sort((a, b) => {
-      const pa = a.hide_meta ? 0 : (a.priority ?? 0)
-      const pb = b.hide_meta ? 0 : (b.priority ?? 0)
-      if (pb !== pa) return pb - pa
-      return b.created_at.localeCompare(a.created_at)
-    })
-  }, [filteredNotes])
-
-  const noteGroups = useMemo(() => {
-    const result: { date: string; items: Note[] }[] = []
-    sortedNotes.forEach((note) => {
-      const last = result[result.length - 1]
-      if (last && last.date === note.note_date) {
-        last.items.push(note)
-      } else {
-        result.push({ date: note.note_date, items: [note] })
-      }
-    })
-    return result
-  }, [sortedNotes])
-
-  const allTags = useMemo(
-    () => [...new Set(notes.flatMap((n) => n.tags ?? []))].sort(),
-    [notes]
-  )
-
-  const typeTabs: TypeTabCount[] = [
-    { key: 'all', label: t('notes.typeFilters.all'), count: counts.all },
-    { key: 'good', label: t('notes.typeFilters.good'), count: counts.good },
-    { key: 'bad', label: t('notes.typeFilters.bad'), count: counts.bad },
-  ]
-
   return (
     <main className="notes-page min-h-svh bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.14),transparent_35%),radial-gradient(circle_at_80%_18%,rgba(52,211,153,0.16),transparent_30%),linear-gradient(180deg,#ffffff_0%,#f6fef9_100%)] px-4 pb-10 pt-24 text-zinc-900 sm:px-6 sm:pt-28">
       <div className="mx-auto w-full max-w-4xl space-y-5">
@@ -1075,32 +669,37 @@ export default function NotesPage() {
 
         {currentTab === 'todos' && (
         <TodosTab
-          addingBuyPick={addingBuyPick}
-          addTodo={addTodo}
-          buyPickForm={buyPickForm}
-          buyPicks={buyPicks}
-          cancelBuyPickForm={cancelBuyPickForm}
-          editingBuyPickId={editingBuyPickId}
-          editingTodoDraft={editingTodoDraft}
-          editingTodoId={editingTodoId}
-          openAddBuyPick={openAddBuyPick}
-          saveBuyPick={saveBuyPick}
-          saveEditingTodo={saveEditingTodo}
-          savingBuyPick={savingBuyPick}
-          savingTodo={savingTodo}
-          setBuyPickForm={setBuyPickForm}
-          setDeleteBuyPick={setDeleteBuyPick}
-          setDeleteTodo={setDeleteTodo}
-          setEditingTodoDraft={setEditingTodoDraft}
-          setEditingTodoId={setEditingTodoId}
-          setTodoDraft={setTodoDraft}
-          setTodoFilter={setTodoFilter}
-          startEditBuyPick={startEditBuyPick}
-          t={t}
-          todoDraft={todoDraft}
-          todoFilter={todoFilter}
-          todos={todos}
-          toggleTodo={toggleTodo}
+          state={{
+            addingBuyPick,
+            buyPickForm,
+            buyPicks,
+            editingBuyPickId,
+            editingTodoDraft,
+            editingTodoId,
+            savingBuyPick,
+            savingTodo,
+            todoDraft,
+            todoFilter,
+            todos,
+          }}
+          actions={{
+            addTodo,
+            cancelBuyPickForm,
+            openAddBuyPick,
+            saveBuyPick,
+            saveEditingTodo,
+            setBuyPickForm,
+            setDeleteBuyPick,
+            setDeleteTodo,
+            setEditingTodoDraft,
+            setEditingTodoId,
+            setTodoDraft,
+            setTodoFilter,
+            startEditBuyPick,
+            toggleTodo,
+          }}
+          refs={{}}
+          ui={{ t }}
         />
         )}
 

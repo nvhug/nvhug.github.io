@@ -1,6 +1,6 @@
 import type { Dispatch, RefObject, SetStateAction } from 'react'
 
-import type { Goal, GoalItem, Note } from '@/types'
+import type { BuyPick, Goal, GoalItem, Note, Todo } from '@/types'
 
 export type Translate = (key: string, vars?: Record<string, string | number>) => string
 
@@ -36,3 +36,44 @@ export type SetState<T> = Dispatch<SetStateAction<T>>
 export type InputRef = RefObject<HTMLInputElement | null>
 export type TextareaRef = RefObject<HTMLTextAreaElement | null>
 export type NotesGroup = { date: string; items: Note[] }
+
+export type TodoFilter = 'all' | 'pending' | 'done'
+
+export type BuyPickFormState = {
+  category: string
+  emoji: string
+  brands: string[]
+  note: string
+  brandInput: string
+}
+
+export type TodosTabState = {
+  addingBuyPick: boolean
+  buyPickForm: BuyPickFormState
+  buyPicks: BuyPick[]
+  editingBuyPickId: string | null
+  editingTodoDraft: string
+  editingTodoId: string | null
+  savingBuyPick: boolean
+  savingTodo: boolean
+  todoDraft: string
+  todoFilter: TodoFilter
+  todos: Todo[]
+}
+
+export type TodosTabActions = {
+  addTodo: () => Promise<void>
+  cancelBuyPickForm: () => void
+  openAddBuyPick: () => void
+  saveBuyPick: () => Promise<void>
+  saveEditingTodo: (id: string) => Promise<void>
+  setBuyPickForm: SetState<BuyPickFormState>
+  setDeleteBuyPick: (pick: BuyPick) => void
+  setDeleteTodo: (todo: Todo) => void
+  setEditingTodoDraft: SetState<string>
+  setEditingTodoId: SetState<string | null>
+  setTodoDraft: SetState<string>
+  setTodoFilter: SetState<TodoFilter>
+  startEditBuyPick: (pick: BuyPick) => void
+  toggleTodo: (todo: Todo) => Promise<void>
+}
