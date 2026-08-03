@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, CircleDot, Loader2, Plus, Tags, Trash2 } from 'lucide-react'
 import { marked } from 'marked'
@@ -44,12 +44,6 @@ function htmlToPlainText(html: string): string {
 // headings, blockquotes, bullet/numbered lists, fenced code blocks.
 const MARKDOWN_PATTERN = /^ {0,3}(#{1,6}\s|>\s?|[-*+]\s|\d+[.)]\s|```)/m
 
-// Detects if content is already formatted HTML (not just plain markdown).
-// Checks for block-level HTML tags that Quill produces.
-function isFormattedHTML(html: string): boolean {
-  return /<(h[1-6]|p|li|blockquote|pre|div|ul|ol)(?:\s|>|\/)/i.test(html)
-}
-
 function isLikelyMarkdown(plainText: string): boolean {
   return MARKDOWN_PATTERN.test(plainText)
 }
@@ -88,13 +82,7 @@ export default function PostForm({ mode, initialPost, autotagName, submitting, o
   const [deleting, setDeleting] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
 
-  // Re-run when autotagName arrives after mount (e.g. search params
-  // resolving post-hydration) so the auto-selected tag is still applied.
-  useEffect(() => {
-    fetchTags()
-  }, [autotagName])
-
-  async function fetchTags() {
+  const fetchTags = useCallback(async () => {
     try {
       const { data, error } = await supabase.from('tags').select('*').order('name')
       if (error) throw error
@@ -121,7 +109,14 @@ export default function PostForm({ mode, initialPost, autotagName, submitting, o
     } catch (error) {
       console.error('Error fetching tags:', error)
     }
-  }
+  }, [autotagName])
+
+  // Re-run when autotagName arrives after mount (e.g. search params
+  // resolving post-hydration) so the auto-selected tag is still applied.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void fetchTags()
+  }, [fetchTags])
 
   function handleTitleChange(value: string) {
     setTitle(value)

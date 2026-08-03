@@ -44,7 +44,8 @@ export default function QuotesPage() {
   }
 
   useEffect(() => {
-    fetchQuotes()
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void fetchQuotes()
   }, [])
 
   useEffect(() => {

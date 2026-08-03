@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Plus, Trash2, Dumbbell, X, Pencil, ChevronUp } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
@@ -120,8 +120,7 @@ export function GymTracker() {
   const [deleteTarget,setDeleteTarget]= useState<GymLog | null>(null)
   const [deleting,    setDeleting]    = useState(false)
 
-  async function fetchLogs(d = date) {
-    setLoading(true)
+  const fetchLogs = useCallback(async (d = date) => {
     try {
       const { data, error } = await supabase
         .from('gym_logs')
@@ -136,12 +135,12 @@ export function GymTracker() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [date, t])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void fetchLogs(date)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [date])
+  }, [date, fetchLogs])
 
   function patch(key: keyof LogForm, value: string) {
     setForm(f => ({ ...f, [key]: value }))
@@ -175,6 +174,7 @@ export function GymTracker() {
       toast.success(t('gymTracker.saved'))
       setForm(EMPTY_FORM)
       setShowForm(false)
+      setLoading(true)
       await fetchLogs(date)
     } catch {
       toast.error(t('gymTracker.genericError'))
@@ -282,7 +282,7 @@ export function GymTracker() {
     <div className="space-y-4">
       {/* Date selector + summary */}
       <div className="flex flex-wrap items-center gap-3">
-        <DatePicker value={date} onChange={d => { setDate(d); setShowForm(false) }} />
+        <DatePicker value={date} onChange={d => { setLoading(true); setDate(d); setShowForm(false) }} />
         {logs.length > 0 && (
           <span className="text-xs text-zinc-500">
             {t('gymTracker.summary', { exercises: logs.length, sets: totalSets })}

@@ -21,14 +21,9 @@ export default function HomeClient({
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedTag, setSelectedTag] = useState('all')
   const [currentPage, setCurrentPage] = useState(1)
-  const [currentQuote, setCurrentQuote] = useState<Quote | null>(null)
-
-  // Set random quote after hydration to avoid server/client mismatch
-  useEffect(() => {
-    if (initialQuotes.length > 0) {
-      setCurrentQuote(initialQuotes[Math.floor(Math.random() * initialQuotes.length)])
-    }
-  }, [initialQuotes])
+  const [currentQuote, setCurrentQuote] = useState<Quote | null>(() =>
+    initialQuotes.length > 0 ? initialQuotes[Math.floor(Math.random() * initialQuotes.length)] : null
+  )
 
   useEffect(() => {
     if (initialQuotes.length === 0) return
