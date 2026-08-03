@@ -5,6 +5,7 @@ import { useCallback, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { getSupabaseBrowserClient } from '@/lib/supabase-browser'
 import type { BuyPick, CalendarEvent, Goal, GoalItem, Note, Post, Todo } from '@/types'
+import { isHealthTagAlias } from '../_lib/healthTags'
 
 export function useNotesData() {
   const [notes, setNotes] = useState<Note[]>([])
@@ -84,18 +85,11 @@ export function useNotesData() {
           .select('id, name')
 
         if (tagError) throw tagError
-        const tags = (tagData || []) as { id: string; name: string }[]
+      const tags = (tagData || []) as { id: string; name: string }[]
         const healthTagIds = new Set(
           tags
-            .filter((tag) => {
-              const normalized = tag.name
-                .normalize('NFD')
-                .replace(/\p{Mn}/gu, '')
-                .toLowerCase()
-                .trim()
-              return normalized === 'suc khoe' || normalized === 'suc-khoe' || normalized === 'health'
-            })
-            .map((tag) => tag.id)
+          .filter((tag) => isHealthTagAlias(tag.name))
+          .map((tag) => tag.id)
         )
 
         if (healthTagIds.size === 0) {
