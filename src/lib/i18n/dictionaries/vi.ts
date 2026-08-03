@@ -618,6 +618,8 @@ export const vi = {
     },
     meals: {
       heading: 'Lịch Ăn',
+      expand: 'Mở rộng lịch ăn',
+      collapse: 'Thu gọn lịch ăn',
     },
     health: {
       heading: 'Bài viết sức khỏe',

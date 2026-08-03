@@ -50,9 +50,9 @@ import { getIntlLocale } from '@/lib/i18n/locale'
 import type { Lang } from '@/lib/i18n/language-context'
 
 type TypeFilter = 'all' | 'good' | 'bad'
-type TabType = 'notes' | 'todos' | 'goals' | 'calo' | 'meals' | 'health' | 'stats' | 'tracker' | 'calendar'
+type TabType = 'notes' | 'todos' | 'goals' | 'calo' | 'health' | 'stats' | 'tracker' | 'calendar'
 
-const VALID_TABS: TabType[] = ['notes', 'todos', 'goals', 'calo', 'meals', 'health', 'stats', 'tracker', 'calendar']
+const VALID_TABS: TabType[] = ['notes', 'todos', 'goals', 'calo', 'health', 'stats', 'tracker', 'calendar']
 const TAB_CHANGE_EVENT = 'tab-hash-change'
 
 function subscribeToTabHash(callback: () => void) {
@@ -65,8 +65,12 @@ function subscribeToTabHash(callback: () => void) {
 }
 
 function getTabFromHash(): TabType {
-  const hash = window.location.hash.slice(1) as TabType
-  return VALID_TABS.includes(hash) ? hash : 'notes'
+  const hash = window.location.hash.slice(1)
+  if (hash === 'meals') return 'calo'
+  if ((VALID_TABS as readonly string[]).includes(hash)) {
+    return hash as TabType
+  }
+  return 'notes'
 }
 
 function todayDate() {
@@ -81,6 +85,11 @@ function formatNoteDate(isoDate: string, lang: Lang): string {
     month: 'long',
     day: 'numeric',
   }).format(new Date(year, month - 1, day))
+}
+
+function buildPreferenceKey(userId: string | null, suffix: string) {
+  const scope = userId ? `user:${userId}` : 'user:anonymous'
+  return `notes:${scope}:${suffix}`
 }
 
 type Draft = {
@@ -228,6 +237,7 @@ export default function NotesPage() {
   const [isGymExpanded, setIsGymExpanded] = useState(true)
   const [isWeightExpanded, setIsWeightExpanded] = useState(true)
   const [isBowelExpanded, setIsBowelExpanded] = useState(false)
+  const [isMealsExpanded, setIsMealsExpanded] = useState(true)
   const [trackerSubTab, setTrackerSubTab] = useState<'logs' | 'videos'>('logs')
   const [preferencesUserId, setPreferencesUserId] = useState<string | null>(null)
   const [preferencesReady, setPreferencesReady] = useState(false)
@@ -267,11 +277,6 @@ export default function NotesPage() {
     el.style.height = `${el.scrollHeight}px`
   }, [editingGoalDraft?.description])
 
-  function getPreferenceKey(suffix: string) {
-    const scope = preferencesUserId ? `user:${preferencesUserId}` : 'user:anonymous'
-    return `notes:${scope}:${suffix}`
-  }
-
   useEffect(() => {
     void (async () => {
       try {
@@ -286,8 +291,9 @@ export default function NotesPage() {
   useEffect(() => {
     if (!preferencesReady) return
     try {
-      const stored = window.localStorage.getItem(getPreferenceKey('tracker:gym:expanded'))
+      const stored = window.localStorage.getItem(buildPreferenceKey(preferencesUserId, 'tracker:gym:expanded'))
       if (stored !== null) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setIsGymExpanded(stored === 'true')
       }
     } catch {
@@ -298,17 +304,18 @@ export default function NotesPage() {
   useEffect(() => {
     if (!preferencesReady) return
     try {
-      window.localStorage.setItem(getPreferenceKey('tracker:gym:expanded'), String(isGymExpanded))
+      window.localStorage.setItem(buildPreferenceKey(preferencesUserId, 'tracker:gym:expanded'), String(isGymExpanded))
     } catch {
       // Ignore storage write errors.
     }
-  }, [isGymExpanded]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isGymExpanded, preferencesReady, preferencesUserId])
 
   useEffect(() => {
     if (!preferencesReady) return
     try {
-      const stored = window.localStorage.getItem(getPreferenceKey('tracker:weight:expanded'))
+      const stored = window.localStorage.getItem(buildPreferenceKey(preferencesUserId, 'tracker:weight:expanded'))
       if (stored !== null) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setIsWeightExpanded(stored === 'true')
       }
     } catch {
@@ -319,17 +326,18 @@ export default function NotesPage() {
   useEffect(() => {
     if (!preferencesReady) return
     try {
-      window.localStorage.setItem(getPreferenceKey('tracker:weight:expanded'), String(isWeightExpanded))
+      window.localStorage.setItem(buildPreferenceKey(preferencesUserId, 'tracker:weight:expanded'), String(isWeightExpanded))
     } catch {
       // Ignore storage write errors.
     }
-  }, [isWeightExpanded]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isWeightExpanded, preferencesReady, preferencesUserId])
 
   useEffect(() => {
     if (!preferencesReady) return
     try {
-      const stored = window.localStorage.getItem(getPreferenceKey('tracker:bowel:expanded'))
+      const stored = window.localStorage.getItem(buildPreferenceKey(preferencesUserId, 'tracker:bowel:expanded'))
       if (stored !== null) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setIsBowelExpanded(stored === 'true')
       }
     } catch {
@@ -340,17 +348,40 @@ export default function NotesPage() {
   useEffect(() => {
     if (!preferencesReady) return
     try {
-      window.localStorage.setItem(getPreferenceKey('tracker:bowel:expanded'), String(isBowelExpanded))
+      window.localStorage.setItem(buildPreferenceKey(preferencesUserId, 'tracker:bowel:expanded'), String(isBowelExpanded))
     } catch {
       // Ignore storage write errors.
     }
-  }, [isBowelExpanded]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isBowelExpanded, preferencesReady, preferencesUserId])
 
   useEffect(() => {
     if (!preferencesReady) return
     try {
-      const stored = window.localStorage.getItem(getPreferenceKey('tracker:subtab'))
+      const stored = window.localStorage.getItem(buildPreferenceKey(preferencesUserId, 'calo:meals:expanded'))
+      if (stored !== null) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setIsMealsExpanded(stored === 'true')
+      }
+    } catch {
+      // Ignore storage read errors.
+    }
+  }, [preferencesReady, preferencesUserId])
+
+  useEffect(() => {
+    if (!preferencesReady) return
+    try {
+      window.localStorage.setItem(buildPreferenceKey(preferencesUserId, 'calo:meals:expanded'), String(isMealsExpanded))
+    } catch {
+      // Ignore storage write errors.
+    }
+  }, [isMealsExpanded, preferencesReady, preferencesUserId])
+
+  useEffect(() => {
+    if (!preferencesReady) return
+    try {
+      const stored = window.localStorage.getItem(buildPreferenceKey(preferencesUserId, 'tracker:subtab'))
       if (stored === 'logs' || stored === 'videos') {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setTrackerSubTab(stored)
       }
     } catch {
@@ -361,17 +392,18 @@ export default function NotesPage() {
   useEffect(() => {
     if (!preferencesReady) return
     try {
-      window.localStorage.setItem(getPreferenceKey('tracker:subtab'), trackerSubTab)
+      window.localStorage.setItem(buildPreferenceKey(preferencesUserId, 'tracker:subtab'), trackerSubTab)
     } catch {
       // Ignore storage write errors.
     }
-  }, [trackerSubTab]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [trackerSubTab, preferencesReady, preferencesUserId])
 
   useEffect(() => {
     if (!preferencesReady) return
     try {
-      const stored = window.localStorage.getItem(getPreferenceKey('goals:expanded:id'))
+      const stored = window.localStorage.getItem(buildPreferenceKey(preferencesUserId, 'goals:expanded:id'))
       if (stored) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setExpandedGoal(stored)
       }
     } catch {
@@ -383,22 +415,23 @@ export default function NotesPage() {
     if (!preferencesReady) return
     try {
       if (expandedGoal) {
-        window.localStorage.setItem(getPreferenceKey('goals:expanded:id'), expandedGoal)
+        window.localStorage.setItem(buildPreferenceKey(preferencesUserId, 'goals:expanded:id'), expandedGoal)
       } else {
-        window.localStorage.removeItem(getPreferenceKey('goals:expanded:id'))
+        window.localStorage.removeItem(buildPreferenceKey(preferencesUserId, 'goals:expanded:id'))
       }
     } catch {
       // Ignore storage write errors.
     }
-  }, [expandedGoal]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [expandedGoal, preferencesReady, preferencesUserId])
 
   useEffect(() => {
     if (!preferencesReady) return
     try {
-      const stored = window.localStorage.getItem(getPreferenceKey('goals:collapsed:ids'))
+      const stored = window.localStorage.getItem(buildPreferenceKey(preferencesUserId, 'goals:collapsed:ids'))
       if (!stored) return
       const parsed = JSON.parse(stored)
       if (Array.isArray(parsed)) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setCollapsedGoalIds(parsed.filter((id): id is string => typeof id === 'string'))
       }
     } catch {
@@ -409,11 +442,11 @@ export default function NotesPage() {
   useEffect(() => {
     if (!preferencesReady) return
     try {
-      window.localStorage.setItem(getPreferenceKey('goals:collapsed:ids'), JSON.stringify(collapsedGoalIds))
+      window.localStorage.setItem(buildPreferenceKey(preferencesUserId, 'goals:collapsed:ids'), JSON.stringify(collapsedGoalIds))
     } catch {
       // Ignore storage write errors.
     }
-  }, [collapsedGoalIds]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [collapsedGoalIds, preferencesReady, preferencesUserId])
 
   async function fetchNotes(withLoading = true) {
     if (withLoading) {
@@ -520,7 +553,8 @@ export default function NotesPage() {
         .eq('date', today)
 
       if (error) throw error
-      const total = (data || []).reduce((sum: number, food: any) => sum + (food.total_calories || 0), 0)
+      const rows = (data || []) as { total_calories: number | null }[]
+      const total = rows.reduce((sum, food) => sum + (food.total_calories || 0), 0)
       setTodayCalories(total)
     } catch (error) {
       console.error('Error fetching today calories:', error)
@@ -955,11 +989,12 @@ export default function NotesPage() {
         setGoalItems((prev) => ({ ...prev, [expandedGoal]: items }))
       })()
     }
-  }, [expandedGoal])
+  }, [expandedGoal, goalItems])
 
   useEffect(() => {
     if (goals.length === 0) return
     const validIds = new Set(goals.map((g) => g.id))
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setCollapsedGoalIds((prev) => {
       const filtered = prev.filter((id) => validIds.has(id))
       return filtered.length === prev.length ? prev : filtered
@@ -1376,17 +1411,6 @@ export default function NotesPage() {
           >
             <span className="text-base leading-none">🔥</span>
             <span className="whitespace-nowrap text-center leading-tight">{t('notes.tabs.calo')}</span>
-          </button>
-          <button
-            onClick={() => handleTabChange('meals')}
-            className={`shrink-0 flex w-20 flex-col items-center justify-center gap-1.5 py-4 text-sm font-medium transition-colors sm:w-auto sm:flex-1 sm:gap-1 sm:px-3 sm:py-3 ${
-              currentTab === 'meals'
-                ? 'border-b-2 border-emerald-600 text-emerald-600'
-                : 'text-zinc-600 hover:text-zinc-900'
-            }`}
-          >
-            <span className="text-base leading-none">🍽️</span>
-            <span className="whitespace-nowrap text-center leading-tight">{t('notes.tabs.meals')}</span>
           </button>
           <button
             onClick={() => handleTabChange('tracker')}
@@ -2925,18 +2949,32 @@ export default function NotesPage() {
             <CalorieTracker />
           </div>
         </section>
-        </>
-        )}
 
-        {currentTab === 'meals' && (
         <section className="overflow-hidden rounded-2xl border border-orange-200 bg-white shadow-[0_4px_20px_-8px_rgba(234,88,12,0.25)]">
-          <div className="border-b border-orange-100 px-4 py-3.5">
+          <div className="flex items-center gap-2 border-b border-orange-100 px-4 py-3.5">
+            <span className="text-xl">🍽️</span>
             <h3 className="font-semibold text-zinc-900">{t('notes.meals.heading')}</h3>
+            <button
+              type="button"
+              onClick={() => setIsMealsExpanded((prev) => !prev)}
+              aria-label={isMealsExpanded ? t('notes.meals.collapse') : t('notes.meals.expand')}
+              title={isMealsExpanded ? t('notes.meals.collapse') : t('notes.meals.expand')}
+              className="ml-auto rounded p-1.5 sm:p-1 text-orange-600 hover:bg-orange-100"
+            >
+              {isMealsExpanded ? (
+                <ChevronUp className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
+              ) : (
+                <ChevronDown className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
+              )}
+            </button>
           </div>
-          <div className="p-4">
-            <MealScheduleTracker />
-          </div>
+          {isMealsExpanded && (
+            <div className="p-4">
+              <MealScheduleTracker />
+            </div>
+          )}
         </section>
+        </>
         )}
 
         {currentTab === 'health' && (

@@ -620,6 +620,8 @@ export const en: Dictionary = {
     },
     meals: {
       heading: 'Meal Plan',
+      expand: 'Expand meal plan',
+      collapse: 'Collapse meal plan',
     },
     health: {
       heading: 'Health articles',
