@@ -1,13 +1,11 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Plus, Trash2, Edit2, X, Check, Clock } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import { useCalorieGoal } from '@/lib/useCalorieGoal'
 import { FoodTemplate, DailyFood } from '@/types'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { TimePicker } from '@/components/ui/time-picker'
 import { DatePicker } from '@/components/ui/date-picker'
 import { useLanguage } from '@/lib/i18n/language-context'
@@ -53,7 +51,7 @@ export function CalorieTracker() {
   const [editingData, setEditingData] = useState<Partial<DailyFood> | null>(null)
   const [editingTime, setEditingTime] = useState('')
 
-  async function fetchFoodTemplates() {
+  const fetchFoodTemplates = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('food_templates')
@@ -65,10 +63,12 @@ export function CalorieTracker() {
     } catch (error) {
       console.error('Error fetching food templates:', error)
       toast.error(t('calorieTracker.loadFoodsError'))
+    } finally {
+      setLoading(false)
     }
-  }
+  }, [t])
 
-  async function fetchDailyFoods() {
+  const fetchDailyFoods = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('daily_foods')
@@ -80,13 +80,15 @@ export function CalorieTracker() {
       setDailyFoods((data || []) as DailyFood[])
     } catch (error) {
       console.error('Error fetching daily foods:', error)
+    } finally {
+      setLoading(false)
     }
-  }
+  }, [selectedDate])
 
   useEffect(() => {
-    setLoading(true)
-    Promise.all([fetchFoodTemplates()]).finally(() => setLoading(false))
-  }, [])
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void fetchFoodTemplates()
+  }, [fetchFoodTemplates])
 
   function saveGoal() {
     const val = parseInt(goalDraft, 10)
@@ -95,8 +97,9 @@ export function CalorieTracker() {
   }
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void fetchDailyFoods()
-  }, [selectedDate])
+  }, [fetchDailyFoods])
 
   async function addFood() {
     if (useCustom) {
@@ -214,7 +217,7 @@ export function CalorieTracker() {
       <div className="rounded-xl border border-emerald-200 bg-white p-4">
         <div className="mb-3 flex items-center justify-between">
           <h3 className="font-semibold text-zinc-900">{t('calorieTracker.todayHeading', { date: selectedDate })}</h3>
-          <DatePicker value={selectedDate} onChange={setSelectedDate} align="end" />
+          <DatePicker value={selectedDate} onChange={(v) => { setLoading(true); setSelectedDate(v) }} align="end" />
         </div>
 
         <div className="space-y-2">

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Clock, CheckCircle2, Circle, Plus, Trash2, X, Check, Pencil } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
@@ -39,7 +39,39 @@ export function MealScheduleTracker() {
   const [newForm, setNewForm] = useState<EditForm>(EMPTY_FORM)
   const [savingNew, setSavingNew] = useState(false)
 
-  async function fetchMeals() {
+  const setupDefaultMeals = useCallback(async () => {
+    try {
+      const { data: { user } } = await getSupabaseBrowserClient().auth.getUser()
+
+      const mealsToInsert = DEFAULT_MEALS.map((meal, idx) => ({
+        date: selectedDate,
+        meal_type: ['breakfast', 'mid_morning', 'lunch', 'afternoon', 'dinner'][idx],
+        time: meal.time,
+        name: meal.name,
+        target_calories: meal.target_calories,
+        foods: meal.foods,
+        is_completed: false,
+        ...(user ? { user_id: user.id } : {}),
+      }))
+
+      const { error } = await supabase.from('meals').insert(mealsToInsert)
+      if (error) throw error
+
+      const { data: newData } = await supabase
+        .from('meals')
+        .select('*')
+        .eq('date', selectedDate)
+        .order('time', { ascending: true })
+
+      setMeals((newData || []) as Meal[])
+      setLoading(false)
+    } catch (error) {
+      console.error('Error setting up meals:', error)
+      setLoading(false)
+    }
+  }, [selectedDate])
+
+  const fetchMeals = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('meals')
@@ -70,45 +102,13 @@ export function MealScheduleTracker() {
       toast.error(t('mealScheduleTracker.loadError'))
       setLoading(false)
     }
-  }
+  }, [selectedDate, setupDefaultMeals, t])
 
   useEffect(() => {
     isSettingUpRef.current = false
-    setLoading(true)
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void fetchMeals()
-  }, [selectedDate])
-
-  async function setupDefaultMeals() {
-    try {
-      const { data: { user } } = await getSupabaseBrowserClient().auth.getUser()
-
-      const mealsToInsert = DEFAULT_MEALS.map((meal, idx) => ({
-        date: selectedDate,
-        meal_type: ['breakfast', 'mid_morning', 'lunch', 'afternoon', 'dinner'][idx],
-        time: meal.time,
-        name: meal.name,
-        target_calories: meal.target_calories,
-        foods: meal.foods,
-        is_completed: false,
-        ...(user ? { user_id: user.id } : {}),
-      }))
-
-      const { error } = await supabase.from('meals').insert(mealsToInsert)
-      if (error) throw error
-
-      const { data: newData } = await supabase
-        .from('meals')
-        .select('*')
-        .eq('date', selectedDate)
-        .order('time', { ascending: true })
-
-      setMeals((newData || []) as Meal[])
-      setLoading(false)
-    } catch (error) {
-      console.error('Error setting up meals:', error)
-      setLoading(false)
-    }
-  }
+  }, [fetchMeals])
 
   async function toggleMealComplete(meal: Meal) {
     try {
@@ -212,6 +212,7 @@ export function MealScheduleTracker() {
 
       setAddingNew(false)
       setNewForm(EMPTY_FORM)
+      setLoading(true)
       void fetchMeals()
       toast.success(t('mealScheduleTracker.added'))
     } catch {
@@ -232,7 +233,7 @@ export function MealScheduleTracker() {
       <div className="rounded-xl border border-emerald-200 bg-linear-to-br from-emerald-50 to-white p-3 sm:p-4">
         <div className="mb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <h3 className="font-semibold text-zinc-900">{t('mealScheduleTracker.todayHeading', { date: selectedDate })}</h3>
-          <DatePicker value={selectedDate} onChange={setSelectedDate} align="end" />
+          <DatePicker value={selectedDate} onChange={(v) => { setLoading(true); setSelectedDate(v) }} align="end" />
         </div>
 
         <div className="space-y-2">

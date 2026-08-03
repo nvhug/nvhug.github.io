@@ -65,8 +65,6 @@ export default function RichEditor({
   const wrapperRef = useRef<HTMLDivElement>(null)
   const quillRef = useRef<Quill | null>(null)
   const onChangeRef = useRef(onChange)
-  const openPickerRef = useRef<() => void>(() => {})
-  onChangeRef.current = onChange
 
   const [tablePicker, setTablePicker] = useState(false)
   const [hovered, setHovered] = useState({ rows: 1, cols: 1 })
@@ -81,20 +79,9 @@ export default function RichEditor({
     setTablePicker(false)
   }, [])
 
-  // Keep openPickerRef pointing to the latest function so the DOM listener can call it
-  openPickerRef.current = () => {
-    const wrapper = wrapperRef.current
-    const btn = wrapper?.querySelector<HTMLElement>('.ql-table-insert')
-    if (btn && wrapper) {
-      const btnRect = btn.getBoundingClientRect()
-      const wrapRect = wrapper.getBoundingClientRect()
-      setPickerPos({
-        top: btnRect.bottom - wrapRect.top + 4,
-        left: btnRect.left - wrapRect.left,
-      })
-    }
-    setTablePicker((prev) => !prev)
-  }
+  useEffect(() => {
+    onChangeRef.current = onChange
+  }, [onChange])
 
   useEffect(() => {
     let cancelled = false
@@ -151,7 +138,17 @@ export default function RichEditor({
       btn.addEventListener('click', (e) => {
         e.preventDefault()
         e.stopPropagation()
-        openPickerRef.current()
+        const wrapper = wrapperRef.current
+        const tableBtn = wrapper?.querySelector<HTMLElement>('.ql-table-insert')
+        if (tableBtn && wrapper) {
+          const btnRect = tableBtn.getBoundingClientRect()
+          const wrapRect = wrapper.getBoundingClientRect()
+          setPickerPos({
+            top: btnRect.bottom - wrapRect.top + 4,
+            left: btnRect.left - wrapRect.left,
+          })
+        }
+        setTablePicker((prev) => !prev)
       })
       span.appendChild(btn)
       toolbar.container.appendChild(span)

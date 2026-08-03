@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { Post } from '@/types'
@@ -34,7 +34,7 @@ const TEMPLATES = [
     descKey: 'ink',
     preview: (
       <div className="flex h-28 flex-col gap-1.5 rounded-xl bg-[#0f172a] p-3">
-        <div className="h-0.5 w-full rounded bg-gradient-to-r from-orange-500 to-transparent" />
+        <div className="h-0.5 w-full rounded bg-linear-to-r from-orange-500 to-transparent" />
         <div className="mt-1 h-2.5 w-3/5 rounded bg-white/90" />
         <div className="mt-1 h-1.5 w-full rounded bg-slate-600/80" />
         <div className="h-1.5 w-5/6 rounded bg-slate-600/80" />
@@ -124,7 +124,7 @@ const TEMPLATES = [
     descKey: 'notion',
     preview: (
       <div className="flex h-28 flex-col rounded-xl bg-white overflow-hidden">
-        <div className="h-8 bg-gradient-to-br from-[#f1f0ef] to-[#dddad6]" />
+        <div className="h-8 bg-linear-to-br from-[#f1f0ef] to-[#dddad6]" />
         <div className="flex flex-col gap-1 px-3 pb-2">
           <div className="-mt-3 mb-1 h-6 w-6 rounded bg-white shadow-sm ring-1 ring-black/5 flex items-center justify-center text-[10px]">📝</div>
           <div className="h-2.5 w-3/5 rounded bg-[#37352f]/80" />
@@ -170,18 +170,19 @@ export default function TemplatesPage() {
   const [saving, setSaving] = useState<string | null>(null)
   const [applyingAll, setApplyingAll] = useState<string | null>(null)
 
-  useEffect(() => {
-    fetchPosts()
-  }, [])
-
-  async function fetchPosts() {
+  const fetchPosts = useCallback(async () => {
     const { data } = await supabase
       .from('posts')
       .select('id, title, slug, template, created_at, published')
       .order('created_at', { ascending: false })
     setPosts((data as Post[]) || [])
     setLoading(false)
-  }
+  }, [])
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void fetchPosts()
+  }, [fetchPosts])
 
   async function updateTemplate(postId: string, template: string) {
     setSaving(postId)

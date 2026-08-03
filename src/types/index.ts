@@ -132,7 +132,7 @@ export interface GoalItem {
   goal_id: string
   content: string
   item_type: string // 'meal', 'routine', 'lesson', 'exercise', etc.
-  metadata?: Record<string, any> // JSON: { calories, duration, reps, etc. }
+  metadata?: Record<string, unknown> // JSON: { calories, duration, reps, etc. }
   result?: string // Kết quả sau khi hoàn thành
   is_completed?: boolean
   order?: number // For drag-drop sorting

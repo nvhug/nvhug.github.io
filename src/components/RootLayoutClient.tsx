@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { BookOpen, Home, LogOut, Quote, Settings, StickyNote, User as UserIcon, type LucideIcon } from 'lucide-react'
+import { BookOpen, Home, LogOut, Quote, Settings, User as UserIcon, type LucideIcon } from 'lucide-react'
 import { Toaster } from 'sonner'
 import { useEffect, useRef, useState } from 'react'
 import { getSupabaseBrowserClient } from '@/lib/supabase-browser'
