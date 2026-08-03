@@ -160,13 +160,13 @@ export function BuyPicksSection({
                   <div className="flex shrink-0 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
                     <button
                       onClick={() => startEditBuyPick(pick)}
-                      className="rounded p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 sm:p-1"
+                      className="rounded p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700"
                     >
                       <Pencil className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
                     </button>
                     <button
                       onClick={() => setDeleteBuyPick(pick)}
-                      className="rounded p-1.5 text-zinc-400 hover:bg-rose-50 hover:text-rose-500 sm:p-1"
+                      className="rounded p-1.5 text-zinc-400 hover:bg-rose-50 hover:text-rose-500"
                     >
                       <Trash2 className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
                     </button>
