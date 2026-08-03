@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import type { Dispatch, SetStateAction } from 'react'
 
 import { Pencil, Plus, Trash2, X } from 'lucide-react'
@@ -48,6 +49,8 @@ export function BuyPicksSection({
   startEditBuyPick,
   t,
 }: BuyPicksSectionProps) {
+  const [activeMobileActionsId, setActiveMobileActionsId] = useState<string | null>(null)
+
   return (
     <section className="overflow-hidden rounded-2xl border border-zinc-200 bg-slate-50 shadow-[0_2px_12px_-4px_rgba(0,0,0,0.08)]">
       <div className="flex items-center justify-between border-b border-zinc-100 px-4 py-3">
@@ -151,21 +154,31 @@ export function BuyPicksSection({
         ) : (
           <div className="grid grid-cols-2 gap-2.25 sm:grid-cols-3 lg:grid-cols-4">
             {buyPicks.map((pick) => editingBuyPickId !== pick.id && (
-              <div key={pick.id} className="group rounded-xl border border-zinc-200 bg-white p-3 shadow-sm transition-all hover:border-zinc-300 hover:shadow-md">
+              <div
+                key={pick.id}
+                onClick={() => setActiveMobileActionsId((prev) => prev === pick.id ? null : pick.id)}
+                className="group rounded-xl border border-zinc-200 bg-white p-3 shadow-sm transition-all hover:border-zinc-300 hover:shadow-md"
+              >
                 <div className="mb-2 flex items-start justify-between gap-1">
                   <div className="flex min-w-0 items-center gap-1.5">
                     <span className="shrink-0 text-base leading-none">{pick.emoji}</span>
                     <span className="truncate text-xs font-bold text-zinc-800">{pick.category}</span>
                   </div>
-                  <div className="flex shrink-0 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
+                  <div className={`flex shrink-0 transition-opacity ${activeMobileActionsId === pick.id ? 'opacity-100' : 'pointer-events-none opacity-0'} sm:pointer-events-auto sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100`}>
                     <button
-                      onClick={() => startEditBuyPick(pick)}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        startEditBuyPick(pick)
+                      }}
                       className="rounded p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700"
                     >
                       <Pencil className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
                     </button>
                     <button
-                      onClick={() => setDeleteBuyPick(pick)}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setDeleteBuyPick(pick)
+                      }}
                       className="rounded p-1.5 text-zinc-400 hover:bg-rose-50 hover:text-rose-500"
                     >
                       <Trash2 className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
