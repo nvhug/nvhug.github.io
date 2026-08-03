@@ -157,18 +157,18 @@ export function BuyPicksSection({
                     <span className="shrink-0 text-base leading-none">{pick.emoji}</span>
                     <span className="truncate text-xs font-bold text-zinc-800">{pick.category}</span>
                   </div>
-                  <div className="flex shrink-0 opacity-0 transition-opacity group-hover:opacity-100">
+                  <div className="flex shrink-0 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
                     <button
                       onClick={() => startEditBuyPick(pick)}
-                      className="flex h-5 w-5 items-center justify-center rounded text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700"
+                      className="rounded p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 sm:p-1"
                     >
-                      <Pencil className="h-2.5 w-2.5" />
+                      <Pencil className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
                     </button>
                     <button
                       onClick={() => setDeleteBuyPick(pick)}
-                      className="flex h-5 w-5 items-center justify-center rounded text-zinc-400 hover:bg-rose-50 hover:text-rose-500"
+                      className="rounded p-1.5 text-zinc-400 hover:bg-rose-50 hover:text-rose-500 sm:p-1"
                     >
-                      <Trash2 className="h-2.5 w-2.5" />
+                      <Trash2 className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
                     </button>
                   </div>
                 </div>
