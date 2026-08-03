@@ -75,5 +75,6 @@ export type TodosTabActions = {
   setTodoDraft: SetState<string>
   setTodoFilter: SetState<TodoFilter>
   startEditBuyPick: (pick: BuyPick) => void
+  toggleBuyPickPurchased: (pick: BuyPick) => Promise<void>
   toggleTodo: (todo: Todo) => Promise<void>
 }

@@ -88,6 +88,7 @@ export interface BuyPick {
   brands: string[]
   note?: string
   order_index: number
+  is_purchased: boolean
   created_at: string
   updated_at: string
 }
