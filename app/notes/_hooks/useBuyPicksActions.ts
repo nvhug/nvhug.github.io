@@ -8,6 +8,7 @@ import { supabase } from '@/lib/supabase'
 import { getSupabaseBrowserClient } from '@/lib/supabase-browser'
 import type { BuyPick } from '@/types'
 import type { BuyPickFormState, SetState, Translate } from '../_components/tabs/types'
+import { type BuyPickDetail, parseBuyPickNote, serializeBuyPickNote } from '../_lib/buyPickDetails'
 
 type UseBuyPicksActionsParams = {
   buyPickForm: BuyPickFormState
@@ -115,6 +116,31 @@ export function useBuyPicksActions(params: UseBuyPicksActionsParams) {
     }
   }, [setBuyPicks, t])
 
+  const updateBuyPickDetails = useCallback(async (pick: BuyPick, details: BuyPickDetail[]) => {
+    const now = new Date().toISOString()
+    const previousNote = pick.note ?? null
+    const { noteText } = parseBuyPickNote(previousNote)
+    const nextNote = serializeBuyPickNote({ noteText, purchaseDetails: details })
+
+    setBuyPicks((prev) => prev.map((item) => item.id === pick.id
+      ? { ...item, note: nextNote ?? undefined, updated_at: now }
+      : item
+    ))
+
+    const { error } = await supabase
+      .from('buy_picks')
+      .update({ note: nextNote, updated_at: now })
+      .eq('id', pick.id)
+
+    if (error) {
+      setBuyPicks((prev) => prev.map((item) => item.id === pick.id
+        ? { ...item, note: previousNote ?? undefined }
+        : item
+      ))
+      toast.error(t('notes.buyPicks.updateError'))
+    }
+  }, [setBuyPicks, t])
+
   const confirmDeleteBuyPick = useCallback(async () => {
     if (!deleteBuyPick) return
 
@@ -144,5 +170,6 @@ export function useBuyPicksActions(params: UseBuyPicksActionsParams) {
     openAddBuyPick,
     saveBuyPick,
     startEditBuyPick,
+    updateBuyPickDetails,
   }
 }

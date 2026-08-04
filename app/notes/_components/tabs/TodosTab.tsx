@@ -194,6 +194,7 @@ export function TodosTab({
         setBuyPickForm={actions.setBuyPickForm}
         setDeleteBuyPick={actions.setDeleteBuyPick}
         startEditBuyPick={actions.startEditBuyPick}
+        updateBuyPickDetails={actions.updateBuyPickDetails}
         toggleBuyPickPurchased={actions.toggleBuyPickPurchased}
         t={ui.t}
       />
