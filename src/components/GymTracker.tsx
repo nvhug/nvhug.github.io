@@ -13,32 +13,40 @@ import { DatePicker } from '@/components/ui/date-picker'
 import { useLanguage } from '@/lib/i18n/language-context'
 
 // ─── Preset exercises ─────────────────────────────────────────────────────────
-const PRESETS: { exercise: string; muscle_group: string }[] = [
-  { exercise: 'Hít đất (Push-up)',                    muscle_group: 'Ngực, vai trước, tay sau' },
-  { exercise: 'One-arm Dumbbell Row',                  muscle_group: 'Lưng, xô, tay trước' },
-  { exercise: 'One-arm Shoulder Press',                muscle_group: 'Vai' },
-  { exercise: 'Dumbbell Biceps Curl',                  muscle_group: 'Tay trước' },
-  { exercise: 'One-arm Overhead Triceps Extension',    muscle_group: 'Tay sau' },
-  { exercise: 'Squat',                                 muscle_group: 'Đùi, mông' },
-  { exercise: 'Deadlift',                              muscle_group: 'Lưng dưới, đùi sau, mông' },
-  { exercise: 'Bench Press',                           muscle_group: 'Ngực, vai, tay sau' },
-  { exercise: 'Pull-up / Chin-up',                     muscle_group: 'Lưng, xô, tay trước' },
-  { exercise: 'Dumbbell Lateral Raise',                muscle_group: 'Vai ngang' },
-  { exercise: 'Plank',                                 muscle_group: 'Core' },
-  { exercise: 'Lunges',                                muscle_group: 'Đùi, mông' },
-  { exercise: 'Leg Press',                             muscle_group: 'Đùi trước' },
-  { exercise: 'Calf Raise',                            muscle_group: 'Bắp chân' },
-  { exercise: 'Crunch / Sit-up',                       muscle_group: 'Bụng trên' },
-  { exercise: 'Russian Twist',                         muscle_group: 'Bụng chéo' },
-  { exercise: 'Hip Thrust',                            muscle_group: 'Mông, đùi sau' },
-  { exercise: 'Face Pull',                             muscle_group: 'Vai sau, lưng trên' },
-  { exercise: 'Triceps Dips',                          muscle_group: 'Tay sau, ngực dưới' },
-  { exercise: 'Arnold Press',                          muscle_group: 'Vai toàn phần' },
+const PRESETS: { exercise: string; muscle_group: string; default_weight_kg: string }[] = [
+  { exercise: 'Hít đất (Push-up)',                    muscle_group: 'Ngực, vai trước, tay sau', default_weight_kg: '' },
+  { exercise: 'One-arm Dumbbell Row',                 muscle_group: 'Lưng, xô, tay trước', default_weight_kg: '10' },
+  { exercise: 'One-arm Shoulder Press',               muscle_group: 'Vai', default_weight_kg: '10' },
+  { exercise: 'Dumbbell Biceps Curl',                 muscle_group: 'Tay trước', default_weight_kg: '10' },
+  { exercise: 'One-arm Overhead Triceps Extension',   muscle_group: 'Tay sau', default_weight_kg: '10' },
+  { exercise: 'Squat',                                muscle_group: 'Đùi, mông', default_weight_kg: '10' },
+  { exercise: 'Deadlift',                             muscle_group: 'Lưng dưới, đùi sau, mông', default_weight_kg: '10' },
+  { exercise: 'Bench Press',                          muscle_group: 'Ngực, vai, tay sau', default_weight_kg: '10' },
+  { exercise: 'Pull-up / Chin-up',                    muscle_group: 'Lưng, xô, tay trước', default_weight_kg: '' },
+  { exercise: 'Dumbbell Lateral Raise',               muscle_group: 'Vai ngang', default_weight_kg: '10' },
+  { exercise: 'Plank',                                muscle_group: 'Core', default_weight_kg: '' },
+  { exercise: 'Lunges',                               muscle_group: 'Đùi, mông', default_weight_kg: '10' },
+  { exercise: 'Leg Press',                            muscle_group: 'Đùi trước', default_weight_kg: '10' },
+  { exercise: 'Calf Raise',                           muscle_group: 'Bắp chân', default_weight_kg: '10' },
+  { exercise: 'Crunch / Sit-up',                      muscle_group: 'Bụng trên', default_weight_kg: '' },
+  { exercise: 'Russian Twist',                        muscle_group: 'Bụng chéo', default_weight_kg: '' },
+  { exercise: 'Hip Thrust',                           muscle_group: 'Mông, đùi sau', default_weight_kg: '10' },
+  { exercise: 'Face Pull',                            muscle_group: 'Vai sau, lưng trên', default_weight_kg: '10' },
+  { exercise: 'Triceps Dips',                         muscle_group: 'Tay sau, ngực dưới', default_weight_kg: '' },
+  { exercise: 'Arnold Press',                         muscle_group: 'Vai toàn phần', default_weight_kg: '10' },
 ]
 
 function todayISO() {
   const d = new Date()
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+function normalizeSearchText(value: string) {
+  return value
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
 }
 
 type LogForm = {
@@ -51,8 +59,9 @@ type LogForm = {
 }
 
 const EMPTY_FORM: LogForm = {
-  exercise: '', muscle_group: '', sets: '3', reps: '12', weight_kg: '10', note: '',
+  exercise: '', muscle_group: '', sets: '3', reps: '10', weight_kg: '10', note: '',
 }
+
 
 // ─── ExerciseSuggest ──────────────────────────────────────────────────────────
 function ExerciseSuggest({ value, onChange, onSelect, placeholder }: {
@@ -62,10 +71,45 @@ function ExerciseSuggest({ value, onChange, onSelect, placeholder }: {
   placeholder: string
 }) {
   const [open, setOpen] = useState(false)
+  const [selectedExercise, setSelectedExercise] = useState<string | null>(() => {
+    const normalized = normalizeSearchText(value.trim())
+    return PRESETS.find(p => normalizeSearchText(p.exercise) === normalized)?.exercise ?? null
+  })
   const ref = useRef<HTMLDivElement>(null)
 
-  const filtered = value.trim()
-    ? PRESETS.filter(p => p.exercise.toLowerCase().includes(value.toLowerCase()))
+  const normalizedValue = normalizeSearchText(value.trim())
+  const selectedFromInput = PRESETS.find(p => normalizeSearchText(p.exercise) === normalizedValue)
+  const filtered = selectedFromInput
+    ? PRESETS
+    : normalizedValue
+    ? PRESETS
+      .map((preset, index) => ({ preset, index }))
+      .filter(({ preset }) => {
+        const exercise = normalizeSearchText(preset.exercise)
+        const muscle = normalizeSearchText(preset.muscle_group)
+        return exercise.includes(normalizedValue) || muscle.includes(normalizedValue)
+      })
+      .sort((a, b) => {
+        const aExercise = normalizeSearchText(a.preset.exercise)
+        const bExercise = normalizeSearchText(b.preset.exercise)
+        const aMuscle = normalizeSearchText(a.preset.muscle_group)
+        const bMuscle = normalizeSearchText(b.preset.muscle_group)
+
+        const score = (exercise: string, muscle: string) => {
+          if (muscle.startsWith(normalizedValue)) return 0
+          if (exercise.startsWith(normalizedValue)) return 1
+          if (muscle.includes(normalizedValue)) return 2
+          return 3
+        }
+
+        const scoreA = score(aExercise, aMuscle)
+        const scoreB = score(bExercise, bMuscle)
+        if (scoreA !== scoreB) return scoreA - scoreB
+
+        // Keep list predictable when same score.
+        return a.index - b.index
+      })
+      .map(({ preset }) => preset)
     : PRESETS
 
   useEffect(() => {
@@ -81,8 +125,19 @@ function ExerciseSuggest({ value, onChange, onSelect, placeholder }: {
       <Input
         autoFocus
         value={value}
-        onChange={e => { onChange(e.target.value); setOpen(true) }}
+        onChange={e => {
+          const nextValue = e.target.value
+          onChange(nextValue)
+          if (!nextValue.trim()) {
+            setSelectedExercise(null)
+          } else {
+            const matched = PRESETS.find(p => normalizeSearchText(p.exercise) === normalizeSearchText(nextValue))
+            if (matched) setSelectedExercise(matched.exercise)
+          }
+          setOpen(true)
+        }}
         onFocus={() => setOpen(true)}
+        onClick={() => setOpen(true)}
         placeholder={placeholder}
         className="text-sm"
       />
@@ -92,8 +147,8 @@ function ExerciseSuggest({ value, onChange, onSelect, placeholder }: {
             <button
               key={p.exercise}
               type="button"
-              onClick={() => { onSelect(p); setOpen(false) }}
-              className="flex w-full flex-col px-3 py-2 text-left hover:bg-emerald-50 transition-colors border-b border-zinc-50 last:border-0"
+              onClick={() => { setSelectedExercise(p.exercise); onSelect(p); setOpen(false) }}
+              className={`flex w-full flex-col px-3 py-2 text-left transition-colors border-b border-zinc-50 last:border-0 ${selectedExercise === p.exercise ? 'bg-emerald-100 hover:bg-emerald-100' : 'hover:bg-emerald-50'}`}
             >
               <span className="text-sm font-medium text-zinc-800">{p.exercise}</span>
               <span className="text-[11px] text-zinc-400">{p.muscle_group}</span>
@@ -148,7 +203,12 @@ export function GymTracker() {
   }
 
   function selectPreset(p: typeof PRESETS[0]) {
-    setForm(f => ({ ...f, exercise: p.exercise, muscle_group: p.muscle_group }))
+    setForm(f => ({
+      ...f,
+      exercise: p.exercise,
+      muscle_group: p.muscle_group,
+      weight_kg: p.default_weight_kg,
+    }))
   }
 
   async function saveLog() {
@@ -174,7 +234,6 @@ export function GymTracker() {
       if (error) throw error
       toast.success(t('gymTracker.saved'))
       setForm(EMPTY_FORM)
-      setShowForm(false)
       setLoading(true)
       await fetchLogs(date)
     } catch {
