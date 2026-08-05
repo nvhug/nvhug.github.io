@@ -14,9 +14,12 @@ function vietnamNow() {
 }
 
 function isoDate(daysAgo: number): string {
-  const d = new Date(vietnamNow().slice(0, 10))
+  const d = new Date(`${vietnamNow().slice(0, 10)}T00:00:00`)
   d.setDate(d.getDate() - daysAgo)
-  return d.toISOString().slice(0, 10)
+  const year = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
 }
 
 type UserStats = {

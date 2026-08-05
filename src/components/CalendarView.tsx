@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input'
 import { ConfirmModal } from '@/components/ui/confirm-modal'
 import { TimePicker } from '@/components/ui/time-picker'
 import { DatePicker } from '@/components/ui/date-picker'
+import { toLocalISODate } from '@/lib/date'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const PX_PER_HOUR = 64
@@ -60,7 +61,7 @@ function minToTime(min: number) {
 }
 
 function toISO(d: Date) {
-  return d.toISOString().slice(0, 10)
+  return toLocalISODate(d)
 }
 
 // Parse ISO date string as local date (avoids UTC-shift when constructing Date)
@@ -400,7 +401,11 @@ function RecurrenceForm({ value, onChange }: {
               <input
                 type="radio"
                 checked={value.end.type === 'until'}
-                onChange={() => patchEnd({ type: 'until', date: new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10) })}
+                onChange={() => {
+                  const endDate = new Date()
+                  endDate.setDate(endDate.getDate() + 30)
+                  patchEnd({ type: 'until', date: toISO(endDate) })
+                }}
                 className="accent-violet-600"
               />
               Đến ngày

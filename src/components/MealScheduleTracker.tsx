@@ -9,6 +9,7 @@ import { Meal } from '@/types'
 import { useLanguage } from '@/lib/i18n/language-context'
 import { DatePicker } from '@/components/ui/date-picker'
 import { TimePicker } from '@/components/ui/time-picker'
+import { getTodayLocalISODate } from '@/lib/date'
 
 const DEFAULT_MEALS = [
   { time: '07:00', name: 'Bữa sáng', target_calories: 520, foods: ['Cơm trắng: 150g', 'Trứng luộc: 2 quả', 'Sữa nóng: 150ml', 'Mật ong: 1.5 thìa'] },
@@ -30,7 +31,7 @@ const EMPTY_FORM: EditForm = { time: '', name: '', target_calories: '', foods: '
 export function MealScheduleTracker() {
   const { t } = useLanguage()
   const [meals, setMeals] = useState<Meal[]>([])
-  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10))
+  const [selectedDate, setSelectedDate] = useState(() => getTodayLocalISODate())
   const [loading, setLoading] = useState(true)
   const isSettingUpRef = useRef(false)
   const [editingId, setEditingId] = useState<string | null>(null)

@@ -1,4 +1,5 @@
 import type { Note, Todo } from '@/types'
+import { toLocalISODate } from '@/lib/date'
 import type { Translate, TypeFilter, TypeTabCount } from '../_components/tabs/types'
 
 export type NotesViewModel = {
@@ -24,14 +25,14 @@ function buildNotesStreak(notes: Note[]): number {
   let streak = 0
   const cursor = new Date()
   cursor.setHours(0, 0, 0, 0)
-  const todayStr = cursor.toISOString().slice(0, 10)
+  const todayStr = toLocalISODate(cursor)
 
   if (!dates.has(todayStr)) {
     cursor.setDate(cursor.getDate() - 1)
   }
 
   while (true) {
-    const d = cursor.toISOString().slice(0, 10)
+    const d = toLocalISODate(cursor)
     if (!dates.has(d)) break
     streak += 1
     cursor.setDate(cursor.getDate() - 1)

@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { CalendarIcon, ChevronLeft, ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { getTodayLocalISODate } from '@/lib/date'
 import { Popover, PopoverContent, PopoverTrigger } from './popover'
 
 const MONTHS = ['Tháng 1','Tháng 2','Tháng 3','Tháng 4','Tháng 5','Tháng 6','Tháng 7','Tháng 8','Tháng 9','Tháng 10','Tháng 11','Tháng 12']
@@ -26,7 +27,7 @@ interface DatePickerProps {
 }
 
 export function DatePicker({ value, onChange, align = 'start', className }: DatePickerProps) {
-  const todayISO = new Date().toISOString().slice(0, 10)
+  const todayISO = getTodayLocalISODate()
   const { year: initY, month: initMo } = parseISO(value)
   const [viewYear, setViewYear] = useState(initY)
   const [viewMonth, setViewMonth] = useState(initMo)
