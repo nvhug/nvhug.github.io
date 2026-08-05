@@ -10,12 +10,13 @@ import { useLanguage } from '@/lib/i18n/language-context'
 import { DatePicker } from '@/components/ui/date-picker'
 import { getIntlLocale } from '@/lib/i18n/locale'
 import type { Lang } from '@/lib/i18n/language-context'
+import { getTodayLocalISODate } from '@/lib/date'
 
 const TARGET_WEIGHT = 75
 const START_WEIGHT = 61
 
 function todayDate() {
-  return new Date().toISOString().slice(0, 10)
+  return getTodayLocalISODate()
 }
 
 function formatDate(iso: string, lang: Lang) {

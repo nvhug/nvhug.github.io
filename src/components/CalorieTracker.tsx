@@ -10,9 +10,10 @@ import { TimePicker } from '@/components/ui/time-picker'
 import { DatePicker } from '@/components/ui/date-picker'
 import { useLanguage } from '@/lib/i18n/language-context'
 import { getIntlLocale } from '@/lib/i18n/locale'
+import { getTodayLocalISODate } from '@/lib/date'
 
 function todayDate() {
-  return new Date().toISOString().slice(0, 10)
+  return getTodayLocalISODate()
 }
 
 function currentTimeStr() {

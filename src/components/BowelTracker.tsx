@@ -11,11 +11,12 @@ import { DatePicker } from '@/components/ui/date-picker'
 import { TimePicker } from '@/components/ui/time-picker'
 import { getIntlLocale } from '@/lib/i18n/locale'
 import type { Lang } from '@/lib/i18n/language-context'
+import { getTodayLocalISODate } from '@/lib/date'
 
 type StoolType = BowelLog['stool_type']
 
 function todayDate() {
-  return new Date().toISOString().slice(0, 10)
+  return getTodayLocalISODate()
 }
 
 function currentTime() {

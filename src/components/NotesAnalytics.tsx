@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react'
 import { Note } from '@/types'
 import { useLanguage } from '@/lib/i18n/language-context'
+import { toLocalISODate } from '@/lib/date'
 
 const DAYS = 30
 const BAR_W = 18
@@ -21,7 +22,7 @@ interface Props {
 function toISO(daysAgo: number) {
   const d = new Date()
   d.setDate(d.getDate() - daysAgo)
-  return d.toISOString().slice(0, 10)
+  return toLocalISODate(d)
 }
 
 function fmtDate(iso: string) {

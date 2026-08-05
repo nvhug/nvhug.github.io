@@ -4,6 +4,7 @@ import { useCallback, useState } from 'react'
 
 import { supabase } from '@/lib/supabase'
 import { getSupabaseBrowserClient } from '@/lib/supabase-browser'
+import { getTodayLocalISODate } from '@/lib/date'
 import type { BuyPick, CalendarEvent, Goal, GoalItem, Note, Post, Todo } from '@/types'
 import { isHealthTagAlias } from '../_lib/healthTags'
 
@@ -134,7 +135,7 @@ export function useNotesData() {
 
   const fetchTodayCalories = useCallback(async () => {
     try {
-      const today = new Date().toISOString().slice(0, 10)
+      const today = getTodayLocalISODate()
       const { data, error } = await supabase
         .from('daily_foods')
         .select('total_calories')

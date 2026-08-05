@@ -9,6 +9,7 @@ import { useCalorieGoal } from '@/lib/useCalorieGoal'
 import { Note, Todo, Goal, GoalItem, BuyPick } from '@/types'
 import { ConfirmModal } from '@/components/ui/confirm-modal'
 import { useLanguage } from '@/lib/i18n/language-context'
+import { getTodayLocalISODate } from '@/lib/date'
 import { NotesPageHeader } from './_components/NotesPageHeader'
 import { NotesTabsNav } from './_components/NotesTabsNav'
 import { useBuyPicksActions } from './_hooks/useBuyPicksActions'
@@ -64,7 +65,7 @@ function getTabFromHash(): TabType {
 }
 
 function todayDate() {
-  return new Date().toISOString().slice(0, 10)
+  return getTodayLocalISODate()
 }
 
 function hasWorkHourlySchedule(times: string[]) {
