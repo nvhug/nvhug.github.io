@@ -32,6 +32,7 @@ const PRESETS: { exercise: string; muscle_group: string; default_weight_kg: stri
   { exercise: 'Russian Twist',                        muscle_group: 'Bụng chéo', default_weight_kg: '' },
   { exercise: 'Hip Thrust',                           muscle_group: 'Mông, đùi sau', default_weight_kg: '10' },
   { exercise: 'Face Pull',                            muscle_group: 'Vai sau, lưng trên', default_weight_kg: '10' },
+  { exercise: 'Phồng má luân phiên (Cheek Puff)',     muscle_group: 'Cơ má, cơ mặt', default_weight_kg: '' },
   { exercise: 'Triceps Dips',                         muscle_group: 'Tay sau, ngực dưới', default_weight_kg: '' },
   { exercise: 'Arnold Press',                         muscle_group: 'Vai toàn phần', default_weight_kg: '10' },
 ]
@@ -182,7 +183,7 @@ export function GymTracker() {
         .from('gym_logs')
         .select('*')
         .eq('log_date', d)
-        .order('order_index', { ascending: true })
+        .order('order_index', { ascending: true, nullsFirst: true })
         .order('created_at', { ascending: true })
       if (error) throw error
       setLogs((data ?? []) as GymLog[])
