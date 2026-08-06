@@ -183,8 +183,8 @@ export function GymTracker() {
         .from('gym_logs')
         .select('*')
         .eq('log_date', d)
-        .order('order_index', { ascending: true, nullsFirst: true })
-        .order('created_at', { ascending: true })
+        .order('order_index', { ascending: false, nullsLast: true })
+        .order('created_at', { ascending: false })
       if (error) throw error
       setLogs((data ?? []) as GymLog[])
     } catch {
