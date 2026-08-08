@@ -25,6 +25,7 @@ function getClient() {
 export const supabase = {
   from: (table: string) => getClient().from(table),
   storage: (bucket: string) => getClient().storage.from(bucket),
+  get auth() { return getClient().auth },
 }
 
 export async function initializeDatabase() {

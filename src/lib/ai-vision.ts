@@ -15,10 +15,11 @@ const KEY_ENV: Record<VisionProvider, string> = {
   openrouter: 'OPENROUTER_API_KEY',
 }
 
+// Google retires older ids for new keys, so pin a current one and override via FOOD_VISION_MODEL.
 const DEFAULT_MODEL: Record<VisionProvider, string> = {
-  gemini: 'gemini-2.5-flash',
+  gemini: 'gemini-3.6-flash',
   openai: 'gpt-4o-mini',
-  openrouter: 'google/gemini-2.5-flash',
+  openrouter: 'google/gemini-3.6-flash',
 }
 
 export interface VisionConfig {

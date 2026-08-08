@@ -1,14 +1,17 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Camera, ImagePlus, LoaderCircle, Plus, RefreshCw, Sparkles, TriangleAlert, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
+import { uploadFoodThumb } from '@/lib/storage'
 import { TimePicker } from '@/components/ui/time-picker'
 import { useLanguage } from '@/lib/i18n/language-context'
 
 const MAX_EDGE_PX = 1024
 const JPEG_QUALITY = 0.82
+// 512 px: large enough to look sharp in a phone-sized lightbox, small enough for a DB TEXT column (~40-80 KB base64).
+const THUMB_SIZE_PX = 512
 
 interface AnalyzedItem {
   name: string
@@ -27,6 +30,7 @@ interface AnalyzeResponse {
   needsDetail: boolean
   questions: string[]
   notes: string
+  focusBox?: [number, number, number, number] | null
 }
 
 interface EditableItem extends AnalyzedItem {
@@ -44,6 +48,8 @@ interface FoodPhotoAnalyzerProps {
   date: string
   onAdded: () => Promise<void> | void
 }
+
+type FocusBox = [number, number, number, number]
 
 function currentTimeStr() {
   const now = new Date()
@@ -94,6 +100,58 @@ function confidenceTone(value: number) {
   return 'bg-rose-100 text-rose-700'
 }
 
+function clamp(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(value, max))
+}
+
+function toFocusCrop(width: number, height: number, focusBox?: FocusBox | null) {
+  const shortest = Math.min(width, height)
+  if (!focusBox || focusBox.length !== 4) {
+    const size = Math.round(shortest * 0.9)
+    return {
+      x: Math.round((width - size) / 2),
+      y: Math.round((height - size) / 2),
+      size,
+    }
+  }
+
+  const [yMinN, xMinN, yMaxN, xMaxN] = focusBox
+  const xMin = clamp((xMinN / 1000) * width, 0, width)
+  const xMax = clamp((xMaxN / 1000) * width, 0, width)
+  const yMin = clamp((yMinN / 1000) * height, 0, height)
+  const yMax = clamp((yMaxN / 1000) * height, 0, height)
+
+  const boxW = Math.max(1, xMax - xMin)
+  const boxH = Math.max(1, yMax - yMin)
+  const cx = (xMin + xMax) / 2
+  const cy = (yMin + yMax) / 2
+
+  const padded = Math.max(boxW, boxH) * 1.25
+  const size = clamp(Math.round(padded), Math.round(shortest * 0.35), shortest)
+  const x = Math.round(clamp(cx - size / 2, 0, width - size))
+  const y = Math.round(clamp(cy - size / 2, 0, height - size))
+  return { x, y, size }
+}
+
+async function buildThumbnailDataUrl(image: PickedImage, focusBox?: FocusBox | null): Promise<string | null> {
+  try {
+    const bitmap = await createImageBitmap(await (await fetch(image.previewUrl)).blob())
+    const crop = toFocusCrop(bitmap.width, bitmap.height, focusBox)
+
+    const canvas = document.createElement('canvas')
+    canvas.width = THUMB_SIZE_PX
+    canvas.height = THUMB_SIZE_PX
+    const ctx = canvas.getContext('2d')
+    if (!ctx) throw new Error('no 2d context')
+
+    ctx.drawImage(bitmap, crop.x, crop.y, crop.size, crop.size, 0, 0, THUMB_SIZE_PX, THUMB_SIZE_PX)
+    bitmap.close()
+    return canvas.toDataURL('image/jpeg', 0.88)
+  } catch {
+    return null
+  }
+}
+
 export function FoodPhotoAnalyzer({ date, onAdded }: FoodPhotoAnalyzerProps) {
   const { t, lang } = useLanguage()
   const cameraRef = useRef<HTMLInputElement>(null)
@@ -107,6 +165,14 @@ export function FoodPhotoAnalyzer({ date, onAdded }: FoodPhotoAnalyzerProps) {
   const [detailOpen, setDetailOpen] = useState(false)
   const [time, setTime] = useState(currentTimeStr)
   const [saving, setSaving] = useState(false)
+  const [analysisProgress, setAnalysisProgress] = useState(0)
+  const progressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (progressTimerRef.current) clearInterval(progressTimerRef.current)
+    }
+  }, [])
 
   const included = items.filter((i) => i.include)
   const totals = included.reduce(
@@ -120,13 +186,38 @@ export function FoodPhotoAnalyzer({ date, onAdded }: FoodPhotoAnalyzerProps) {
   )
 
   function resetAll() {
+    if (progressTimerRef.current) {
+      clearInterval(progressTimerRef.current)
+      progressTimerRef.current = null
+    }
     setImage(null)
     setResult(null)
     setItems([])
     setDetail('')
     setDetailOpen(false)
+    setAnalysisProgress(0)
     if (cameraRef.current) cameraRef.current.value = ''
     if (galleryRef.current) galleryRef.current.value = ''
+  }
+
+  function startProgressTicker() {
+    if (progressTimerRef.current) clearInterval(progressTimerRef.current)
+    setAnalysisProgress(6)
+    progressTimerRef.current = setInterval(() => {
+      setAnalysisProgress((prev) => {
+        if (prev >= 88) return prev
+        const step = prev < 35 ? 8 : prev < 65 ? 5 : 2
+        return Math.min(88, prev + step)
+      })
+    }, 400)
+  }
+
+  function stopProgressTicker(finalPercent = 100) {
+    if (progressTimerRef.current) {
+      clearInterval(progressTimerRef.current)
+      progressTimerRef.current = null
+    }
+    setAnalysisProgress(finalPercent)
   }
 
   async function pickImage(file: File | undefined) {
@@ -140,20 +231,26 @@ export function FoodPhotoAnalyzer({ date, onAdded }: FoodPhotoAnalyzerProps) {
       setImage(prepared)
       setResult(null)
       setItems([])
+      setDetailOpen(false)
+      setTime(currentTimeStr())
+      void analyze('image', prepared)
     } catch {
       toast.error(t('foodPhoto.readImageError'))
     }
   }
 
-  async function analyze(mode: 'image' | 'text') {
+  async function analyze(mode: 'image' | 'text', imageOverride?: PickedImage) {
+    if (analyzing) return
+    const picked = imageOverride ?? image
     setAnalyzing(true)
+    startProgressTicker()
     try {
       const res = await fetch('/api/notes/analyze-food', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           mode,
-          image: mode === 'image' && image ? { data: image.data, mimeType: image.mimeType } : undefined,
+          image: mode === 'image' && picked ? { data: picked.data, mimeType: picked.mimeType } : undefined,
           description: detail.trim() || undefined,
           lang,
         }),
@@ -161,6 +258,7 @@ export function FoodPhotoAnalyzer({ date, onAdded }: FoodPhotoAnalyzerProps) {
 
       const payload = await res.json()
       if (!res.ok) {
+        stopProgressTicker(0)
         toast.error(payload?.error || t('foodPhoto.analyzeError'))
         setDetailOpen(true)
         return
@@ -178,11 +276,13 @@ export function FoodPhotoAnalyzer({ date, onAdded }: FoodPhotoAnalyzerProps) {
       // The tab can sit open for hours, so stamp the meal at analysis time.
       setTime(currentTimeStr())
       setDetailOpen(data.needsDetail)
+      stopProgressTicker(100)
       if (data.items.length === 0) {
         toast.error(t('foodPhoto.nothingDetected'))
         setDetailOpen(true)
       }
     } catch {
+      stopProgressTicker(0)
       toast.error(t('foodPhoto.analyzeError'))
       setDetailOpen(true)
     } finally {
@@ -199,6 +299,16 @@ export function FoodPhotoAnalyzer({ date, onAdded }: FoodPhotoAnalyzerProps) {
     setSaving(true)
     try {
       const createdAt = new Date(`${date}T${time}:00`).toISOString()
+      const { data: { user } } = await supabase.auth.getUser()
+      let thumbUrl: string | null = null
+      if (image && user) {
+        try {
+          const dataUrl = await buildThumbnailDataUrl(image, result?.focusBox ?? null)
+          if (dataUrl) thumbUrl = await uploadFoodThumb(dataUrl, user.id)
+        } catch {
+          // Thumbnail upload failed — save the entry without the photo rather than blocking.
+        }
+      }
       const rows = included.map((i) => ({
         date,
         custom_food_name: i.name.trim(),
@@ -207,6 +317,7 @@ export function FoodPhotoAnalyzer({ date, onAdded }: FoodPhotoAnalyzerProps) {
         protein_g: i.protein_g,
         carbs_g: i.carbs_g,
         fat_g: i.fat_g,
+        image_thumb: thumbUrl,
         notes: i.portion || null,
         created_at: createdAt,
       }))
@@ -270,15 +381,17 @@ export function FoodPhotoAnalyzer({ date, onAdded }: FoodPhotoAnalyzerProps) {
             className="h-24 w-24 shrink-0 rounded-lg border border-emerald-200 object-cover"
           />
           <div className="flex flex-1 flex-col gap-2">
-            <button
-              type="button"
-              onClick={() => void analyze('image')}
-              disabled={analyzing}
-              className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-500 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-emerald-600 disabled:opacity-50"
-            >
-              {analyzing ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-              {analyzing ? t('foodPhoto.analyzing') : result ? t('foodPhoto.reanalyze') : t('foodPhoto.analyze')}
-            </button>
+              {result && (
+                <button
+                  type="button"
+                  onClick={() => void analyze('image')}
+                  disabled={analyzing}
+                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-500 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-emerald-600 disabled:opacity-50"
+                >
+                  {analyzing ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                  {analyzing ? t('foodPhoto.analyzing') : t('foodPhoto.reanalyze')}
+                </button>
+              )}
             <button
               type="button"
               onClick={resetAll}
@@ -292,7 +405,17 @@ export function FoodPhotoAnalyzer({ date, onAdded }: FoodPhotoAnalyzerProps) {
       )}
 
       {analyzing && (
-        <p className="text-center text-xs text-zinc-500">{t('foodPhoto.analyzingHint')}</p>
+        <div className="space-y-1.5">
+          <div className="h-2 overflow-hidden rounded-full border border-emerald-200 bg-emerald-50">
+            <div
+              className="h-full bg-emerald-500 transition-all duration-300"
+              style={{ width: `${analysisProgress}%` }}
+            />
+          </div>
+          <p className="text-center text-xs text-zinc-500">
+            {t('foodPhoto.analyzingHint')} ({analysisProgress}%)
+          </p>
+        </div>
       )}
 
       {/* Detail fallback — shown when the AI is unsure, failed, or the user has no photo */}

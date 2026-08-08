@@ -188,6 +188,7 @@ export interface DailyFood {
   protein_g?: number | null
   carbs_g?: number | null
   fat_g?: number | null
+  image_thumb?: string | null
   notes?: string
   created_at: string
   updated_at: string

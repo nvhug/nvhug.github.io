@@ -84,6 +84,7 @@ const JSON_SHAPE = `{
 const OBSERVATION_SHAPE = `{
   "is_food": boolean,
   "image_quality": "clear" | "blurry" | "dark" | "cropped" | "far",
+  "focus_box": [ymin, xmin, ymax, xmax],
   "scale_reference": string,
   "overall_confidence": number 0..1,
   "questions": string[],
@@ -116,7 +117,8 @@ RULES:
 7. "confidence": 0.85+ only when both the dish and its portion are unambiguous; 0.5-0.85 when the dish is clear but the portion is inferred; below 0.5 when the dish itself is uncertain.
 8. "questions": 2-4 SHORT, SPECIFIC questions, only for facts the photo cannot show (portion weight, oil used, sugar in the sauce, whether the broth was drunk). Never ask "what did you eat". Leave empty when the photo is self-explanatory.
 9. If there is no food in the photo, return "is_food": false with an empty "items" array.
-10. Write "name", "description", "estimated_portion", "scale_reference" and "questions" in ${lang === 'en' ? 'English' : 'Vietnamese'}.`
+10. "focus_box" must tightly cover the main plated food area as [ymin, xmin, ymax, xmax] normalized to 0..1000.
+11. Write "name", "description", "estimated_portion", "scale_reference" and "questions" in ${lang === 'en' ? 'English' : 'Vietnamese'}.`
 }
 
 /** Stage 2 — nutrition model converts observations (or a written description) into kcal + macros. */
@@ -187,6 +189,18 @@ const MSG = {
   aiFailed: { vi: 'AI không phân tích được, vui lòng thử lại.', en: 'AI analysis failed, please try again.' },
 } as const
 
+const observationSchema = z.object({
+  focus_box: z
+    .tuple([z.coerce.number(), z.coerce.number(), z.coerce.number(), z.coerce.number()])
+    .transform(([yMin, xMin, yMax, xMax]) => [
+      Math.max(0, Math.min(Math.round(yMin), 1000)),
+      Math.max(0, Math.min(Math.round(xMin), 1000)),
+      Math.max(0, Math.min(Math.round(yMax), 1000)),
+      Math.max(0, Math.min(Math.round(xMax), 1000)),
+    ] as [number, number, number, number])
+    .catch([0, 0, 1000, 1000] as [number, number, number, number]),
+})
+
 export async function POST(request: Request) {
   let body: unknown
   try {
@@ -230,10 +244,16 @@ export async function POST(request: Request) {
   }
 
   let raw: string
+  let focusBox: [number, number, number, number] | null = null
   try {
     if (mode === 'image' && image) {
       // Stage 1: vision model describes the plate. Stage 2: DeepSeek does the nutrition maths.
       const observation = await requestVisionJSON(buildVisionPrompt(lang, description), image)
+      try {
+        focusBox = observationSchema.parse(extractJSON(observation)).focus_box
+      } catch {
+        focusBox = null
+      }
       raw = await requestTextJSON(buildNutritionPrompt(lang, { observation, description }))
     } else {
       raw = await requestTextJSON(buildNutritionPrompt(lang, { description }))
@@ -265,5 +285,6 @@ export async function POST(request: Request) {
     needsDetail: result.needs_more_detail || !result.is_food || items.length === 0,
     questions: result.questions.slice(0, 4),
     notes: result.notes,
+    focusBox,
   })
 }
