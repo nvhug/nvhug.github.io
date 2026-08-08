@@ -334,6 +334,14 @@ export const vi = {
     foodListHeading: 'Danh sách thực phẩm trong ngày',
     emptyFoods: 'Chưa có thực phẩm nào.',
     editFoodNamePlaceholder: 'Tên thực phẩm',
+    macroTargets: 'Mục tiêu macro',
+    macroTargetHint: 'Nhấn vào số để chỉnh mục tiêu',
+    proteinTarget: 'Đạm',
+    carbsTarget: 'Tinh bột',
+    fatTarget: 'Chất béo',
+    macroUnit: 'g',
+    macroReached: 'Đạt',
+    macroOver: 'Vượt',
   },
 
   foodPhoto: {
