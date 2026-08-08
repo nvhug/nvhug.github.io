@@ -1,0 +1,269 @@
+import { NextResponse } from 'next/server'
+import { z } from 'zod'
+import { createSupabaseServerClient } from '@/lib/supabase-server'
+import { requestVisionJSON, requestTextJSON, resolveVisionConfig, visionProviderNames } from '@/lib/ai-vision'
+
+export const dynamic = 'force-dynamic'
+export const maxDuration = 60
+
+// Vercel caps request bodies at 4.5 MB and base64 inflates by ~4/3, so keep the
+// decoded image below that. The client downscales to ~1024 px first.
+const MAX_IMAGE_BYTES = 3 * 1024 * 1024
+const ALLOWED_MIME = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif']
+
+type Lang = 'vi' | 'en'
+
+const requestSchema = z.object({
+  mode: z.enum(['image', 'text']),
+  image: z
+    .object({
+      data: z.string().min(1),
+      mimeType: z.string().min(1),
+    })
+    .optional(),
+  description: z.string().max(2000).optional(),
+  lang: z.enum(['vi', 'en']).optional(),
+})
+
+// The model is asked for exact keys, but stays a language model — coerce and
+// default everything so one sloppy field does not fail the whole analysis.
+
+/** Accepts 0..1 ratios and 0..100 percentages, which models use interchangeably. */
+const confidence = (fallback: number) =>
+  z.coerce
+    .number()
+    .catch(fallback)
+    .transform((n) => (n > 1 ? Math.min(n / 100, 1) : Math.max(n, 0)))
+
+/** `z.coerce.boolean()` turns the string "false" into true, so parse strings explicitly. */
+const looseBool = (fallback: boolean) =>
+  z
+    .preprocess((v) => (typeof v === 'string' ? v.trim().toLowerCase() === 'true' : v), z.boolean())
+    .catch(fallback)
+
+const itemSchema = z.object({
+  name: z.string().min(1).catch('?'),
+  portion: z.string().catch(''),
+  calories: z.coerce.number().min(0).catch(0),
+  protein_g: z.coerce.number().min(0).catch(0),
+  carbs_g: z.coerce.number().min(0).catch(0),
+  fat_g: z.coerce.number().min(0).catch(0),
+  confidence: confidence(0.5),
+  assumptions: z.string().catch(''),
+})
+
+const resultSchema = z.object({
+  is_food: looseBool(true),
+  overall_confidence: confidence(0.5),
+  needs_more_detail: looseBool(false),
+  questions: z.array(z.string()).catch([]),
+  notes: z.string().catch(''),
+  items: z.array(itemSchema).catch([]),
+})
+
+const JSON_SHAPE = `{
+  "is_food": boolean,
+  "overall_confidence": number 0..1,
+  "needs_more_detail": boolean,
+  "questions": string[],
+  "notes": string,
+  "items": [
+    {
+      "name": string,
+      "portion": string,
+      "calories": number,
+      "protein_g": number,
+      "carbs_g": number,
+      "fat_g": number,
+      "confidence": number 0..1,
+      "assumptions": string
+    }
+  ]
+}`
+
+const OBSERVATION_SHAPE = `{
+  "is_food": boolean,
+  "image_quality": "clear" | "blurry" | "dark" | "cropped" | "far",
+  "scale_reference": string,
+  "overall_confidence": number 0..1,
+  "questions": string[],
+  "items": [
+    {
+      "name": string,
+      "description": string,
+      "estimated_portion": string,
+      "cooking_method": string,
+      "visible_fat_sauce": string,
+      "confidence": number 0..1
+    }
+  ]
+}`
+
+/** Stage 1 — vision model only observes; it must not guess calories. */
+function buildVisionPrompt(lang: Lang, detail?: string): string {
+  return `You are a food photo analyst for a nutrition app. Look at the attached photo and report ONLY what you can actually see. Do NOT estimate calories or macronutrients — a nutrition model does that in the next step.
+${detail ? `\nThe user added these details — trust them over your visual guess when they conflict:\n"""${detail}"""\n` : ''}
+Return ONLY valid JSON, no markdown fence, exactly this shape:
+${OBSERVATION_SHAPE}
+
+RULES:
+1. One entry in "items" per distinct dish, side or drink. Separate components that can be weighed separately (rice, meat, vegetables, broth, sauce, drink).
+2. "name": the specific dish name, not a generic category. Vietnamese dishes are common (com tam, pho, bun bo Hue, banh mi, xoi, che, ca kho to, canh chua, goi cuon).
+3. "description": visible ingredients, colour, texture, garnish, and anything that hints at richness.
+4. "estimated_portion": derive scale from reference objects — bowl or plate diameter, chopsticks, spoon, can, bottle, hand — and give a weight or household measure, e.g. "1 rice bowl, ~200 g cooked rice". State the reference you used in "scale_reference".
+5. "cooking_method": deep-fried / stir-fried / grilled / steamed / boiled / raw / braised, plus anything visible such as charring or breading.
+6. "visible_fat_sauce": oil sheen, fat trim, mayonnaise, condensed milk, syrup, dipping sauce, broth level.
+7. "confidence": 0.85+ only when both the dish and its portion are unambiguous; 0.5-0.85 when the dish is clear but the portion is inferred; below 0.5 when the dish itself is uncertain.
+8. "questions": 2-4 SHORT, SPECIFIC questions, only for facts the photo cannot show (portion weight, oil used, sugar in the sauce, whether the broth was drunk). Never ask "what did you eat". Leave empty when the photo is self-explanatory.
+9. If there is no food in the photo, return "is_food": false with an empty "items" array.
+10. Write "name", "description", "estimated_portion", "scale_reference" and "questions" in ${lang === 'en' ? 'English' : 'Vietnamese'}.`
+}
+
+/** Stage 2 — nutrition model converts observations (or a written description) into kcal + macros. */
+function buildNutritionPrompt(lang: Lang, source: { observation?: string; description?: string }): string {
+  const role =
+    lang === 'en'
+      ? 'You are a clinical dietitian specialising in Vietnamese cuisine, portion estimation and macronutrients.'
+      : 'Ban la chuyen gia dinh duong lam sang, chuyen sau ve am thuc Viet Nam, uoc luong khau phan va macro.'
+
+  const input = source.observation
+    ? `A vision model examined the user's meal photo and reported these observations:
+"""${source.observation}"""
+
+Treat those observations as the ground truth about what is on the plate. Your job is the nutrition maths.${
+        source.description
+          ? `\n\nThe user also described the meal in their own words. Trust this over the vision model wherever the two conflict:\n"""${source.description}"""`
+          : ''
+      }`
+    : `There is no photo. Estimate from this written description only:
+"""${source.description ?? ''}"""
+
+Rely on typical serving sizes for the dish and say so in "assumptions".`
+
+  return `${role}
+
+${input}
+
+OUTPUT FORMAT — return ONLY valid JSON, no markdown fence, no commentary, exactly this shape:
+${JSON_SHAPE}
+
+HARD RULES:
+1. Keep one "items" entry per dish reported above. Do not merge or drop items, and do not invent items that were not reported.
+2. "portion" must state the serving with a weight or household measure, e.g. "1 bowl (~200 g cooked rice)", "2 pieces (~120 g)".
+3. Macro consistency is mandatory: calories MUST equal protein_g*4 + carbs_g*4 + fat_g*9 within +/-10%. Recompute and adjust before answering.
+4. Round calories to the nearest 5 kcal and macros to 1 decimal place.
+5. Apply the cooking method: deep-fried adds ~8-15 g fat per serving, stir-fried ~5-10 g, grilled/steamed/boiled ~0-3 g. Vietnamese dishes usually carry added sugar in the marinade or dipping sauce.
+6. Count only the edible portion — exclude bones, shells and inedible garnish — but include sauces, broth actually consumed, toppings, condensed milk and syrup.
+7. "confidence": start from the confidence the vision model gave each item, then lower it further when the portion weight or cooking fat is still unknown.
+8. Set "needs_more_detail": true when overall_confidence < 0.6, when image quality was poor, or when an unknown (portion weight, oil, sugar, broth) materially changes the estimate. When true, carry over and sharpen the vision model's questions into 2-4 SHORT, SPECIFIC questions in "questions".
+9. "assumptions" states what you assumed for that item (cooking oil, sauce, container size, doneness).
+10. "notes": one sentence on the overall reliability of this estimate.
+11. Write "name", "portion", "questions", "notes" and "assumptions" in ${lang === 'en' ? 'English' : 'Vietnamese'}.`
+}
+
+function extractJSON(raw: string): unknown {
+  const trimmed = raw.trim().replace(/^```(?:json)?/i, '').replace(/```$/, '').trim()
+  try {
+    return JSON.parse(trimmed)
+  } catch {
+    const start = trimmed.indexOf('{')
+    const end = trimmed.lastIndexOf('}')
+    if (start === -1 || end <= start) throw new Error('Model did not return JSON')
+    return JSON.parse(trimmed.slice(start, end + 1))
+  }
+}
+
+const MSG = {
+  unauthorized: { vi: 'Vui lòng đăng nhập.', en: 'Please sign in.' },
+  badBody: { vi: 'Dữ liệu gửi lên không hợp lệ.', en: 'Invalid request body.' },
+  noImage: { vi: 'Thiếu ảnh để phân tích.', en: 'Missing image to analyse.' },
+  badMime: { vi: 'Định dạng ảnh không được hỗ trợ.', en: 'Unsupported image format.' },
+  tooLarge: { vi: 'Ảnh quá lớn, vui lòng chụp lại.', en: 'Image is too large, please retake it.' },
+  noDescription: { vi: 'Vui lòng mô tả món ăn.', en: 'Please describe the food.' },
+  noProvider: {
+    vi: 'Chưa cấu hình AI đọc ảnh trên máy chủ.',
+    en: 'Image AI is not configured on the server.',
+  },
+  aiFailed: { vi: 'AI không phân tích được, vui lòng thử lại.', en: 'AI analysis failed, please try again.' },
+} as const
+
+export async function POST(request: Request) {
+  let body: unknown
+  try {
+    body = await request.json()
+  } catch {
+    return NextResponse.json({ error: MSG.badBody.vi }, { status: 400 })
+  }
+
+  // Read the language before validation so even a rejection is localised.
+  const lang: Lang = (body as { lang?: unknown } | null)?.lang === 'en' ? 'en' : 'vi'
+
+  const parsed = requestSchema.safeParse(body)
+  if (!parsed.success) {
+    return NextResponse.json({ error: MSG.badBody[lang] }, { status: 400 })
+  }
+  const { mode, image, description } = parsed.data
+
+  const supabase = await createSupabaseServerClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return NextResponse.json({ error: MSG.unauthorized[lang] }, { status: 401 })
+  }
+
+  if (mode === 'image') {
+    if (!image) return NextResponse.json({ error: MSG.noImage[lang] }, { status: 400 })
+    if (!ALLOWED_MIME.includes(image.mimeType.toLowerCase())) {
+      return NextResponse.json({ error: MSG.badMime[lang] }, { status: 400 })
+    }
+    // base64 inflates by ~4/3; compare against the decoded size.
+    if ((image.data.length * 3) / 4 > MAX_IMAGE_BYTES) {
+      return NextResponse.json({ error: MSG.tooLarge[lang] }, { status: 413 })
+    }
+    if (!resolveVisionConfig()) {
+      return NextResponse.json(
+        { error: MSG.noProvider[lang], missingEnv: visionProviderNames() },
+        { status: 500 }
+      )
+    }
+  } else if (!description?.trim()) {
+    return NextResponse.json({ error: MSG.noDescription[lang] }, { status: 400 })
+  }
+
+  let raw: string
+  try {
+    if (mode === 'image' && image) {
+      // Stage 1: vision model describes the plate. Stage 2: DeepSeek does the nutrition maths.
+      const observation = await requestVisionJSON(buildVisionPrompt(lang, description), image)
+      raw = await requestTextJSON(buildNutritionPrompt(lang, { observation, description }))
+    } else {
+      raw = await requestTextJSON(buildNutritionPrompt(lang, { description }))
+    }
+  } catch (err) {
+    console.error('[analyze-food] provider call failed:', err)
+    return NextResponse.json({ error: MSG.aiFailed[lang] }, { status: 502 })
+  }
+
+  let result: z.infer<typeof resultSchema>
+  try {
+    result = resultSchema.parse(extractJSON(raw))
+  } catch (err) {
+    console.error('[analyze-food] unparsable model output:', err, raw.slice(0, 300))
+    return NextResponse.json({ error: MSG.aiFailed[lang] }, { status: 502 })
+  }
+
+  const items = result.items.map((item) => ({
+    ...item,
+    calories: Math.round(item.calories),
+    protein_g: Math.round(item.protein_g * 10) / 10,
+    carbs_g: Math.round(item.carbs_g * 10) / 10,
+    fat_g: Math.round(item.fat_g * 10) / 10,
+  }))
+
+  return NextResponse.json({
+    items,
+    confidence: result.overall_confidence,
+    needsDetail: result.needs_more_detail || !result.is_food || items.length === 0,
+    questions: result.questions.slice(0, 4),
+    notes: result.notes,
+  })
+}

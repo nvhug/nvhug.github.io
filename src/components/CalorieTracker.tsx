@@ -1,13 +1,14 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { Plus, Trash2, Edit2, X, Check, Clock } from 'lucide-react'
+import { Plus, Trash2, Edit2, X, Check, Clock, Camera } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import { useCalorieGoal } from '@/lib/useCalorieGoal'
 import { FoodTemplate, DailyFood } from '@/types'
 import { TimePicker } from '@/components/ui/time-picker'
 import { DatePicker } from '@/components/ui/date-picker'
+import { FoodPhotoAnalyzer } from '@/components/FoodPhotoAnalyzer'
 import { useLanguage } from '@/lib/i18n/language-context'
 import { getIntlLocale } from '@/lib/i18n/locale'
 import { getTodayLocalISODate } from '@/lib/date'
@@ -27,6 +28,8 @@ function timeStrFromISO(iso: string) {
 }
 
 
+type InputMode = 'custom' | 'list' | 'photo'
+
 export function CalorieTracker() {
   const { t, lang } = useLanguage()
   const [foodTemplates, setFoodTemplates] = useState<FoodTemplate[]>([])
@@ -39,7 +42,8 @@ export function CalorieTracker() {
   const [quantity, setQuantity] = useState<string>('1')
   const [customFoodName, setCustomFoodName] = useState<string>('')
   const [customCalories, setCustomCalories] = useState<string>('')
-  const [useCustom, setUseCustom] = useState(true)
+  const [mode, setMode] = useState<InputMode>('custom')
+  const useCustom = mode === 'custom'
   const [customTime, setCustomTime] = useState(currentTimeStr)
   const [saving, setSaving] = useState(false)
 
@@ -148,7 +152,7 @@ export function CalorieTracker() {
       setCustomFoodName('')
       setCustomCalories('')
       setCustomTime(currentTimeStr())
-      setUseCustom(false)
+      setMode('list')
       toast.success(t('calorieTracker.addSuccess'))
     } catch {
       toast.error(t('calorieTracker.addError'))
@@ -186,6 +190,10 @@ export function CalorieTracker() {
       const { error } = await supabase.from('daily_foods').update({
         custom_food_name: editingData.custom_food_name,
         total_calories: editingData.total_calories,
+        // 0 means "not tracked" here — keep it null so entries without macros stay blank.
+        protein_g: editingData.protein_g || null,
+        carbs_g: editingData.carbs_g || null,
+        fat_g: editingData.fat_g || null,
         quantity: editingData.quantity,
         notes: editingData.notes,
         created_at: new Date(`${food.date}T${editingTime}:00`).toISOString(),
@@ -206,6 +214,16 @@ export function CalorieTracker() {
   const totalCalories = dailyFoods.reduce((sum, food) => sum + (food.total_calories || 0), 0)
   const progressPercent = Math.round((totalCalories / calorieGoal) * 100)
   const remainingCalories = calorieGoal - totalCalories
+
+  const macroTotals = dailyFoods.reduce(
+    (acc, food) => ({
+      protein: Math.round((acc.protein + (food.protein_g ?? 0)) * 10) / 10,
+      carbs: Math.round((acc.carbs + (food.carbs_g ?? 0)) * 10) / 10,
+      fat: Math.round((acc.fat + (food.fat_g ?? 0)) * 10) / 10,
+    }),
+    { protein: 0, carbs: 0, fat: 0 }
+  )
+  const hasMacros = macroTotals.protein > 0 || macroTotals.carbs > 0 || macroTotals.fat > 0
 
   const selectedTemplate = foodTemplates.find((f) => f.id === selectedFoodId)
   const previewCalories = selectedTemplate && selectedFoodId && !useCustom
@@ -271,6 +289,21 @@ export function CalorieTracker() {
               <span className="text-amber-600">{t('calorieTracker.overKcal', { n: Math.round(Math.abs(remainingCalories)) })}</span>
             )}
           </div>
+
+          {hasMacros && (
+            <div className="grid grid-cols-3 gap-2 pt-1">
+              {([
+                [t('foodPhoto.protein'), macroTotals.protein],
+                [t('foodPhoto.carbs'), macroTotals.carbs],
+                [t('foodPhoto.fat'), macroTotals.fat],
+              ] as const).map(([label, value]) => (
+                <div key={label} className="rounded-lg bg-emerald-50 px-2 py-1.5 text-center">
+                  <p className="text-[10px] text-zinc-500">{label}</p>
+                  <p className="text-sm font-semibold tabular-nums text-zinc-900">{value}g</p>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
@@ -279,9 +312,9 @@ export function CalorieTracker() {
         <div className="mb-3 flex gap-2">
           <button
             type="button"
-            onClick={() => setUseCustom(true)}
+            onClick={() => setMode('custom')}
             className={`flex-1 rounded-lg px-3 py-2 text-xs font-medium transition-colors ${
-              useCustom
+              mode === 'custom'
                 ? 'bg-emerald-500 text-white'
                 : 'border border-emerald-200 text-emerald-700 hover:bg-emerald-50'
             }`}
@@ -290,18 +323,32 @@ export function CalorieTracker() {
           </button>
           <button
             type="button"
-            onClick={() => setUseCustom(false)}
+            onClick={() => setMode('list')}
             className={`flex-1 rounded-lg px-3 py-2 text-xs font-medium transition-colors ${
-              !useCustom
+              mode === 'list'
                 ? 'bg-emerald-500 text-white'
                 : 'border border-emerald-200 text-emerald-700 hover:bg-emerald-50'
             }`}
           >
             {t('calorieTracker.list')}
           </button>
+          <button
+            type="button"
+            onClick={() => setMode('photo')}
+            className={`flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-colors ${
+              mode === 'photo'
+                ? 'bg-emerald-500 text-white'
+                : 'border border-emerald-200 text-emerald-700 hover:bg-emerald-50'
+            }`}
+          >
+            <Camera className="h-3.5 w-3.5" />
+            {t('calorieTracker.photo')}
+          </button>
         </div>
 
-        {useCustom ? (
+        {mode === 'photo' ? (
+          <FoodPhotoAnalyzer date={selectedDate} onAdded={fetchDailyFoods} />
+        ) : useCustom ? (
           <div className="space-y-2">
             <input
               type="text"
@@ -434,6 +481,25 @@ export function CalorieTracker() {
                           </button>
                         </div>
                       </div>
+                      <div className="grid grid-cols-3 gap-1.5">
+                        {([
+                          ['protein_g', t('foodPhoto.protein')],
+                          ['carbs_g', t('foodPhoto.carbs')],
+                          ['fat_g', t('foodPhoto.fat')],
+                        ] as const).map(([field, label]) => (
+                          <label key={field} className="flex flex-col gap-0.5">
+                            <span className="text-[10px] text-zinc-500">{label} (g)</span>
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.1"
+                              value={editingData?.[field] ?? 0}
+                              onChange={(e) => setEditingData({ ...editingData, [field]: Number(e.target.value) || 0 })}
+                              className="w-full rounded border border-emerald-300 px-1.5 py-1 text-xs tabular-nums text-zinc-900 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                            />
+                          </label>
+                        ))}
+                      </div>
                     </div>
                   ) : (
                     <div className="flex flex-col gap-1">
@@ -456,7 +522,7 @@ export function CalorieTracker() {
                           </button>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <span className="flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-medium text-emerald-600">
                           <Clock className="h-3 w-3" />
                           {new Date(food.created_at).toLocaleTimeString(getIntlLocale(lang), { hour: '2-digit', minute: '2-digit' })}
@@ -464,6 +530,11 @@ export function CalorieTracker() {
                         <p className="text-xs text-zinc-500">
                           {template && !food.custom_food_name ? `${food.quantity} ${template.unit} • ` : ''}{Math.round(food.total_calories * 10) / 10} kcal
                         </p>
+                        {(food.protein_g || food.carbs_g || food.fat_g) ? (
+                          <p className="text-[11px] tabular-nums text-zinc-400">
+                            P {food.protein_g ?? 0}g · C {food.carbs_g ?? 0}g · F {food.fat_g ?? 0}g
+                          </p>
+                        ) : null}
                       </div>
                     </div>
                   )}
