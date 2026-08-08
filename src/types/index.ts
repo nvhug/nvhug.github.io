@@ -185,6 +185,9 @@ export interface DailyFood {
   quantity: number
   unit?: string
   total_calories: number
+  protein_g?: number | null
+  carbs_g?: number | null
+  fat_g?: number | null
   notes?: string
   created_at: string
   updated_at: string

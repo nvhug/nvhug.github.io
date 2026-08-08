@@ -1,0 +1,447 @@
+'use client'
+
+import { useRef, useState } from 'react'
+import { Camera, ImagePlus, LoaderCircle, Plus, RefreshCw, Sparkles, TriangleAlert, X } from 'lucide-react'
+import { toast } from 'sonner'
+import { supabase } from '@/lib/supabase'
+import { TimePicker } from '@/components/ui/time-picker'
+import { useLanguage } from '@/lib/i18n/language-context'
+
+const MAX_EDGE_PX = 1024
+const JPEG_QUALITY = 0.82
+
+interface AnalyzedItem {
+  name: string
+  portion: string
+  calories: number
+  protein_g: number
+  carbs_g: number
+  fat_g: number
+  confidence: number
+  assumptions: string
+}
+
+interface AnalyzeResponse {
+  items: AnalyzedItem[]
+  confidence: number
+  needsDetail: boolean
+  questions: string[]
+  notes: string
+}
+
+interface EditableItem extends AnalyzedItem {
+  key: string
+  include: boolean
+}
+
+interface PickedImage {
+  data: string
+  mimeType: string
+  previewUrl: string
+}
+
+interface FoodPhotoAnalyzerProps {
+  date: string
+  onAdded: () => Promise<void> | void
+}
+
+function currentTimeStr() {
+  const now = new Date()
+  return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+}
+
+function readAsDataURL(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result))
+    reader.onerror = () => reject(new Error('read failed'))
+    reader.readAsDataURL(file)
+  })
+}
+
+// Downscale before upload: phone photos are ~4 MB, the model only needs ~1024 px.
+async function prepareImage(file: File): Promise<PickedImage> {
+  try {
+    const bitmap = await createImageBitmap(file)
+    const scale = Math.min(1, MAX_EDGE_PX / Math.max(bitmap.width, bitmap.height))
+    const width = Math.round(bitmap.width * scale)
+    const height = Math.round(bitmap.height * scale)
+
+    const canvas = document.createElement('canvas')
+    canvas.width = width
+    canvas.height = height
+    const ctx = canvas.getContext('2d')
+    if (!ctx) throw new Error('no 2d context')
+    ctx.drawImage(bitmap, 0, 0, width, height)
+    bitmap.close()
+
+    const dataUrl = canvas.toDataURL('image/jpeg', JPEG_QUALITY)
+    return { data: dataUrl.split(',')[1], mimeType: 'image/jpeg', previewUrl: dataUrl }
+  } catch {
+    // Formats the canvas cannot decode (some HEIC) are sent as-is.
+    const dataUrl = await readAsDataURL(file)
+    return {
+      data: dataUrl.split(',')[1],
+      mimeType: file.type || 'image/jpeg',
+      previewUrl: dataUrl,
+    }
+  }
+}
+
+function confidenceTone(value: number) {
+  if (value >= 0.75) return 'bg-emerald-100 text-emerald-700'
+  if (value >= 0.5) return 'bg-amber-100 text-amber-700'
+  return 'bg-rose-100 text-rose-700'
+}
+
+export function FoodPhotoAnalyzer({ date, onAdded }: FoodPhotoAnalyzerProps) {
+  const { t, lang } = useLanguage()
+  const cameraRef = useRef<HTMLInputElement>(null)
+  const galleryRef = useRef<HTMLInputElement>(null)
+
+  const [image, setImage] = useState<PickedImage | null>(null)
+  const [analyzing, setAnalyzing] = useState(false)
+  const [result, setResult] = useState<AnalyzeResponse | null>(null)
+  const [items, setItems] = useState<EditableItem[]>([])
+  const [detail, setDetail] = useState('')
+  const [detailOpen, setDetailOpen] = useState(false)
+  const [time, setTime] = useState(currentTimeStr)
+  const [saving, setSaving] = useState(false)
+
+  const included = items.filter((i) => i.include)
+  const totals = included.reduce(
+    (acc, i) => ({
+      calories: acc.calories + i.calories,
+      protein: Math.round((acc.protein + i.protein_g) * 10) / 10,
+      carbs: Math.round((acc.carbs + i.carbs_g) * 10) / 10,
+      fat: Math.round((acc.fat + i.fat_g) * 10) / 10,
+    }),
+    { calories: 0, protein: 0, carbs: 0, fat: 0 }
+  )
+
+  function resetAll() {
+    setImage(null)
+    setResult(null)
+    setItems([])
+    setDetail('')
+    setDetailOpen(false)
+    if (cameraRef.current) cameraRef.current.value = ''
+    if (galleryRef.current) galleryRef.current.value = ''
+  }
+
+  async function pickImage(file: File | undefined) {
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      toast.error(t('foodPhoto.notAnImage'))
+      return
+    }
+    try {
+      const prepared = await prepareImage(file)
+      setImage(prepared)
+      setResult(null)
+      setItems([])
+    } catch {
+      toast.error(t('foodPhoto.readImageError'))
+    }
+  }
+
+  async function analyze(mode: 'image' | 'text') {
+    setAnalyzing(true)
+    try {
+      const res = await fetch('/api/notes/analyze-food', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mode,
+          image: mode === 'image' && image ? { data: image.data, mimeType: image.mimeType } : undefined,
+          description: detail.trim() || undefined,
+          lang,
+        }),
+      })
+
+      const payload = await res.json()
+      if (!res.ok) {
+        toast.error(payload?.error || t('foodPhoto.analyzeError'))
+        setDetailOpen(true)
+        return
+      }
+
+      const data = payload as AnalyzeResponse
+      setResult(data)
+      setItems(
+        data.items.map((item, index) => ({
+          ...item,
+          key: `${index}-${item.name}`,
+          include: true,
+        }))
+      )
+      // The tab can sit open for hours, so stamp the meal at analysis time.
+      setTime(currentTimeStr())
+      setDetailOpen(data.needsDetail)
+      if (data.items.length === 0) {
+        toast.error(t('foodPhoto.nothingDetected'))
+        setDetailOpen(true)
+      }
+    } catch {
+      toast.error(t('foodPhoto.analyzeError'))
+      setDetailOpen(true)
+    } finally {
+      setAnalyzing(false)
+    }
+  }
+
+  function patchItem(key: string, patch: Partial<EditableItem>) {
+    setItems((prev) => prev.map((i) => (i.key === key ? { ...i, ...patch } : i)))
+  }
+
+  async function saveToDiary() {
+    if (included.length === 0) return
+    setSaving(true)
+    try {
+      const createdAt = new Date(`${date}T${time}:00`).toISOString()
+      const rows = included.map((i) => ({
+        date,
+        custom_food_name: i.name.trim(),
+        quantity: 1,
+        total_calories: Math.round(i.calories),
+        protein_g: i.protein_g,
+        carbs_g: i.carbs_g,
+        fat_g: i.fat_g,
+        notes: i.portion || null,
+        created_at: createdAt,
+      }))
+
+      const { error } = await supabase.from('daily_foods').insert(rows)
+      if (error) throw error
+
+      await onAdded()
+      resetAll()
+      toast.success(t('foodPhoto.addedCount', { n: rows.length }))
+    } catch {
+      toast.error(t('foodPhoto.saveError'))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="space-y-3">
+      <input
+        ref={cameraRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="hidden"
+        onChange={(e) => void pickImage(e.target.files?.[0])}
+      />
+      <input
+        ref={galleryRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => void pickImage(e.target.files?.[0])}
+      />
+
+      {!image ? (
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => cameraRef.current?.click()}
+            className="flex flex-col items-center gap-1.5 rounded-lg border border-dashed border-emerald-300 bg-emerald-50/50 px-3 py-5 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-50"
+          >
+            <Camera className="h-5 w-5" />
+            {t('foodPhoto.takePhoto')}
+          </button>
+          <button
+            type="button"
+            onClick={() => galleryRef.current?.click()}
+            className="flex flex-col items-center gap-1.5 rounded-lg border border-dashed border-emerald-300 bg-emerald-50/50 px-3 py-5 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-50"
+          >
+            <ImagePlus className="h-5 w-5" />
+            {t('foodPhoto.uploadPhoto')}
+          </button>
+        </div>
+      ) : (
+        <div className="flex gap-3">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={image.previewUrl}
+            alt={t('foodPhoto.previewAlt')}
+            className="h-24 w-24 shrink-0 rounded-lg border border-emerald-200 object-cover"
+          />
+          <div className="flex flex-1 flex-col gap-2">
+            <button
+              type="button"
+              onClick={() => void analyze('image')}
+              disabled={analyzing}
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-500 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-emerald-600 disabled:opacity-50"
+            >
+              {analyzing ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+              {analyzing ? t('foodPhoto.analyzing') : result ? t('foodPhoto.reanalyze') : t('foodPhoto.analyze')}
+            </button>
+            <button
+              type="button"
+              onClick={resetAll}
+              className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-emerald-200 px-3 py-1.5 text-xs text-zinc-600 transition-colors hover:bg-emerald-50"
+            >
+              <X className="h-3.5 w-3.5" />
+              {t('foodPhoto.removePhoto')}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {analyzing && (
+        <p className="text-center text-xs text-zinc-500">{t('foodPhoto.analyzingHint')}</p>
+      )}
+
+      {/* Detail fallback — shown when the AI is unsure, failed, or the user has no photo */}
+      {(detailOpen || result?.needsDetail) && (
+        <div className="space-y-2 rounded-lg border border-amber-200 bg-amber-50 p-3">
+          <div className="flex items-start gap-2">
+            <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+            <div className="space-y-1">
+              <p className="text-xs font-medium text-amber-800">{t('foodPhoto.needDetailTitle')}</p>
+              <p className="text-[11px] leading-relaxed text-amber-700">{t('foodPhoto.needDetailHint')}</p>
+            </div>
+          </div>
+
+          {result?.questions && result.questions.length > 0 && (
+            <ul className="ml-6 list-disc space-y-0.5 text-[11px] text-amber-800">
+              {result.questions.map((q, index) => (
+                <li key={`${index}-${q}`}>{q}</li>
+              ))}
+            </ul>
+          )}
+
+          <textarea
+            value={detail}
+            onChange={(e) => setDetail(e.target.value)}
+            rows={3}
+            placeholder={t('foodPhoto.detailPlaceholder')}
+            className="w-full resize-y rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-amber-400"
+          />
+
+          <button
+            type="button"
+            onClick={() => void analyze(image ? 'image' : 'text')}
+            disabled={analyzing || !detail.trim()}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-amber-500 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-amber-600 disabled:opacity-50"
+          >
+            {analyzing ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+            {image ? t('foodPhoto.reanalyzeWithDetail') : t('foodPhoto.analyzeDetailOnly')}
+          </button>
+        </div>
+      )}
+
+      {!image && !detailOpen && (
+        <button
+          type="button"
+          onClick={() => setDetailOpen(true)}
+          className="w-full text-center text-[11px] text-emerald-600 underline decoration-dashed underline-offset-2 hover:text-emerald-700"
+        >
+          {t('foodPhoto.noPhotoCta')}
+        </button>
+      )}
+
+      {/* Editable results */}
+      {items.length > 0 && (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-semibold text-zinc-700">{t('foodPhoto.resultHeading')}</p>
+            {result && (
+              <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${confidenceTone(result.confidence)}`}>
+                {t('foodPhoto.confidence', { n: Math.round(result.confidence * 100) })}
+              </span>
+            )}
+          </div>
+
+          {result?.notes && <p className="text-[11px] italic text-zinc-500">{result.notes}</p>}
+
+          {items.map((item) => (
+            <div
+              key={item.key}
+              className={`space-y-2 rounded-lg border p-2.5 transition-colors ${
+                item.include ? 'border-emerald-200 bg-emerald-50/60' : 'border-zinc-200 bg-zinc-50 opacity-60'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={item.include}
+                  onChange={(e) => patchItem(item.key, { include: e.target.checked })}
+                  className="h-4 w-4 shrink-0 accent-emerald-500"
+                  aria-label={t('foodPhoto.includeItem')}
+                />
+                <input
+                  type="text"
+                  value={item.name}
+                  onChange={(e) => patchItem(item.key, { name: e.target.value })}
+                  className="min-w-0 flex-1 rounded border border-emerald-200 bg-white px-2 py-1 text-sm text-zinc-900 outline-none focus:border-emerald-400"
+                />
+                <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium ${confidenceTone(item.confidence)}`}>
+                  {Math.round(item.confidence * 100)}%
+                </span>
+              </div>
+
+              <input
+                type="text"
+                value={item.portion}
+                onChange={(e) => patchItem(item.key, { portion: e.target.value })}
+                placeholder={t('foodPhoto.portionPlaceholder')}
+                className="w-full rounded border border-emerald-200 bg-white px-2 py-1 text-xs text-zinc-600 outline-none placeholder:text-zinc-400 focus:border-emerald-400"
+              />
+
+              <div className="grid grid-cols-4 gap-1.5">
+                {([
+                  ['calories', t('foodPhoto.kcal')],
+                  ['protein_g', t('foodPhoto.protein')],
+                  ['carbs_g', t('foodPhoto.carbs')],
+                  ['fat_g', t('foodPhoto.fat')],
+                ] as const).map(([field, label]) => (
+                  <label key={field} className="flex flex-col gap-0.5">
+                    <span className="text-[10px] text-zinc-500">{label}</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step={field === 'calories' ? '5' : '0.1'}
+                      value={item[field]}
+                      onChange={(e) => patchItem(item.key, { [field]: Number(e.target.value) || 0 })}
+                      className="w-full rounded border border-emerald-200 bg-white px-1.5 py-1 text-xs tabular-nums text-zinc-900 outline-none focus:border-emerald-400"
+                    />
+                  </label>
+                ))}
+              </div>
+
+              {item.assumptions && (
+                <p className="text-[10px] leading-relaxed text-zinc-500">{item.assumptions}</p>
+              )}
+            </div>
+          ))}
+
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-emerald-200 bg-white px-3 py-2">
+            <span className="text-xs font-semibold text-zinc-900">
+              {totals.calories} kcal
+            </span>
+            <span className="text-[11px] tabular-nums text-zinc-500">
+              {t('foodPhoto.protein')} {totals.protein}g · {t('foodPhoto.carbs')} {totals.carbs}g · {t('foodPhoto.fat')} {totals.fat}g
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <TimePicker value={time} onChange={setTime} />
+            <button
+              type="button"
+              onClick={() => void saveToDiary()}
+              disabled={saving || included.length === 0}
+              className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-emerald-500 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-emerald-600 disabled:opacity-50"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              {t('foodPhoto.addSelected', { n: included.length })}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
