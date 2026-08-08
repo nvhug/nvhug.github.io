@@ -336,6 +336,14 @@ export const en: Dictionary = {
     foodListHeading: "Today's food list",
     emptyFoods: 'No food entries yet.',
     editFoodNamePlaceholder: 'Food name',
+    macroTargets: 'Macro targets',
+    macroTargetHint: 'Click a number to edit',
+    proteinTarget: 'Protein',
+    carbsTarget: 'Carbs',
+    fatTarget: 'Fat',
+    macroUnit: 'g',
+    macroReached: 'Reached',
+    macroOver: 'Over',
   },
 
   foodPhoto: {

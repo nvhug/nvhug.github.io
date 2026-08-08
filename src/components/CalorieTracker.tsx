@@ -52,6 +52,27 @@ export function CalorieTracker() {
   const [editingGoal, setEditingGoal] = useState(false)
   const [goalDraft, setGoalDraft] = useState('')
 
+  // Macro targets — stored in localStorage so they survive page reloads.
+  const [macroTargets, setMacroTargets] = useState(() => {
+    if (typeof window === 'undefined') return { protein: 118, carbs: 375, fat: 73 }
+    try {
+      const saved = localStorage.getItem('macro_targets')
+      return saved ? JSON.parse(saved) as { protein: number; carbs: number; fat: number } : { protein: 118, carbs: 375, fat: 73 }
+    } catch { return { protein: 118, carbs: 375, fat: 73 } }
+  })
+  const [editingMacro, setEditingMacro] = useState<'protein' | 'carbs' | 'fat' | null>(null)
+  const [macroDraft, setMacroDraft] = useState('')
+
+  function saveMacroTarget(key: 'protein' | 'carbs' | 'fat') {
+    const val = parseInt(macroDraft, 10)
+    if (!isNaN(val) && val > 0) {
+      const next = { ...macroTargets, [key]: val }
+      setMacroTargets(next)
+      localStorage.setItem('macro_targets', JSON.stringify(next))
+    }
+    setEditingMacro(null)
+  }
+
   // Edit state
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingData, setEditingData] = useState<Partial<DailyFood> | null>(null)
@@ -305,17 +326,63 @@ export function CalorieTracker() {
           </div>
 
           {hasMacros && (
-            <div className="grid grid-cols-3 gap-2 pt-1">
+            <div className="space-y-2 pt-1">
+              <p className="text-[10px] font-medium text-zinc-400 uppercase tracking-wide" title={t('calorieTracker.macroTargetHint')}>
+                {t('calorieTracker.macroTargets')}
+              </p>
               {([
-                [t('foodPhoto.protein'), macroTotals.protein],
-                [t('foodPhoto.carbs'), macroTotals.carbs],
-                [t('foodPhoto.fat'), macroTotals.fat],
-              ] as const).map(([label, value]) => (
-                <div key={label} className="rounded-lg bg-emerald-50 px-2 py-1.5 text-center">
-                  <p className="text-[10px] text-zinc-500">{label}</p>
-                  <p className="text-sm font-semibold tabular-nums text-zinc-900">{value}g</p>
-                </div>
-              ))}
+                ['protein', t('calorieTracker.proteinTarget'), macroTotals.protein, 'bg-blue-400'],
+                ['carbs',   t('calorieTracker.carbsTarget'),   macroTotals.carbs,   'bg-amber-400'],
+                ['fat',     t('calorieTracker.fatTarget'),     macroTotals.fat,     'bg-rose-400'],
+              ] as const).map(([key, label, actual, barColor]) => {
+                const target = macroTargets[key]
+                const pct = Math.min(Math.round((actual / target) * 100), 100)
+                const over = actual > target
+                const reached = actual >= target
+                return (
+                  <div key={key} className="space-y-0.5">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-zinc-600">{label}</span>
+                      <span className={`tabular-nums font-medium ${reached ? 'text-emerald-600' : 'text-zinc-500'}`}>
+                        {actual}
+                        {' / '}
+                        {editingMacro === key ? (
+                          <input
+                            type="number"
+                            value={macroDraft}
+                            onChange={(e) => setMacroDraft(e.target.value)}
+                            onBlur={() => saveMacroTarget(key)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') saveMacroTarget(key)
+                              if (e.key === 'Escape') setEditingMacro(null)
+                            }}
+                            autoFocus
+                            className="w-14 rounded border border-emerald-300 px-1 py-0.5 text-xs text-zinc-900 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                          />
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => { setMacroDraft(String(target)); setEditingMacro(key) }}
+                            className="underline decoration-dashed underline-offset-2 hover:text-emerald-600 transition-colors"
+                            title={t('calorieTracker.macroTargetHint')}
+                          >
+                            {target}
+                          </button>
+                        )}
+                        {' '}g
+                        {reached && !over && <span className="ml-1 text-emerald-500">✓</span>}
+                        {over && <span className="ml-1 text-amber-500">+{Math.round(actual - target)}g</span>}
+                      </span>
+                    </div>
+                    <div className="h-1.5 overflow-hidden rounded-full bg-zinc-100">
+                      <div
+                        className={`h-full transition-all ${over ? 'bg-amber-400' : barColor}`}
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           )}
         </div>
