@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createSupabaseServerClient } from '@/lib/supabase-server'
 import { requestVisionJSON, requestTextJSON, resolveVisionConfig, visionProviderNames } from '@/lib/ai-vision'
+import { normalizeItemsWithInternalTable } from './nutrition-normalizer'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -152,15 +153,18 @@ ${JSON_SHAPE}
 HARD RULES:
 1. Keep one "items" entry per dish reported above. Do not merge or drop items, and do not invent items that were not reported.
 2. "portion" must state the serving with a weight or household measure, e.g. "1 bowl (~200 g cooked rice)", "2 pieces (~120 g)".
-3. Macro consistency is mandatory: calories MUST equal protein_g*4 + carbs_g*4 + fat_g*9 within +/-10%. Recompute and adjust before answering.
-4. Round calories to the nearest 5 kcal and macros to 1 decimal place.
-5. Apply the cooking method: deep-fried adds ~8-15 g fat per serving, stir-fried ~5-10 g, grilled/steamed/boiled ~0-3 g. Vietnamese dishes usually carry added sugar in the marinade or dipping sauce.
-6. Count only the edible portion — exclude bones, shells and inedible garnish — but include sauces, broth actually consumed, toppings, condensed milk and syrup.
-7. "confidence": start from the confidence the vision model gave each item, then lower it further when the portion weight or cooking fat is still unknown.
-8. Set "needs_more_detail": true when overall_confidence < 0.6, when image quality was poor, or when an unknown (portion weight, oil, sugar, broth) materially changes the estimate. When true, carry over and sharpen the vision model's questions into 2-4 SHORT, SPECIFIC questions in "questions".
-9. "assumptions" states what you assumed for that item (cooking oil, sauce, container size, doneness).
-10. "notes": one sentence on the overall reliability of this estimate.
-11. Write "name", "portion", "questions", "notes" and "assumptions" in ${lang === 'en' ? 'English' : 'Vietnamese'}.`
+3. If the user explicitly gave amounts (for example "154g", "75 g", "1 bowl", "2 pieces"), treat those amounts as ground truth. Do not upscale to a typical serving and do not replace them with larger defaults.
+4. When an explicit amount is present, calculate calories and macros from that exact amount only.
+5. Macro consistency is mandatory: calories MUST equal protein_g*4 + carbs_g*4 + fat_g*9 within +/-10%. Recompute and adjust before answering.
+6. Round calories to the nearest 5 kcal and macros to 1 decimal place.
+7. Apply the cooking method carefully: estimate added oil per 100 g edible finished food (deep-fried ~4-10 g fat/100 g, stir-fried ~2-6 g fat/100 g, grilled/steamed/boiled ~0-3 g fat/100 g).
+8. Avoid double counting oil: if the dish is already identified as a cooked fried dish and the portion refers to the final cooked weight, use realistic cooked-food nutrition density and do not add a second generic oil surcharge.
+9. Count only the edible portion — exclude bones, shells and inedible garnish — but include sauces, broth actually consumed, toppings, condensed milk and syrup.
+10. "confidence": start from the confidence the vision model gave each item, then lower it further when the portion weight or cooking fat is still unknown.
+11. Set "needs_more_detail": true when overall_confidence < 0.6, when image quality was poor, or when an unknown (portion weight, oil, sugar, broth) materially changes the estimate. When true, carry over and sharpen the vision model's questions into 2-4 SHORT, SPECIFIC questions in "questions".
+12. "assumptions" states what you assumed for that item (cooking oil, sauce, container size, doneness).
+13. "notes": one sentence on the overall reliability of this estimate.
+14. Write "name", "portion", "questions", "notes" and "assumptions" in ${lang === 'en' ? 'English' : 'Vietnamese'}.`
 }
 
 function extractJSON(raw: string): unknown {
@@ -271,13 +275,35 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: MSG.aiFailed[lang] }, { status: 502 })
   }
 
-  const items = result.items.map((item) => ({
+  const normalizedItems = normalizeItemsWithInternalTable(result.items)
+
+  const items = normalizedItems.map((item) => ({
     ...item,
     calories: Math.round(item.calories),
     protein_g: Math.round(item.protein_g * 10) / 10,
     carbs_g: Math.round(item.carbs_g * 10) / 10,
     fat_g: Math.round(item.fat_g * 10) / 10,
   }))
+
+  const telemetryRows = items.map((item) => ({
+    event_name: item.normalized_table_key
+      ? (item.normalized_by_internal_table
+        ? 'internal_table_match_applied'
+        : 'internal_table_match_ambiguous')
+      : 'internal_table_no_match',
+    normalized_table_key: item.normalized_table_key ?? null,
+    normalized_source: item.normalized_source ?? null,
+    normalization_version: item.normalization_version ?? null,
+    normalization_confidence: item.normalization_confidence ?? null,
+  }))
+
+  if (telemetryRows.length > 0) {
+    const { error: telemetryError } = await supabase.from('nutrition_normalization_metrics').insert(telemetryRows)
+    if (telemetryError) {
+      // Telemetry is best-effort only.
+      console.warn('[analyze-food] telemetry insert skipped:', telemetryError.message)
+    }
+  }
 
   return NextResponse.json({
     items,

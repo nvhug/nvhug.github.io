@@ -190,6 +190,12 @@ export interface DailyFood {
   fat_g?: number | null
   image_thumb?: string | null
   notes?: string
+  normalized_by_internal_table?: boolean | null
+  normalized_table_key?: 'white_rice' | 'tofu_plain' | 'tofu_fried' | 'braised_fish' | null
+  normalized_source?: 'internal_table' | null
+  normalization_version?: string | null
+  normalization_confidence?: number | null
+  normalization_warning?: 'ambiguous_match' | 'household_unit_converted' | null
   created_at: string
   updated_at: string
 }

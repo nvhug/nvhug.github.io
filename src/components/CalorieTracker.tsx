@@ -14,6 +14,7 @@ import { useLanguage } from '@/lib/i18n/language-context'
 import { getIntlLocale } from '@/lib/i18n/locale'
 import { getTodayLocalISODate } from '@/lib/date'
 import { getSupabaseBrowserClient } from '@/lib/supabase-browser'
+import { buildFoodDisplayName } from '@/lib/foodDisplay'
 
 function todayDate() {
   return getTodayLocalISODate()
@@ -181,6 +182,25 @@ export function CalorieTracker() {
     void fetchMacroTargets()
   }, [fetchMacroTargets])
 
+  function trackNormalizationEdit(food: DailyFood, nextCalories: number | null | undefined) {
+    if (!food.normalized_by_internal_table) return
+    if (typeof nextCalories !== 'number') return
+    if (nextCalories === food.total_calories) return
+
+    void fetch('/api/notes/nutrition-telemetry', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        eventName: 'manual_calorie_edit_after_normalization',
+        normalized_table_key: food.normalized_table_key,
+        normalized_source: food.normalized_source,
+        normalization_version: food.normalization_version,
+        previous_calories: food.total_calories,
+        updated_calories: nextCalories,
+      }),
+    })
+  }
+
   async function deleteFood(id: string) {
     try {
       const food = dailyFoods.find((f) => f.id === id)
@@ -222,6 +242,7 @@ export function CalorieTracker() {
       }).eq('id', food.id)
 
       if (error) throw error
+      trackNormalizationEdit(food, editingData.total_calories ?? null)
       await fetchDailyFoods()
       setEditingId(null)
       setEditingData(null)
@@ -506,7 +527,7 @@ export function CalorieTracker() {
                       <div className="min-w-0 flex-1 flex flex-col gap-1">
                         <div className="flex items-start justify-between gap-2">
                           <p className="text-sm font-medium text-zinc-900 leading-snug">
-                            {food.custom_food_name || '—'}
+                            {buildFoodDisplayName(food.custom_food_name, food.notes)}
                           </p>
                           <div className="flex items-center gap-1 shrink-0">
                             <button
@@ -527,6 +548,11 @@ export function CalorieTracker() {
                           <span className="flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-medium text-emerald-600">
                             {new Date(food.created_at).toLocaleTimeString(getIntlLocale(lang), { hour: '2-digit', minute: '2-digit' })}
                           </span>
+                          {food.normalized_by_internal_table ? (
+                            <span className="rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-700">
+                              {t('foodPhoto.internalTableBadge')}
+                            </span>
+                          ) : null}
                           <p className="text-xs text-zinc-500">
                             {Math.round(food.total_calories * 10) / 10} kcal
                           </p>

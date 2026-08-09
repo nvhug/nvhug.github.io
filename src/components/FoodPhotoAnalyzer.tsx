@@ -22,6 +22,12 @@ interface AnalyzedItem {
   fat_g: number
   confidence: number
   assumptions: string
+  normalized_by_internal_table?: boolean
+  normalized_table_key?: 'white_rice' | 'tofu_plain' | 'tofu_fried' | 'braised_fish'
+  normalized_source?: 'internal_table'
+  normalization_version?: string
+  normalization_confidence?: number
+  normalization_warning?: 'ambiguous_match' | 'household_unit_converted'
 }
 
 interface AnalyzeResponse {
@@ -371,11 +377,37 @@ export function FoodPhotoAnalyzer({ date, onAdded, inputMode = 'photo' }: FoodPh
         fat_g: i.fat_g,
         image_thumb: thumbUrl,
         notes: i.portion || null,
+        normalized_by_internal_table: i.normalized_by_internal_table ?? false,
+        normalized_table_key: i.normalized_table_key ?? null,
+        normalized_source: i.normalized_source ?? null,
+        normalization_version: i.normalization_version ?? null,
+        normalization_confidence: i.normalization_confidence ?? null,
+        normalization_warning: i.normalization_warning ?? null,
         created_at: createdAt,
       }))
 
       const { error } = await supabase.from('daily_foods').insert(rows)
-      if (error) throw error
+      if (error) {
+        const message = String(error.message || '')
+        const columnMissing = /column .* does not exist|could not find the '(normalized_by_internal_table|normalized_table_key|normalized_source|normalization_version|normalization_confidence|normalization_warning)' column .* in the schema cache/i.test(message)
+        if (!columnMissing) throw error
+
+        const legacyRows = included.map((i) => ({
+          date,
+          custom_food_name: i.name.trim(),
+          quantity: 1,
+          total_calories: Math.round(i.calories),
+          protein_g: i.protein_g,
+          carbs_g: i.carbs_g,
+          fat_g: i.fat_g,
+          image_thumb: thumbUrl,
+          notes: i.portion || null,
+          created_at: createdAt,
+        }))
+
+        const { error: fallbackError } = await supabase.from('daily_foods').insert(legacyRows)
+        if (fallbackError) throw fallbackError
+      }
 
       await onAdded()
       resetAll()
@@ -642,6 +674,11 @@ export function FoodPhotoAnalyzer({ date, onAdded, inputMode = 'photo' }: FoodPh
                 <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium ${confidenceTone(item.confidence)}`}>
                   {Math.round(item.confidence * 100)}%
                 </span>
+                {item.normalized_by_internal_table ? (
+                  <span className="shrink-0 rounded-full border border-blue-200 bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-700">
+                    {t('foodPhoto.internalTableBadge')}
+                  </span>
+                ) : null}
               </div>
 
               <input
@@ -675,6 +712,13 @@ export function FoodPhotoAnalyzer({ date, onAdded, inputMode = 'photo' }: FoodPh
 
               {item.assumptions && (
                 <p className="text-[10px] leading-relaxed text-zinc-500">{item.assumptions}</p>
+              )}
+              {item.normalization_warning && (
+                <p className="rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-[10px] leading-relaxed text-amber-700">
+                  {item.normalization_warning === 'household_unit_converted'
+                    ? t('foodPhoto.internalTableWarningHousehold')
+                    : t('foodPhoto.internalTableWarningAmbiguous')}
+                </p>
               )}
             </div>
           ))}
