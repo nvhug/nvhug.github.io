@@ -361,6 +361,7 @@ export const en: Dictionary = {
     analyzeDetailOnly: 'Analyse from description',
     orManual: 'or add manually',
     manualNamePlaceholder: 'Food name',
+    manualAddButton: 'Add to diary',
     noPhotoCta: 'No photo? Describe the food and let AI estimate',
     resultHeading: 'Analysis result (editable)',
     confidence: '{n}% confidence',

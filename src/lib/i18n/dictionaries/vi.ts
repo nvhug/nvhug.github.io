@@ -359,6 +359,7 @@ export const vi = {
     analyzeDetailOnly: 'Phân tích từ mô tả',
     orManual: 'hoặc nhập nhanh',
     manualNamePlaceholder: 'Tên món ăn',
+    manualAddButton: 'Thêm vào nhật ký',
     noPhotoCta: 'Không có ảnh? Mô tả món ăn để AI ước tính',
     resultHeading: 'Kết quả phân tích (có thể sửa)',
     confidence: 'Độ tin cậy {n}%',

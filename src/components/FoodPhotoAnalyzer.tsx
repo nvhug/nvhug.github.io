@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { Camera, ImagePlus, LoaderCircle, Plus, Sparkles, TriangleAlert, X } from 'lucide-react'
+import { Camera, ChevronDown, ChevronUp, ImagePlus, LoaderCircle, Plus, Sparkles, TriangleAlert, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import { uploadFoodThumb } from '@/lib/storage'
@@ -172,8 +172,20 @@ export function FoodPhotoAnalyzer({ date, onAdded, inputMode = 'photo' }: FoodPh
   // Manual quick-add state (text mode only)
   const [manualName, setManualName] = useState('')
   const [manualCalories, setManualCalories] = useState('')
+  const [manualProtein, setManualProtein] = useState('')
+  const [manualCarbs, setManualCarbs] = useState('')
+  const [manualFat, setManualFat] = useState('')
   const [manualTime, setManualTime] = useState(currentTimeStr)
   const [manualSaving, setManualSaving] = useState(false)
+  const [isManualExpanded, setIsManualExpanded] = useState(() => {
+    try { return localStorage.getItem('foodphoto:manual:expanded') !== 'false' } catch { return true }
+  })
+
+  function toggleManualExpanded() {
+    const next = !isManualExpanded
+    setIsManualExpanded(next)
+    try { localStorage.setItem('foodphoto:manual:expanded', String(next)) } catch { /* ignore */ }
+  }
 
   useEffect(() => {
     return () => {
@@ -313,12 +325,18 @@ export function FoodPhotoAnalyzer({ date, onAdded, inputMode = 'photo' }: FoodPh
         custom_food_name: name,
         quantity: 1,
         total_calories: Math.round(cal),
+        protein_g: Number(manualProtein) || null,
+        carbs_g: Number(manualCarbs) || null,
+        fat_g: Number(manualFat) || null,
         created_at: createdAt,
       }])
       if (error) throw error
       await onAdded()
       setManualName('')
       setManualCalories('')
+      setManualProtein('')
+      setManualCarbs('')
+      setManualFat('')
       setManualTime(currentTimeStr())
       toast.success(t('foodPhoto.addedCount', { n: 1 }))
     } catch {
@@ -507,41 +525,71 @@ export function FoodPhotoAnalyzer({ date, onAdded, inputMode = 'photo' }: FoodPh
           </button>
 
           {inputMode === 'text' && (
-            <>
-              <div className="flex items-center gap-2">
-                <div className="flex-1 border-t border-emerald-200" />
-                <span className="text-[11px] text-zinc-400">{t('foodPhoto.orManual')}</span>
-                <div className="flex-1 border-t border-emerald-200" />
+            <div className="mt-3 rounded-lg border border-emerald-100 bg-emerald-50/40 px-4 py-2.5">
+              {/* header — click to toggle */}
+              <button
+                type="button"
+                onClick={toggleManualExpanded}
+                className={`flex w-full items-center justify-between text-xs font-semibold uppercase tracking-wide text-emerald-600 hover:text-emerald-700 ${isManualExpanded ? 'mb-2' : ''}`}
+              >
+                <span className="flex items-center gap-1.5"><span>⚡</span>{t('foodPhoto.orManual')}</span>
+                {isManualExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+              </button>
+
+              {isManualExpanded && (
+              <>
+
+              {/* name */}
+              <input
+                type="text"
+                value={manualName}
+                onChange={(e) => setManualName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') void addManual() }}
+                placeholder={t('foodPhoto.manualNamePlaceholder')}
+                className="mb-2 w-full rounded-xl border-0 bg-white px-3 py-2.5 text-sm font-medium text-zinc-900 shadow-sm ring-1 ring-zinc-200 outline-none placeholder:font-normal placeholder:text-zinc-400 focus:ring-2 focus:ring-emerald-400"
+              />
+
+              {/* nutrient chips — 4 equal-width pills */}
+              <div className="mb-2 grid grid-cols-4 gap-5">
+                {([
+                  ['kcal', '🔥', manualCalories, setManualCalories, '', 'bg-orange-100 ring-orange-200 focus-within:ring-orange-400', 'text-orange-500', 'text-orange-700 placeholder:text-orange-200'],
+                  [t('foodPhoto.protein'), '', manualProtein, setManualProtein, 'g', 'bg-blue-50 ring-blue-200 focus-within:ring-blue-400', 'text-blue-500', 'text-blue-700 placeholder:text-blue-200'],
+                  [t('foodPhoto.carbs'), '', manualCarbs, setManualCarbs, 'g', 'bg-amber-50 ring-amber-200 focus-within:ring-amber-400', 'text-amber-500', 'text-amber-700 placeholder:text-amber-200'],
+                  [t('foodPhoto.fat'), '', manualFat, setManualFat, 'g', 'bg-rose-50 ring-rose-200 focus-within:ring-rose-400', 'text-rose-500', 'text-rose-700 placeholder:text-rose-200'],
+                ] as const).map(([label, icon, val, setter, unit, chip, labelColor, inputColor]) => (
+                  <div key={label} className={`flex items-center gap-0.5 overflow-hidden rounded-lg px-1.5 py-2 ring-1 ${chip}`}>
+                    <span className={`shrink-0 text-[11px] font-medium ${labelColor}`}>{icon}{label}</span>
+                    <input
+                      type="number"
+                      min={label === 'kcal' ? '1' : '0'}
+                      step={label === 'kcal' ? '1' : '0.1'}
+                      value={val}
+                      onChange={(e) => (setter as (v: string) => void)(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') void addManual() }}
+                      placeholder="0"
+                      className={`min-w-0 flex-1 bg-transparent text-right text-sm font-semibold tabular-nums outline-none ${inputColor}`}
+                    />
+                    {unit && <span className={`shrink-0 text-[11px] ${labelColor}`}>{unit}</span>}
+                  </div>
+                ))}
               </div>
-              <div className="flex gap-1.5">
-                <input
-                  type="text"
-                  value={manualName}
-                  onChange={(e) => setManualName(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') void addManual() }}
-                  placeholder={t('foodPhoto.manualNamePlaceholder')}
-                  className="min-w-0 flex-1 rounded-lg border border-emerald-200 bg-white px-2.5 py-1.5 text-sm text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-emerald-400"
-                />
-                <input
-                  type="number"
-                  value={manualCalories}
-                  onChange={(e) => setManualCalories(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') void addManual() }}
-                  placeholder="kcal"
-                  min="1"
-                  className="w-16 rounded-lg border border-emerald-200 bg-white px-2 py-1.5 text-sm text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-emerald-400"
-                />
+
+              {/* time + submit */}
+              <div className="flex items-center gap-2">
                 <TimePicker value={manualTime} onChange={setManualTime} />
                 <button
                   type="button"
                   onClick={() => void addManual()}
                   disabled={manualSaving || !manualName.trim() || !manualCalories || Number(manualCalories) <= 0}
-                  className="inline-flex items-center justify-center rounded-lg bg-emerald-500 px-2.5 py-1.5 text-xs font-medium text-white transition-colors hover:bg-emerald-600 disabled:opacity-50"
+                  className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-emerald-500 py-2 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-emerald-600 disabled:opacity-40"
                 >
                   {manualSaving ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
+                  {t('foodPhoto.manualAddButton')}
                 </button>
               </div>
-            </>
+              </>
+              )}
+            </div>
           )}
         </div>
       )}
