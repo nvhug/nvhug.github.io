@@ -169,6 +169,12 @@ export function FoodPhotoAnalyzer({ date, onAdded, inputMode = 'photo' }: FoodPh
   const [analysisProgress, setAnalysisProgress] = useState(0)
   const progressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
+  // Manual quick-add state (text mode only)
+  const [manualName, setManualName] = useState('')
+  const [manualCalories, setManualCalories] = useState('')
+  const [manualTime, setManualTime] = useState(currentTimeStr)
+  const [manualSaving, setManualSaving] = useState(false)
+
   useEffect(() => {
     return () => {
       if (progressTimerRef.current) clearInterval(progressTimerRef.current)
@@ -293,6 +299,33 @@ export function FoodPhotoAnalyzer({ date, onAdded, inputMode = 'photo' }: FoodPh
 
   function patchItem(key: string, patch: Partial<EditableItem>) {
     setItems((prev) => prev.map((i) => (i.key === key ? { ...i, ...patch } : i)))
+  }
+
+  async function addManual() {
+    const name = manualName.trim()
+    const cal = Number(manualCalories)
+    if (!name || !cal || cal <= 0) return
+    setManualSaving(true)
+    try {
+      const createdAt = new Date(`${date}T${manualTime}:00`).toISOString()
+      const { error } = await supabase.from('daily_foods').insert([{
+        date,
+        custom_food_name: name,
+        quantity: 1,
+        total_calories: Math.round(cal),
+        created_at: createdAt,
+      }])
+      if (error) throw error
+      await onAdded()
+      setManualName('')
+      setManualCalories('')
+      setManualTime(currentTimeStr())
+      toast.success(t('foodPhoto.addedCount', { n: 1 }))
+    } catch {
+      toast.error(t('foodPhoto.saveError'))
+    } finally {
+      setManualSaving(false)
+    }
   }
 
   async function saveToDiary() {
@@ -472,6 +505,44 @@ export function FoodPhotoAnalyzer({ date, onAdded, inputMode = 'photo' }: FoodPh
             {analyzing ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
             {image ? t('foodPhoto.reanalyzeWithDetail') : t('foodPhoto.analyzeDetailOnly')}
           </button>
+
+          {inputMode === 'text' && (
+            <>
+              <div className="flex items-center gap-2">
+                <div className="flex-1 border-t border-emerald-200" />
+                <span className="text-[11px] text-zinc-400">{t('foodPhoto.orManual')}</span>
+                <div className="flex-1 border-t border-emerald-200" />
+              </div>
+              <div className="flex gap-1.5">
+                <input
+                  type="text"
+                  value={manualName}
+                  onChange={(e) => setManualName(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') void addManual() }}
+                  placeholder={t('foodPhoto.manualNamePlaceholder')}
+                  className="min-w-0 flex-1 rounded-lg border border-emerald-200 bg-white px-2.5 py-1.5 text-sm text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-emerald-400"
+                />
+                <input
+                  type="number"
+                  value={manualCalories}
+                  onChange={(e) => setManualCalories(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') void addManual() }}
+                  placeholder="kcal"
+                  min="1"
+                  className="w-16 rounded-lg border border-emerald-200 bg-white px-2 py-1.5 text-sm text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-emerald-400"
+                />
+                <TimePicker value={manualTime} onChange={setManualTime} />
+                <button
+                  type="button"
+                  onClick={() => void addManual()}
+                  disabled={manualSaving || !manualName.trim() || !manualCalories || Number(manualCalories) <= 0}
+                  className="inline-flex items-center justify-center rounded-lg bg-emerald-500 px-2.5 py-1.5 text-xs font-medium text-white transition-colors hover:bg-emerald-600 disabled:opacity-50"
+                >
+                  {manualSaving ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
+                </button>
+              </div>
+            </>
+          )}
         </div>
       )}
 

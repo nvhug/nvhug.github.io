@@ -357,6 +357,8 @@ export const vi = {
     detailPlaceholder: 'VD: 1 dĩa cơm tấm sườn bì chả, sườn nướng khoảng 150g, thêm 1 trứng ốp la, chan nước mắm ngọt.',
     reanalyzeWithDetail: 'Phân tích lại kèm mô tả',
     analyzeDetailOnly: 'Phân tích từ mô tả',
+    orManual: 'hoặc nhập nhanh',
+    manualNamePlaceholder: 'Tên món ăn',
     noPhotoCta: 'Không có ảnh? Mô tả món ăn để AI ước tính',
     resultHeading: 'Kết quả phân tích (có thể sửa)',
     confidence: 'Độ tin cậy {n}%',

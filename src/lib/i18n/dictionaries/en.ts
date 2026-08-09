@@ -359,6 +359,8 @@ export const en: Dictionary = {
     detailPlaceholder: 'e.g. one plate of broken rice with grilled pork chop (~150 g), a fried egg, and sweet fish sauce.',
     reanalyzeWithDetail: 'Analyse again with details',
     analyzeDetailOnly: 'Analyse from description',
+    orManual: 'or add manually',
+    manualNamePlaceholder: 'Food name',
     noPhotoCta: 'No photo? Describe the food and let AI estimate',
     resultHeading: 'Analysis result (editable)',
     confidence: '{n}% confidence',
