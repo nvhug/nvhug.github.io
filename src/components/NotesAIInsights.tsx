@@ -32,6 +32,7 @@ interface NutritionInsight {
   points:     string[]
   worst_day:  string
   skip_habit: string
+  macro_avg?: string | null
 }
 
 interface GymInsight {
@@ -145,7 +146,6 @@ function fmtDate(iso: string) {
 const STRIP_HTML = /<[^>]*>/g
 const ANALYZE_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000
 const MIN_NOTES_REQUIRED = 5
-
 function getCooldownInfo(lastAnalyzedAt?: string | null) {
   if (!lastAnalyzedAt) {
     return { isBlocked: false, remainingMs: 0 }
@@ -501,6 +501,11 @@ export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note
                   ))}
                 </ul>
                 <div className="space-y-1">
+                  {viewed.nutrition.macro_avg && (
+                    <div className="rounded-lg bg-amber-100/70 px-2.5 py-1.5 text-sm text-amber-700">
+                      <span className="font-medium">{t('notesAIInsights.macroAverageLabel')}</span>{viewed.nutrition.macro_avg}
+                    </div>
+                  )}
                   {viewed.nutrition.worst_day && (
                     <p className="text-sm text-amber-700">
                       <span className="font-medium">{t('notesAIInsights.worstDayLabel')}</span>{viewed.nutrition.worst_day}

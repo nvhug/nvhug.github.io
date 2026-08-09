@@ -13,6 +13,7 @@ import { deleteFoodThumb } from '@/lib/storage'
 import { useLanguage } from '@/lib/i18n/language-context'
 import { getIntlLocale } from '@/lib/i18n/locale'
 import { getTodayLocalISODate } from '@/lib/date'
+import { getSupabaseBrowserClient } from '@/lib/supabase-browser'
 
 function todayDate() {
   return getTodayLocalISODate()
@@ -30,6 +31,26 @@ function timeStrFromISO(iso: string) {
 
 
 type InputMode = 'custom' | 'list' | 'photo'
+type MacroTargets = { protein: number; carbs: number; fat: number }
+
+const DEFAULT_MACRO_TARGETS: MacroTargets = { protein: 118, carbs: 375, fat: 73 }
+
+function getLegacyMacroTargets(): MacroTargets {
+  const numberOrDefault = (value: unknown, fallback: number) => (
+    typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : fallback
+  )
+
+  try {
+    const stored = JSON.parse(localStorage.getItem('macro_targets') ?? '{}') as Partial<MacroTargets>
+    return {
+      protein: numberOrDefault(stored.protein, DEFAULT_MACRO_TARGETS.protein),
+      carbs: numberOrDefault(stored.carbs, DEFAULT_MACRO_TARGETS.carbs),
+      fat: numberOrDefault(stored.fat, DEFAULT_MACRO_TARGETS.fat),
+    }
+  } catch {
+    return DEFAULT_MACRO_TARGETS
+  }
+}
 
 export function CalorieTracker() {
   const { t, lang } = useLanguage()
@@ -52,23 +73,73 @@ export function CalorieTracker() {
   const [editingGoal, setEditingGoal] = useState(false)
   const [goalDraft, setGoalDraft] = useState('')
 
-  // Macro targets — stored in localStorage so they survive page reloads.
-  const [macroTargets, setMacroTargets] = useState(() => {
-    if (typeof window === 'undefined') return { protein: 118, carbs: 375, fat: 73 }
-    try {
-      const saved = localStorage.getItem('macro_targets')
-      return saved ? JSON.parse(saved) as { protein: number; carbs: number; fat: number } : { protein: 118, carbs: 375, fat: 73 }
-    } catch { return { protein: 118, carbs: 375, fat: 73 } }
-  })
+  const [macroTargets, setMacroTargets] = useState<MacroTargets>(DEFAULT_MACRO_TARGETS)
   const [editingMacro, setEditingMacro] = useState<'protein' | 'carbs' | 'fat' | null>(null)
   const [macroDraft, setMacroDraft] = useState('')
 
-  function saveMacroTarget(key: 'protein' | 'carbs' | 'fat') {
+  const fetchMacroTargets = useCallback(async () => {
+    const client = getSupabaseBrowserClient()
+    const { data: { user } } = await client.auth.getUser()
+    if (!user) return
+
+    const { data, error } = await client
+      .from('daily_macro_targets')
+      .select('protein_g, carbs_g, fat_g')
+      .eq('user_id', user.id)
+      .eq('date', selectedDate)
+      .maybeSingle()
+
+    if (error) {
+      console.error('Error fetching macro targets:', error)
+      return
+    }
+
+    if (data) {
+      setMacroTargets({ protein: Number(data.protein_g), carbs: Number(data.carbs_g), fat: Number(data.fat_g) })
+      return
+    }
+
+    if (selectedDate === todayDate()) {
+      const legacyTargets = getLegacyMacroTargets()
+      const { error: migrateError } = await client
+        .from('daily_macro_targets')
+        .upsert({
+          user_id: user.id,
+          date: selectedDate,
+          protein_g: legacyTargets.protein,
+          carbs_g: legacyTargets.carbs,
+          fat_g: legacyTargets.fat,
+        }, { onConflict: 'user_id,date' })
+
+      if (!migrateError) localStorage.removeItem('macro_targets')
+      setMacroTargets(legacyTargets)
+      return
+    }
+
+    setMacroTargets(DEFAULT_MACRO_TARGETS)
+  }, [selectedDate])
+
+  async function saveMacroTarget(key: 'protein' | 'carbs' | 'fat') {
     const val = parseInt(macroDraft, 10)
     if (!isNaN(val) && val > 0) {
       const next = { ...macroTargets, [key]: val }
       setMacroTargets(next)
-      localStorage.setItem('macro_targets', JSON.stringify(next))
+      const client = getSupabaseBrowserClient()
+      const { data: { user } } = await client.auth.getUser()
+      if (!user) return
+      const { error } = await client
+        .from('daily_macro_targets')
+        .upsert({
+          user_id: user.id,
+          date: selectedDate,
+          protein_g: next.protein,
+          carbs_g: next.carbs,
+          fat_g: next.fat,
+        }, { onConflict: 'user_id,date' })
+      if (error) {
+        setMacroTargets(macroTargets)
+        toast.error(t('calorieTracker.updateError'))
+      }
     }
     setEditingMacro(null)
   }
@@ -128,6 +199,11 @@ export function CalorieTracker() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void fetchDailyFoods()
   }, [fetchDailyFoods])
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void fetchMacroTargets()
+  }, [fetchMacroTargets])
 
   useEffect(() => {
     if (!previewImage) return

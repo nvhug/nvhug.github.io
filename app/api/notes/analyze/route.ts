@@ -8,20 +8,40 @@ const CALORIE_TARGET = 2400
 const WEIGHT_START   = 61
 const WEIGHT_TARGET  = 75
 const ANALYZE_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000
+const DEFAULT_MACRO_TARGETS = { protein: 118, carbs: 375, fat: 73 }
 
 type Lang = 'vi' | 'en'
+type MacroTargets = typeof DEFAULT_MACRO_TARGETS
 
-const USER_PROFILE: Record<Lang, string> = {
-  vi: `- Giới tính: Nam, 34 tuổi
+function getMacroTargets(targets?: Partial<MacroTargets>): MacroTargets {
+  const normalize = (value: unknown, fallback: number) => (
+    typeof value === 'number' && Number.isFinite(value) && value > 0 && value <= 10_000 ? value : fallback
+  )
+
+  return {
+    protein: normalize(targets?.protein, DEFAULT_MACRO_TARGETS.protein),
+    carbs: normalize(targets?.carbs, DEFAULT_MACRO_TARGETS.carbs),
+    fat: normalize(targets?.fat, DEFAULT_MACRO_TARGETS.fat),
+  }
+}
+
+function buildUserProfile(lang: Lang, macroTargets: MacroTargets) {
+  const profiles: Record<Lang, string> = {
+    vi: `- Giới tính: Nam, 34 tuổi
 - Mục tiêu: Tăng cân từ ${WEIGHT_START}kg lên ${WEIGHT_TARGET}kg (lean bulk)
 - Công việc: Văn phòng (ít vận động trong giờ làm)
 - Nhu cầu calo: ${CALORIE_TARGET} kcal/ngày (surplus ~300–400 kcal cho lean bulk)
+- Mục tiêu macro: Protein ${macroTargets.protein}g | Carbs ${macroTargets.carbs}g | Fat ${macroTargets.fat}g mỗi ngày
 - Tốc độ tăng cân mục tiêu: 0.25–0.5 kg/tuần`,
-  en: `- Gender: Male, 34 years old
+    en: `- Gender: Male, 34 years old
 - Goal: Gain weight from ${WEIGHT_START}kg to ${WEIGHT_TARGET}kg (lean bulk)
 - Job: Office work (sedentary during work hours)
 - Calorie needs: ${CALORIE_TARGET} kcal/day (surplus ~300–400 kcal for lean bulk)
+- Macro targets: Protein ${macroTargets.protein}g | Carbs ${macroTargets.carbs}g | Fat ${macroTargets.fat}g per day
 - Target weight gain rate: 0.25–0.5 kg/week`,
+  }
+
+  return profiles[lang]
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -181,23 +201,69 @@ function buildWeightSummary(logs: WeightLog[]) {
 
 // ─── Calorie summary ─────────────────────────────────────────────────────────
 
-interface DailyFood { date: string; total_calories: number }
+interface DailyFood { date: string; total_calories: number; protein_g?: number | null; carbs_g?: number | null; fat_g?: number | null }
 interface MealRow   { date: string; meal_type: string; time: string; is_completed: boolean }
+interface MacroTargetRow { date: string; protein_g: number; carbs_g: number; fat_g: number }
 
-function buildCalorieSummary(foods: DailyFood[], meals: MealRow[]) {
+function buildCalorieSummary(foods: DailyFood[], meals: MealRow[], targetRows: MacroTargetRow[]) {
   if (!foods.length && !meals.length) return null
   // Only compute calorie stats when food data exists
   if (!foods.length) return null
 
-  // Aggregate calories by date
+  // Aggregate calories and macros by date
   const byDate: Record<string, number> = {}
-  foods.forEach(f => { byDate[f.date] = (byDate[f.date] ?? 0) + f.total_calories })
+  const macroByDate: Record<string, { protein: number; carbs: number; fat: number }> = {}
+  foods.forEach(f => {
+    byDate[f.date] = (byDate[f.date] ?? 0) + f.total_calories
+    if (!macroByDate[f.date]) macroByDate[f.date] = { protein: 0, carbs: 0, fat: 0 }
+    macroByDate[f.date].protein += f.protein_g ?? 0
+    macroByDate[f.date].carbs   += f.carbs_g   ?? 0
+    macroByDate[f.date].fat     += f.fat_g     ?? 0
+  })
 
   const dailyEntries   = Object.entries(byDate).sort(([a], [b]) => a.localeCompare(b))
   const dailyTotals    = dailyEntries.map(([, v]) => v)
   const trackedDays    = dailyEntries.length
   const avgCal         = Math.round(avg(dailyTotals))
   const totalActual    = dailyTotals.reduce((s, v) => s + v, 0)
+  const sortedTargets  = targetRows
+    .map(row => ({
+      date: row.date,
+      targets: getMacroTargets({
+        protein: Number(row.protein_g),
+        carbs: Number(row.carbs_g),
+        fat: Number(row.fat_g),
+      }),
+    }))
+    .sort((a, b) => a.date.localeCompare(b.date))
+  const targetsByDate: Record<string, MacroTargets> = {}
+  let targetIndex = 0
+  let activeTargets = DEFAULT_MACRO_TARGETS
+  dailyEntries.forEach(([date]) => {
+    while (targetIndex < sortedTargets.length && sortedTargets[targetIndex].date <= date) {
+      activeTargets = sortedTargets[targetIndex].targets
+      targetIndex++
+    }
+    targetsByDate[date] = activeTargets
+  })
+
+  // Macro aggregates — only over days that have any macro data
+  const macroDays = dailyEntries.filter(([date]) => {
+    const m = macroByDate[date]
+    return m && (m.protein > 0 || m.carbs > 0 || m.fat > 0)
+  })
+  const macroCoveragePct = trackedDays > 0 ? Math.round((macroDays.length / trackedDays) * 100) : 0
+  const avgProtein = macroDays.length > 0 ? Math.round(avg(macroDays.map(([d]) => macroByDate[d].protein))) : null
+  const avgCarbs   = macroDays.length > 0 ? Math.round(avg(macroDays.map(([d]) => macroByDate[d].carbs)))   : null
+  const avgFat     = macroDays.length > 0 ? Math.round(avg(macroDays.map(([d]) => macroByDate[d].fat)))     : null
+  const avgMacroTargets = macroDays.length > 0 ? {
+    protein: Math.round(avg(macroDays.map(([d]) => targetsByDate[d].protein))),
+    carbs: Math.round(avg(macroDays.map(([d]) => targetsByDate[d].carbs))),
+    fat: Math.round(avg(macroDays.map(([d]) => targetsByDate[d].fat))),
+  } : null
+  const daysHitProtein = macroDays.filter(([d]) => macroByDate[d].protein >= targetsByDate[d].protein * 0.9).length
+  const daysHitCarbs   = macroDays.filter(([d]) => macroByDate[d].carbs   >= targetsByDate[d].carbs   * 0.9).length
+  const daysHitFat     = macroDays.filter(([d]) => macroByDate[d].fat     >= targetsByDate[d].fat     * 0.9).length
   const totalDeficit   = Math.round(trackedDays * CALORIE_TARGET - totalActual) // >0=thiếu, <0=dư
   const daysMetTarget  = dailyTotals.filter(c => c >= CALORIE_TARGET).length
   const daysUnder      = dailyTotals.filter(c => c < CALORIE_TARGET * 0.9).length
@@ -267,6 +333,14 @@ function buildCalorieSummary(foods: DailyFood[], meals: MealRow[]) {
     meal_scheduled_times:     mealTimes,
     weekly_calorie_trend:     weeklyCalTrend,
     dow_avg_calories:         dowAvgCalories,
+    macro_targets:            sortedTargets.at(-1)?.targets ?? DEFAULT_MACRO_TARGETS,
+    avg_macro_targets:        avgMacroTargets,
+    macro_coverage_pct:       macroCoveragePct,
+    avg_daily_macros:         avgProtein !== null ? { protein_g: avgProtein, carbs_g: avgCarbs, fat_g: avgFat } : null,
+    days_hit_protein_target:  macroDays.length > 0 ? daysHitProtein : null,
+    days_hit_carbs_target:    macroDays.length > 0 ? daysHitCarbs   : null,
+    days_hit_fat_target:      macroDays.length > 0 ? daysHitFat     : null,
+    macro_tracked_days:       macroDays.length,
   }
 }
 
@@ -529,7 +603,7 @@ export async function POST(request: Request) {
     }
   }
 
-  const [weightRes, foodRes, mealRes, gymRes, calRes, bowelRes, goalsRes] = await Promise.all([
+  const [weightRes, foodRes, mealRes, gymRes, calRes, bowelRes, goalsRes, macroTargetsRes] = await Promise.all([
     supabaseAuth.from('weight_logs')
       .select('date, weight')
       .eq('user_id', user!.id)
@@ -537,7 +611,7 @@ export async function POST(request: Request) {
       .order('date', { ascending: true }),
 
     supabaseAuth.from('daily_foods')
-      .select('date, total_calories')
+      .select('date, total_calories, protein_g, carbs_g, fat_g')
       .eq('user_id', user!.id)
       .gte('date', period.from).lte('date', period.to)
       .order('date', { ascending: true }),
@@ -567,11 +641,25 @@ export async function POST(request: Request) {
 
     supabaseAuth.from('goals')
       .select('title, type, status, completion_percentage'),
+
+    supabaseAuth.from('daily_macro_targets')
+      .select('date, protein_g, carbs_g, fat_g')
+      .eq('user_id', user!.id)
+      .lte('date', period.to)
+      .order('date', { ascending: true }),
   ])
+
+  const macroTargetRows = (macroTargetsRes.data ?? []) as MacroTargetRow[]
+  const latestMacroTargets = macroTargetRows.at(-1)
+  const macroTargets = getMacroTargets(latestMacroTargets ? {
+    protein: Number(latestMacroTargets.protein_g),
+    carbs: Number(latestMacroTargets.carbs_g),
+    fat: Number(latestMacroTargets.fat_g),
+  } : undefined)
 
   const notesSummary    = buildNotesSummary(notes, habits ?? [])
   const weightSummary   = buildWeightSummary(weightRes.data ?? [])
-  const calorieSummary  = buildCalorieSummary(foodRes.data ?? [], mealRes.data ?? [])
+  const calorieSummary  = buildCalorieSummary(foodRes.data ?? [], mealRes.data ?? [], macroTargetRows)
   const gymSummary      = buildGymSummary(gymRes.data ?? [])
   const calendarSummary = buildCalendarSummary(calRes.data ?? [], period.from, period.to)
   const bowelSummary    = buildBowelSummary(bowelRes.data ?? [])
@@ -580,7 +668,7 @@ export async function POST(request: Request) {
   const prompt = activeLang === 'en' ? `You are an expert personal health & productivity coach. Analyze all data for **${period.label}** (${period.from} → ${period.to}) and return a comprehensive in-depth review in English.
 
 === USER PROFILE ===
-${USER_PROFILE.en}
+${buildUserProfile('en', macroTargets)}
 
 === NOTES & HABITS ===
 ${JSON.stringify(notesSummary, null, 2)}
@@ -607,6 +695,9 @@ FIELD GUIDE:
 [NOTES] total_notes, good_pct/bad_pct, completion_rate_pct, avg_priority(1–5), weekly_breakdown, habits, recent_content_samples.
 [WEIGHT] gain_per_week_kg (target 0.25–0.5), progress_pct (% to 75 kg), weekly_trend, logs_per_week.
 [NUTRITION] total_calorie_deficit_kcal(>0=under), days_under_90pct, meal_completion_by_type, weekly_calorie_trend, dow_avg_calories.
+  avg_daily_macros: {protein_g, carbs_g, fat_g} vs avg_macro_targets for macro-logged days. macro_targets is the latest target in the period.
+  macro_coverage_pct = % of days with macro data logged. days_hit_protein/carbs/fat_target = days ≥90% of target.
+  If macro_coverage_pct < 50, note that macros are under-tracked and recommend enabling photo/manual logging.
 [GYM] workout_days_per_week (ideal ≥3), consistency_pct (% weeks with ≥3 days), top_exercises, top_muscle_groups, avg_sets_per_session.
 [CALENDAR] events_per_week_avg, busiest_day_of_week, time_distribution(morning/afternoon/evening/night), recurring_events.
 [DIGESTIVE] normal_pct(target ≥80%), avg_per_day(ideal 1–2), abnormal_types.
@@ -614,7 +705,7 @@ FIELD GUIDE:
 
 Return ONLY valid JSON with exactly this structure (no extra fields, no markdown):
 {
-  "summary": "3-sentence overview: briefly mention progress across notes, weight, nutrition, gym, and scheduling this period",
+  "summary": "3-sentence overview: briefly mention progress across notes, weight, nutrition (calories + macros), gym, and scheduling this period",
   "weight": {
     "verdict": "On track | Too slow | Too fast | No data",
     "points": ["insight with numbers", "insight about trend or logging frequency"],
@@ -622,9 +713,10 @@ Return ONLY valid JSON with exactly this structure (no extra fields, no markdown
   },
   "nutrition": {
     "verdict": "Sufficient calories | Calorie deficit | Calorie surplus | No data",
-    "points": ["insight with kcal numbers", "insight about weekly/dow pattern"],
+    "points": ["insight with kcal numbers + key macro gap (e.g. protein avg vs 118g target)", "insight about weekly/dow pattern or most skipped macro"],
     "worst_day": "day of week with lowest avg calories + amount",
-    "skip_habit": "most skipped meal + skip % + estimated kcal impact"
+    "skip_habit": "most skipped meal + skip % + estimated kcal impact",
+    "macro_avg": "protein Xg/carbs Xg/fat Xg per day (tracked X% of days) — or null if no macro data"
   },
   "gym": {
     "verdict": "Consistent | Inconsistent | Getting started | No data",
@@ -657,7 +749,7 @@ Return ONLY valid JSON with exactly this structure (no extra fields, no markdown
 }` : `Bạn là chuyên gia huấn luyện sức khỏe và năng suất cá nhân. Phân tích toàn bộ dữ liệu kỳ **${period.label}** (${period.from} → ${period.to}) và trả về nhận xét chuyên sâu bằng tiếng Việt.
 
 === HỒ SƠ NGƯỜI DÙNG ===
-${USER_PROFILE.vi}
+${buildUserProfile('vi', macroTargets)}
 
 === GHI CHÚ & THÓI QUEN ===
 ${JSON.stringify(notesSummary, null, 2)}
@@ -684,6 +776,9 @@ HƯỚNG DẪN TRƯỜNG DỮ LIỆU:
 [GHI CHÚ] total_notes, good_pct/bad_pct, completion_rate_pct, avg_priority(1–5), weekly_breakdown, habits, recent_content_samples.
 [CÂN NẶNG] gain_per_week_kg (mục tiêu 0.25–0.5), progress_pct (% đến 75 kg), weekly_trend, logs_per_week.
 [DINH DƯỠNG] total_calorie_deficit_kcal(>0=thiếu), days_under_90pct, meal_completion_by_type, weekly_calorie_trend, dow_avg_calories.
+  avg_daily_macros: {protein_g, carbs_g, fat_g} so với avg_macro_targets của các ngày đã ghi macro. macro_targets là target mới nhất trong kỳ.
+  macro_coverage_pct = % ngày có ghi macro. days_hit_protein/carbs/fat_target = ngày đạt ≥90% mục tiêu.
+  Nếu macro_coverage_pct < 50, lưu ý macro chưa được ghi đầy đủ và gợi ý bật chụp ảnh/nhập thủ công.
 [GYM] workout_days_per_week (lý tưởng ≥3), consistency_pct (% tuần có ≥3 ngày tập), top_exercises, top_muscle_groups, avg_sets_per_session.
 [LỊCH] events_per_week_avg, busiest_day_of_week, time_distribution(morning/afternoon/evening/night), recurring_events.
 [TIÊU HÓA] normal_pct(mục tiêu ≥80%), avg_per_day(lý tưởng 1–2 lần/ngày), abnormal_types.
@@ -691,7 +786,7 @@ HƯỚNG DẪN TRƯỜNG DỮ LIỆU:
 
 Trả về JSON hợp lệ với đúng cấu trúc sau (không thêm/bỏ field, không markdown):
 {
-  "summary": "3 câu tổng quan: đề cập tiến độ ghi chú, cân nặng, dinh dưỡng, gym và lập lịch trong kỳ này",
+  "summary": "3 câu tổng quan: đề cập tiến độ ghi chú, cân nặng, dinh dưỡng (calo + macro), gym và lập lịch trong kỳ này",
   "weight": {
     "verdict": "Đúng tiến độ | Quá chậm | Quá nhanh | Chưa có dữ liệu",
     "points": ["nhận xét có số liệu cụ thể", "nhận xét về xu hướng hoặc tần suất ghi cân"],
@@ -699,9 +794,10 @@ Trả về JSON hợp lệ với đúng cấu trúc sau (không thêm/bỏ field
   },
   "nutrition": {
     "verdict": "Đủ calo | Thiếu calo | Dư calo | Chưa có dữ liệu",
-    "points": ["nhận xét có kcal cụ thể", "nhận xét về xu hướng tuần/ngày"],
+    "points": ["nhận xét có kcal cụ thể + thiếu hụt macro chính (VD: protein avg vs mục tiêu 118g)", "nhận xét về xu hướng tuần/ngày hoặc macro hay thiếu nhất"],
     "worst_day": "ngày trong tuần calo thấp nhất + avg cụ thể",
-    "skip_habit": "bữa hay bỏ nhất + % skip + kcal ảnh hưởng"
+    "skip_habit": "bữa hay bỏ nhất + % skip + kcal ảnh hưởng",
+    "macro_avg": "protein Xg/carbs Xg/fat Xg mỗi ngày (ghi macro X% số ngày) — hoặc null nếu chưa có dữ liệu macro"
   },
   "gym": {
     "verdict": "Đều đặn | Chưa đều | Mới bắt đầu | Chưa có dữ liệu",

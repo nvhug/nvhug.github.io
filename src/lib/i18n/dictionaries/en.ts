@@ -482,6 +482,7 @@ export const en: Dictionary = {
     nutritionCard: 'Nutrition',
     worstDayLabel: 'Worst day: ',
     skipHabitLabel: 'Skipped meal: ',
+    macroAverageLabel: 'Average macros: ',
     notesHabitsCard: 'Notes & Habits',
     habitGapLabel: 'Habit gap: ',
     recommendationCard: 'Recommendation',

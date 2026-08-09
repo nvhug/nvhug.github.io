@@ -480,6 +480,7 @@ export const vi = {
     nutritionCard: 'Dinh dưỡng',
     worstDayLabel: 'Ngày yếu: ',
     skipHabitLabel: 'Bỏ bữa: ',
+    macroAverageLabel: 'Macro TB: ',
     notesHabitsCard: 'Ghi chú & Habit',
     habitGapLabel: 'Habit gap: ',
     recommendationCard: 'Gợi ý',
