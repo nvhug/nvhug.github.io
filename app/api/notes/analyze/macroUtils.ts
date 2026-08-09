@@ -48,3 +48,24 @@ export function resolveTargetsByDate(
   }
   return result
 }
+
+/**
+ * Parses the raw JSON string from localStorage `macro_targets` key.
+ * Returns validated targets; any missing/invalid field falls back to the default.
+ */
+export function parseLegacyMacroTargets(raw: string | null): MacroTargets {
+  const numberOrDefault = (value: unknown, fallback: number) => (
+    typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : fallback
+  )
+
+  try {
+    const stored = JSON.parse(raw ?? '{}') as Partial<MacroTargets>
+    return {
+      protein: numberOrDefault(stored.protein, DEFAULT_MACRO_TARGETS.protein),
+      carbs:   numberOrDefault(stored.carbs,   DEFAULT_MACRO_TARGETS.carbs),
+      fat:     numberOrDefault(stored.fat,     DEFAULT_MACRO_TARGETS.fat),
+    }
+  } catch {
+    return { ...DEFAULT_MACRO_TARGETS }
+  }
+}

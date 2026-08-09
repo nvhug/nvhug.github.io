@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   DEFAULT_MACRO_TARGETS,
   getMacroTargets,
+  parseLegacyMacroTargets,
   resolveTargetsByDate,
 } from './macroUtils'
 import type { MacroTargetRow } from './macroUtils'
@@ -108,5 +109,46 @@ describe('resolveTargetsByDate', () => {
     const dates = ['2026-08-01', '2026-08-02', '2026-08-03']
     const result = resolveTargetsByDate(dates, [])
     expect(Object.keys(result).sort()).toEqual(dates.sort())
+  })
+})
+
+describe('parseLegacyMacroTargets', () => {
+  it('returns defaults for null (no key in localStorage)', () => {
+    expect(parseLegacyMacroTargets(null)).toEqual(DEFAULT_MACRO_TARGETS)
+  })
+
+  it('returns defaults for empty string', () => {
+    expect(parseLegacyMacroTargets('')).toEqual(DEFAULT_MACRO_TARGETS)
+  })
+
+  it('returns defaults for invalid JSON', () => {
+    expect(parseLegacyMacroTargets('{not json')).toEqual(DEFAULT_MACRO_TARGETS)
+  })
+
+  it('returns defaults for empty JSON object', () => {
+    expect(parseLegacyMacroTargets('{}')).toEqual(DEFAULT_MACRO_TARGETS)
+  })
+
+  it('parses valid stored targets', () => {
+    const raw = JSON.stringify({ protein: 150, carbs: 300, fat: 60 })
+    expect(parseLegacyMacroTargets(raw)).toEqual({ protein: 150, carbs: 300, fat: 60 })
+  })
+
+  it('falls back per-field for zero or negative values', () => {
+    const raw = JSON.stringify({ protein: 0, carbs: -5, fat: 60 })
+    expect(parseLegacyMacroTargets(raw)).toEqual({
+      protein: DEFAULT_MACRO_TARGETS.protein,
+      carbs:   DEFAULT_MACRO_TARGETS.carbs,
+      fat:     60,
+    })
+  })
+
+  it('falls back per-field for non-numeric values', () => {
+    const raw = JSON.stringify({ protein: 'abc', carbs: 300, fat: null })
+    expect(parseLegacyMacroTargets(raw)).toEqual({
+      protein: DEFAULT_MACRO_TARGETS.protein,
+      carbs:   300,
+      fat:     DEFAULT_MACRO_TARGETS.fat,
+    })
   })
 })

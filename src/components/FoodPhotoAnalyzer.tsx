@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { Camera, ImagePlus, LoaderCircle, Plus, RefreshCw, Sparkles, TriangleAlert, X } from 'lucide-react'
+import { Camera, ImagePlus, LoaderCircle, Plus, Sparkles, TriangleAlert, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import { uploadFoodThumb } from '@/lib/storage'
@@ -47,6 +47,7 @@ interface PickedImage {
 interface FoodPhotoAnalyzerProps {
   date: string
   onAdded: () => Promise<void> | void
+  inputMode?: 'photo' | 'text'
 }
 
 type FocusBox = [number, number, number, number]
@@ -152,7 +153,7 @@ async function buildThumbnailDataUrl(image: PickedImage, focusBox?: FocusBox | n
   }
 }
 
-export function FoodPhotoAnalyzer({ date, onAdded }: FoodPhotoAnalyzerProps) {
+export function FoodPhotoAnalyzer({ date, onAdded, inputMode = 'photo' }: FoodPhotoAnalyzerProps) {
   const { t, lang } = useLanguage()
   const cameraRef = useRef<HTMLInputElement>(null)
   const galleryRef = useRef<HTMLInputElement>(null)
@@ -162,7 +163,7 @@ export function FoodPhotoAnalyzer({ date, onAdded }: FoodPhotoAnalyzerProps) {
   const [result, setResult] = useState<AnalyzeResponse | null>(null)
   const [items, setItems] = useState<EditableItem[]>([])
   const [detail, setDetail] = useState('')
-  const [detailOpen, setDetailOpen] = useState(false)
+  const [detailOpen, setDetailOpen] = useState(inputMode === 'text')
   const [time, setTime] = useState(currentTimeStr)
   const [saving, setSaving] = useState(false)
   const [analysisProgress, setAnalysisProgress] = useState(0)
@@ -354,6 +355,7 @@ export function FoodPhotoAnalyzer({ date, onAdded }: FoodPhotoAnalyzerProps) {
       />
 
       {!image ? (
+        inputMode === 'text' ? null : (
         <div className="grid grid-cols-2 gap-2">
           <button
             type="button"
@@ -372,6 +374,7 @@ export function FoodPhotoAnalyzer({ date, onAdded }: FoodPhotoAnalyzerProps) {
             {t('foodPhoto.uploadPhoto')}
           </button>
         </div>
+        )
       ) : (
         <div className="flex gap-3">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -418,16 +421,22 @@ export function FoodPhotoAnalyzer({ date, onAdded }: FoodPhotoAnalyzerProps) {
         </div>
       )}
 
-      {/* Detail fallback — shown when the AI is unsure, failed, or the user has no photo */}
+      {/* Detail fallback / text-mode primary input */}
       {(detailOpen || result?.needsDetail) && (
-        <div className="space-y-2 rounded-lg border border-amber-200 bg-amber-50 p-3">
-          <div className="flex items-start gap-2">
-            <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
-            <div className="space-y-1">
-              <p className="text-xs font-medium text-amber-800">{t('foodPhoto.needDetailTitle')}</p>
-              <p className="text-[11px] leading-relaxed text-amber-700">{t('foodPhoto.needDetailHint')}</p>
+        <div className={`space-y-2 rounded-lg border p-3 ${
+          inputMode === 'text'
+            ? 'border-emerald-200 bg-emerald-50'
+            : 'border-amber-200 bg-amber-50'
+        }`}>
+          {inputMode !== 'text' && (
+            <div className="flex items-start gap-2">
+              <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+              <div className="space-y-1">
+                <p className="text-xs font-medium text-amber-800">{t('foodPhoto.needDetailTitle')}</p>
+                <p className="text-[11px] leading-relaxed text-amber-700">{t('foodPhoto.needDetailHint')}</p>
+              </div>
             </div>
-          </div>
+          )}
 
           {result?.questions && result.questions.length > 0 && (
             <ul className="ml-6 list-disc space-y-0.5 text-[11px] text-amber-800">
@@ -440,24 +449,33 @@ export function FoodPhotoAnalyzer({ date, onAdded }: FoodPhotoAnalyzerProps) {
           <textarea
             value={detail}
             onChange={(e) => setDetail(e.target.value)}
-            rows={3}
+            rows={inputMode === 'text' ? 4 : 3}
+            autoFocus={inputMode === 'text' && items.length === 0}
             placeholder={t('foodPhoto.detailPlaceholder')}
-            className="w-full resize-y rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-amber-400"
+            className={`w-full resize-y rounded-lg border bg-white px-3 py-2 text-sm text-zinc-900 outline-none placeholder:text-zinc-400 ${
+              inputMode === 'text'
+                ? 'border-emerald-200 focus:border-emerald-400'
+                : 'border-amber-200 focus:border-amber-400'
+            }`}
           />
 
           <button
             type="button"
             onClick={() => void analyze(image ? 'image' : 'text')}
             disabled={analyzing || !detail.trim()}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-amber-500 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-amber-600 disabled:opacity-50"
+            className={`inline-flex w-full items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-white transition-colors disabled:opacity-50 ${
+              inputMode === 'text'
+                ? 'bg-emerald-500 hover:bg-emerald-600'
+                : 'bg-amber-500 hover:bg-amber-600'
+            }`}
           >
-            {analyzing ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+            {analyzing ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
             {image ? t('foodPhoto.reanalyzeWithDetail') : t('foodPhoto.analyzeDetailOnly')}
           </button>
         </div>
       )}
 
-      {!image && !detailOpen && (
+      {!image && !detailOpen && inputMode === 'photo' && (
         <button
           type="button"
           onClick={() => setDetailOpen(true)}
