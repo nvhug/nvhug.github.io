@@ -276,7 +276,7 @@ export function FoodPhotoAnalyzer({ date, onAdded, inputMode = 'photo' }: FoodPh
       )
       // The tab can sit open for hours, so stamp the meal at analysis time.
       setTime(currentTimeStr())
-      setDetailOpen(data.needsDetail)
+      setDetailOpen(inputMode === 'text' || data.needsDetail)
       stopProgressTicker(100)
       if (data.items.length === 0) {
         toast.error(t('foodPhoto.nothingDetected'))
@@ -439,7 +439,7 @@ export function FoodPhotoAnalyzer({ date, onAdded, inputMode = 'photo' }: FoodPh
           )}
 
           {result?.questions && result.questions.length > 0 && (
-            <ul className="ml-6 list-disc space-y-0.5 text-[11px] text-amber-800">
+            <ul className={`ml-6 list-disc space-y-0.5 text-[11px] ${inputMode === 'text' ? 'text-emerald-800' : 'text-amber-800'}`}>
               {result.questions.map((q, index) => (
                 <li key={`${index}-${q}`}>{q}</li>
               ))}
