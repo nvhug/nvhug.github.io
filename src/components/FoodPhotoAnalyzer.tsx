@@ -581,28 +581,79 @@ export function FoodPhotoAnalyzer({ date, onAdded, inputMode = 'photo' }: FoodPh
                 className="mb-2 w-full rounded-xl border-0 bg-white px-3 py-2.5 text-sm font-medium text-zinc-900 shadow-sm ring-1 ring-zinc-200 outline-none placeholder:font-normal placeholder:text-zinc-400 focus:ring-2 focus:ring-emerald-400"
               />
 
-              {/* nutrient chips — 4 equal-width pills */}
-              <div className="mb-2 grid grid-cols-4 gap-5">
+              {/* nutrient chips */}
+              <div className="mb-2 grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
                 {([
-                  ['kcal', '🔥', manualCalories, setManualCalories, '', 'bg-orange-100 ring-orange-200 focus-within:ring-orange-400', 'text-orange-500', 'text-orange-700 placeholder:text-orange-200'],
-                  [t('foodPhoto.protein'), '', manualProtein, setManualProtein, 'g', 'bg-blue-50 ring-blue-200 focus-within:ring-blue-400', 'text-blue-500', 'text-blue-700 placeholder:text-blue-200'],
-                  [t('foodPhoto.carbs'), '', manualCarbs, setManualCarbs, 'g', 'bg-amber-50 ring-amber-200 focus-within:ring-amber-400', 'text-amber-500', 'text-amber-700 placeholder:text-amber-200'],
-                  [t('foodPhoto.fat'), '', manualFat, setManualFat, 'g', 'bg-rose-50 ring-rose-200 focus-within:ring-rose-400', 'text-rose-500', 'text-rose-700 placeholder:text-rose-200'],
-                ] as const).map(([label, icon, val, setter, unit, chip, labelColor, inputColor]) => (
-                  <div key={label} className={`flex items-center gap-0.5 overflow-hidden rounded-lg px-1.5 py-2 ring-1 ${chip}`}>
-                    <span className={`shrink-0 text-[11px] font-medium ${labelColor}`}>{icon}{label}</span>
-                    <input
-                      type="number"
-                      min={label === 'kcal' ? '1' : '0'}
-                      step={label === 'kcal' ? '1' : '0.1'}
-                      value={val}
-                      onChange={(e) => (setter as (v: string) => void)(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === 'Enter') void addManual() }}
-                      placeholder="0"
-                      className={`min-w-0 flex-1 bg-transparent text-right text-sm font-semibold tabular-nums outline-none ${inputColor}`}
-                    />
-                    {unit && <span className={`shrink-0 text-[11px] ${labelColor}`}>{unit}</span>}
-                  </div>
+                  {
+                    key: 'kcal',
+                    label: 'kcal',
+                    icon: '🔥',
+                    value: manualCalories,
+                    setValue: setManualCalories,
+                    unit: '',
+                    min: '1',
+                    step: '1',
+                    chip: 'bg-orange-100 ring-orange-200 focus-within:ring-orange-400',
+                    labelColor: 'text-orange-700',
+                    inputColor: 'text-orange-700 placeholder:text-orange-300',
+                  },
+                  {
+                    key: 'protein',
+                    label: t('foodPhoto.protein'),
+                    icon: '',
+                    value: manualProtein,
+                    setValue: setManualProtein,
+                    unit: 'g',
+                    min: '0',
+                    step: '0.1',
+                    chip: 'bg-blue-50 ring-blue-200 focus-within:ring-blue-400',
+                    labelColor: 'text-blue-700',
+                    inputColor: 'text-blue-700 placeholder:text-blue-300',
+                  },
+                  {
+                    key: 'carbs',
+                    label: t('foodPhoto.carbs'),
+                    icon: '',
+                    value: manualCarbs,
+                    setValue: setManualCarbs,
+                    unit: 'g',
+                    min: '0',
+                    step: '0.1',
+                    chip: 'bg-amber-50 ring-amber-200 focus-within:ring-amber-400',
+                    labelColor: 'text-amber-700',
+                    inputColor: 'text-amber-700 placeholder:text-amber-300',
+                  },
+                  {
+                    key: 'fat',
+                    label: t('foodPhoto.fat'),
+                    icon: '',
+                    value: manualFat,
+                    setValue: setManualFat,
+                    unit: 'g',
+                    min: '0',
+                    step: '0.1',
+                    chip: 'bg-rose-50 ring-rose-200 focus-within:ring-rose-400',
+                    labelColor: 'text-rose-700',
+                    inputColor: 'text-rose-700 placeholder:text-rose-300',
+                  },
+                ] as const).map((field) => (
+                  <label key={field.key} className={`rounded-lg px-2 py-2 ring-1 ${field.chip}`}>
+                    <span className={`mb-1 block text-[11px] font-medium ${field.labelColor}`}>{field.icon}{field.label}</span>
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        min={field.min}
+                        step={field.step}
+                        value={field.value}
+                        onChange={(e) => field.setValue(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') void addManual() }}
+                        placeholder="0"
+                        className={`min-w-0 flex-1 bg-transparent text-sm font-semibold tabular-nums outline-none ${field.inputColor}`}
+                      />
+                      {field.unit && <span className={`shrink-0 text-[11px] ${field.labelColor}`}>{field.unit}</span>}
+                    </div>
+                  </label>
                 ))}
               </div>
 
@@ -613,7 +664,7 @@ export function FoodPhotoAnalyzer({ date, onAdded, inputMode = 'photo' }: FoodPh
                   type="button"
                   onClick={() => void addManual()}
                   disabled={manualSaving || !manualName.trim() || !manualCalories || Number(manualCalories) <= 0}
-                  className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-emerald-500 py-2 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-emerald-600 disabled:opacity-40"
+                  className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-md bg-emerald-500 py-2 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-emerald-600 sm:rounded-xl disabled:opacity-40"
                 >
                   {manualSaving ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
                   {t('foodPhoto.manualAddButton')}

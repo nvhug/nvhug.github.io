@@ -885,6 +885,8 @@ export const en: Dictionary = {
       nutrition: {
         heading: 'AI Nutrition QA Dashboard',
         subtitle: 'Internal telemetry for normalization quality and manual overrides.',
+        nonAdminTitle: 'Admin access required',
+        nonAdminHint: 'This dashboard is only visible to admin accounts.',
         totalEvents30d: 'Events (30d)',
         applied30d: 'Applied (30d)',
         ambiguous30d: 'Ambiguous (30d)',

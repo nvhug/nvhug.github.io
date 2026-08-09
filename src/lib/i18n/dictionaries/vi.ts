@@ -883,6 +883,8 @@ export const vi = {
       nutrition: {
         heading: 'Dashboard QA Dinh dưỡng AI',
         subtitle: 'Telemetry nội bộ để theo dõi chất lượng chuẩn hóa và chỉnh tay calo.',
+        nonAdminTitle: 'Cần quyền quản trị',
+        nonAdminHint: 'Dashboard này chỉ hiển thị cho tài khoản admin.',
         totalEvents30d: 'Sự kiện (30 ngày)',
         applied30d: 'Áp dụng (30 ngày)',
         ambiguous30d: 'Mơ hồ (30 ngày)',

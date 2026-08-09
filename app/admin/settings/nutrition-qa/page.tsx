@@ -7,6 +7,7 @@ import { usePathname } from 'next/navigation'
 import { getSupabaseBrowserClient } from '@/lib/supabase-browser'
 import { useLanguage } from '@/lib/i18n/language-context'
 import { getIntlLocale } from '@/lib/i18n/locale'
+import { useUserRole } from '@/lib/useUserRole'
 
 type MetricRow = {
   id: string
@@ -19,10 +20,18 @@ type MetricRow = {
 export default function AdminNutritionQaPage() {
   const { t, lang } = useLanguage()
   const pathname = usePathname()
+  const { role, loading: roleLoading } = useUserRole()
   const [rows, setRows] = useState<MetricRow[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    if (roleLoading) return
+    if (role !== 'admin') {
+      setRows([])
+      setLoading(false)
+      return
+    }
+
     async function load() {
       const { data, error } = await getSupabaseBrowserClient()
         .from('nutrition_normalization_metrics')
@@ -37,7 +46,7 @@ export default function AdminNutritionQaPage() {
     }
 
     void load()
-  }, [])
+  }, [role, roleLoading])
 
   const summary = useMemo(() => {
     const since = Date.now() - 30 * 24 * 60 * 60 * 1000
@@ -116,9 +125,16 @@ export default function AdminNutritionQaPage() {
         </div>
       </div>
 
-      {loading ? (
+      {!roleLoading && role !== 'admin' ? (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-5">
+          <p className="text-sm font-semibold text-amber-800">{t('admin.settings.nutrition.nonAdminTitle')}</p>
+          <p className="mt-1 text-sm text-amber-700">{t('admin.settings.nutrition.nonAdminHint')}</p>
+        </div>
+      ) : null}
+
+      {role === 'admin' && loading ? (
         <div className="rounded-xl border border-zinc-100 bg-white p-6 text-sm text-zinc-500">{t('common.loading')}</div>
-      ) : (
+      ) : role === 'admin' ? (
         <>
           <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
             <StatCard label={t('admin.settings.nutrition.totalEvents30d')} value={summary.total} />
@@ -182,7 +198,7 @@ export default function AdminNutritionQaPage() {
             </div>
           </div>
         </>
-      )}
+      ) : null}
     </div>
   )
 }
