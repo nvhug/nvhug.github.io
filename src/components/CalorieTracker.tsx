@@ -400,9 +400,9 @@ export function CalorieTracker() {
         </div>
 
         {mode === 'photo' ? (
-          <FoodPhotoAnalyzer date={selectedDate} onAdded={fetchDailyFoods} />
+          <FoodPhotoAnalyzer key="photo" date={selectedDate} onAdded={fetchDailyFoods} />
         ) : (
-          <FoodPhotoAnalyzer date={selectedDate} onAdded={fetchDailyFoods} inputMode="text" />
+          <FoodPhotoAnalyzer key="text" date={selectedDate} onAdded={fetchDailyFoods} inputMode="text" />
         )}
       </div>
 

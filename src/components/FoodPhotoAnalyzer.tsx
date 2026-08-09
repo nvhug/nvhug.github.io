@@ -195,7 +195,7 @@ export function FoodPhotoAnalyzer({ date, onAdded, inputMode = 'photo' }: FoodPh
     setResult(null)
     setItems([])
     setDetail('')
-    setDetailOpen(false)
+    setDetailOpen(inputMode === 'text')
     setAnalysisProgress(0)
     if (cameraRef.current) cameraRef.current.value = ''
     if (galleryRef.current) galleryRef.current.value = ''
