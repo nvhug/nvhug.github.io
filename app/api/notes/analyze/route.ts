@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { Note } from '@/types'
 import { createSupabaseServerClient } from '@/lib/supabase-server'
+import { DEFAULT_MACRO_TARGETS, getMacroTargets, resolveTargetsByDate } from './macroUtils'
+import type { MacroTargets, MacroTargetRow } from './macroUtils'
 
 export const dynamic = 'force-dynamic'
 
@@ -8,22 +10,7 @@ const CALORIE_TARGET = 2400
 const WEIGHT_START   = 61
 const WEIGHT_TARGET  = 75
 const ANALYZE_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000
-const DEFAULT_MACRO_TARGETS = { protein: 118, carbs: 375, fat: 73 }
-
 type Lang = 'vi' | 'en'
-type MacroTargets = typeof DEFAULT_MACRO_TARGETS
-
-function getMacroTargets(targets?: Partial<MacroTargets>): MacroTargets {
-  const normalize = (value: unknown, fallback: number) => (
-    typeof value === 'number' && Number.isFinite(value) && value > 0 && value <= 10_000 ? value : fallback
-  )
-
-  return {
-    protein: normalize(targets?.protein, DEFAULT_MACRO_TARGETS.protein),
-    carbs: normalize(targets?.carbs, DEFAULT_MACRO_TARGETS.carbs),
-    fat: normalize(targets?.fat, DEFAULT_MACRO_TARGETS.fat),
-  }
-}
 
 function buildUserProfile(lang: Lang, macroTargets: MacroTargets) {
   const profiles: Record<Lang, string> = {
@@ -203,7 +190,6 @@ function buildWeightSummary(logs: WeightLog[]) {
 
 interface DailyFood { date: string; total_calories: number; protein_g?: number | null; carbs_g?: number | null; fat_g?: number | null }
 interface MealRow   { date: string; meal_type: string; time: string; is_completed: boolean }
-interface MacroTargetRow { date: string; protein_g: number; carbs_g: number; fat_g: number }
 
 function buildCalorieSummary(foods: DailyFood[], meals: MealRow[], targetRows: MacroTargetRow[]) {
   if (!foods.length && !meals.length) return null
@@ -226,26 +212,10 @@ function buildCalorieSummary(foods: DailyFood[], meals: MealRow[], targetRows: M
   const trackedDays    = dailyEntries.length
   const avgCal         = Math.round(avg(dailyTotals))
   const totalActual    = dailyTotals.reduce((s, v) => s + v, 0)
-  const sortedTargets  = targetRows
-    .map(row => ({
-      date: row.date,
-      targets: getMacroTargets({
-        protein: Number(row.protein_g),
-        carbs: Number(row.carbs_g),
-        fat: Number(row.fat_g),
-      }),
-    }))
+  const sortedTargets = [...targetRows]
+    .map(row => ({ date: row.date, targets: getMacroTargets({ protein: Number(row.protein_g), carbs: Number(row.carbs_g), fat: Number(row.fat_g) }) }))
     .sort((a, b) => a.date.localeCompare(b.date))
-  const targetsByDate: Record<string, MacroTargets> = {}
-  let targetIndex = 0
-  let activeTargets = DEFAULT_MACRO_TARGETS
-  dailyEntries.forEach(([date]) => {
-    while (targetIndex < sortedTargets.length && sortedTargets[targetIndex].date <= date) {
-      activeTargets = sortedTargets[targetIndex].targets
-      targetIndex++
-    }
-    targetsByDate[date] = activeTargets
-  })
+  const targetsByDate = resolveTargetsByDate(dailyEntries.map(([d]) => d), targetRows)
 
   // Macro aggregates — only over days that have any macro data
   const macroDays = dailyEntries.filter(([date]) => {
