@@ -86,7 +86,9 @@ export function CalorieTracker() {
       .from('daily_macro_targets')
       .select('protein_g, carbs_g, fat_g')
       .eq('user_id', user.id)
-      .eq('date', selectedDate)
+      .lte('date', selectedDate)
+      .order('date', { ascending: false })
+      .limit(1)
       .maybeSingle()
 
     if (error) {

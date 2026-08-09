@@ -603,7 +603,7 @@ export async function POST(request: Request) {
     }
   }
 
-  const [weightRes, foodRes, mealRes, gymRes, calRes, bowelRes, goalsRes, macroTargetsRes] = await Promise.all([
+  const [weightRes, foodRes, mealRes, gymRes, calRes, bowelRes, goalsRes, macroBaselineRes, macroTargetsRes] = await Promise.all([
     supabaseAuth.from('weight_logs')
       .select('date, weight')
       .eq('user_id', user!.id)
@@ -645,11 +645,22 @@ export async function POST(request: Request) {
     supabaseAuth.from('daily_macro_targets')
       .select('date, protein_g, carbs_g, fat_g')
       .eq('user_id', user!.id)
+      .lt('date', period.from)
+      .order('date', { ascending: false })
+      .limit(1),
+
+    supabaseAuth.from('daily_macro_targets')
+      .select('date, protein_g, carbs_g, fat_g')
+      .eq('user_id', user!.id)
+      .gte('date', period.from)
       .lte('date', period.to)
       .order('date', { ascending: true }),
   ])
 
-  const macroTargetRows = (macroTargetsRes.data ?? []) as MacroTargetRow[]
+  const macroTargetRows = [
+    ...(macroBaselineRes.data ?? []),
+    ...(macroTargetsRes.data ?? []),
+  ] as MacroTargetRow[]
   const latestMacroTargets = macroTargetRows.at(-1)
   const macroTargets = getMacroTargets(latestMacroTargets ? {
     protein: Number(latestMacroTargets.protein_g),
