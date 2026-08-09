@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { Check, Shield } from 'lucide-react'
+import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { getSupabaseBrowserClient } from '@/lib/supabase-browser'
 import { useLanguage } from '@/lib/i18n/language-context'
 import { APP_ROLES, EXTRA_FEATURES, type AppRole } from '@/lib/permissions'
@@ -14,6 +16,7 @@ type CellKey = `${string}:${AppRole}`
 
 export default function AdminPageAccessPage() {
   const { t } = useLanguage()
+  const pathname = usePathname()
   const [permissions, setPermissions] = useState<Map<CellKey, PagePermission>>(new Map())
   const [loading, setLoading] = useState(true)
   const [busyKey, setBusyKey] = useState<CellKey | null>(null)
@@ -73,6 +76,39 @@ export default function AdminPageAccessPage() {
 
   return (
     <div className="space-y-4">
+      <div className="inline-flex items-center gap-1 rounded-lg border border-zinc-200 bg-white p-1">
+        <Link
+          href="/admin/settings"
+          className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+            pathname === '/admin/settings'
+              ? 'bg-emerald-500 text-white'
+              : 'text-zinc-600 hover:bg-zinc-100'
+          }`}
+        >
+          {t('admin.settings.usersTab')}
+        </Link>
+        <Link
+          href="/admin/settings/pages"
+          className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+            pathname === '/admin/settings/pages'
+              ? 'bg-emerald-500 text-white'
+              : 'text-zinc-600 hover:bg-zinc-100'
+          }`}
+        >
+          {t('admin.settings.pagesTab')}
+        </Link>
+        <Link
+          href="/admin/settings/nutrition-qa"
+          className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+            pathname === '/admin/settings/nutrition-qa'
+              ? 'bg-emerald-500 text-white'
+              : 'text-zinc-600 hover:bg-zinc-100'
+          }`}
+        >
+          {t('admin.settings.nutritionTab')}
+        </Link>
+      </div>
+
       {/* Compact header */}
       <div className="flex items-center gap-3">
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-500 text-white shadow-[0_4px_12px_rgba(16,185,129,0.35)]">

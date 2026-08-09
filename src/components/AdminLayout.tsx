@@ -2,6 +2,7 @@
 
 import * as React from 'react'
 import {
+  BarChart3,
   ArrowUpRight,
   ChevronDown,
   FileText,
@@ -66,6 +67,7 @@ export function AdminSidebar() {
   const settingsSubItems = [
     { title: t('admin.settings.usersTab'), href: '/admin/settings', icon: Users },
     { title: t('admin.settings.pagesTab'), href: '/admin/settings/pages', icon: Shield },
+    { title: t('admin.settings.nutritionTab'), href: '/admin/settings/nutrition-qa', icon: BarChart3 },
   ]
   const isSettingsActive = pathname.startsWith('/admin/settings')
 

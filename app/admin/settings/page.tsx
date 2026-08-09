@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { Check, ChevronDown, ChevronLeft, ChevronRight, Users } from 'lucide-react'
+import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { getSupabaseBrowserClient } from '@/lib/supabase-browser'
 import { useLanguage } from '@/lib/i18n/language-context'
 import { getIntlLocale } from '@/lib/i18n/locale'
@@ -114,6 +116,7 @@ function Pagination({ page, total, onChange }: { page: number; total: number; on
 
 export default function AdminUsersPage() {
   const { t, lang } = useLanguage()
+  const pathname = usePathname()
   const [profiles, setProfiles] = useState<UserProfile[]>([])
   const [loading, setLoading] = useState(true)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
@@ -171,6 +174,39 @@ export default function AdminUsersPage() {
 
   return (
     <div className="space-y-4">
+      <div className="inline-flex items-center gap-1 rounded-lg border border-zinc-200 bg-white p-1">
+        <Link
+          href="/admin/settings"
+          className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+            pathname === '/admin/settings'
+              ? 'bg-emerald-500 text-white'
+              : 'text-zinc-600 hover:bg-zinc-100'
+          }`}
+        >
+          {t('admin.settings.usersTab')}
+        </Link>
+        <Link
+          href="/admin/settings/pages"
+          className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+            pathname === '/admin/settings/pages'
+              ? 'bg-emerald-500 text-white'
+              : 'text-zinc-600 hover:bg-zinc-100'
+          }`}
+        >
+          {t('admin.settings.pagesTab')}
+        </Link>
+        <Link
+          href="/admin/settings/nutrition-qa"
+          className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+            pathname === '/admin/settings/nutrition-qa'
+              ? 'bg-emerald-500 text-white'
+              : 'text-zinc-600 hover:bg-zinc-100'
+          }`}
+        >
+          {t('admin.settings.nutritionTab')}
+        </Link>
+      </div>
+
       {/* Compact header */}
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
