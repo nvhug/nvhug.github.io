@@ -157,6 +157,7 @@ HARD RULES:
 4. When an explicit amount is present, calculate calories and macros from that exact amount only.
 5. Macro consistency is mandatory: calories MUST equal protein_g*4 + carbs_g*4 + fat_g*9 within +/-10%. Recompute and adjust before answering.
 6. Round calories to the nearest 5 kcal and macros to 1 decimal place.
+6.1. Anchor each estimate to a known nutrition reference density (USDA/FoodData Central or equivalent Vietnamese food tables) for the same cooked state. Avoid unusually low outputs; if your estimate is below a plausible lower bound for that food and portion, raise it to the nearest plausible value.
 7. Apply the cooking method carefully: estimate added oil per 100 g edible finished food (deep-fried ~4-10 g fat/100 g, stir-fried ~2-6 g fat/100 g, grilled/steamed/boiled ~0-3 g fat/100 g).
 8. Avoid double counting oil: if the dish is already identified as a cooked fried dish and the portion refers to the final cooked weight, use realistic cooked-food nutrition density and do not add a second generic oil surcharge.
 9. Count only the edible portion — exclude bones, shells and inedible garnish — but include sauces, broth actually consumed, toppings, condensed milk and syrup.

@@ -1,0 +1,23 @@
+export type NormalizedTableKey =
+  | 'white_rice'
+  | 'tofu_plain'
+  | 'tofu_fried'
+  | 'braised_fish'
+  | 'ripe_banana'
+  | 'boiled_egg'
+  | 'chicken_breast_cooked'
+  | 'white_bread'
+  | 'rolled_oats_dry'
+  | 'whole_milk'
+  | 'milk_tea'
+  | 'coffee_with_milk'
+  | 'plain_yogurt'
+  | 'sweet_potato_boiled'
+  | 'rice_noodles_cooked'
+  | 'pho_beef_bowl'
+  | 'bun_meat_bowl'
+  | 'banh_mi_filled'
+
+export type NormalizedSource = 'internal_table'
+
+export type NormalizationWarning = 'ambiguous_match' | 'household_unit_converted'

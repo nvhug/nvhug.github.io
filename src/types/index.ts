@@ -1,3 +1,5 @@
+import type { NormalizedSource, NormalizedTableKey, NormalizationWarning } from './nutrition-normalization'
+
 export type UserRole = 'admin' | 'paid' | 'user'
 
 export interface UserProfile {
@@ -191,11 +193,11 @@ export interface DailyFood {
   image_thumb?: string | null
   notes?: string
   normalized_by_internal_table?: boolean | null
-  normalized_table_key?: 'white_rice' | 'tofu_plain' | 'tofu_fried' | 'braised_fish' | null
-  normalized_source?: 'internal_table' | null
+  normalized_table_key?: NormalizedTableKey | null
+  normalized_source?: NormalizedSource | null
   normalization_version?: string | null
   normalization_confidence?: number | null
-  normalization_warning?: 'ambiguous_match' | 'household_unit_converted' | null
+  normalization_warning?: NormalizationWarning | null
   created_at: string
   updated_at: string
 }

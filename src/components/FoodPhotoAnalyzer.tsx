@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase'
 import { uploadFoodThumb } from '@/lib/storage'
 import { TimePicker } from '@/components/ui/time-picker'
 import { useLanguage } from '@/lib/i18n/language-context'
+import type { NormalizedSource, NormalizedTableKey, NormalizationWarning } from '@/types/nutrition-normalization'
 
 const MAX_EDGE_PX = 1024
 const JPEG_QUALITY = 0.82
@@ -23,11 +24,11 @@ interface AnalyzedItem {
   confidence: number
   assumptions: string
   normalized_by_internal_table?: boolean
-  normalized_table_key?: 'white_rice' | 'tofu_plain' | 'tofu_fried' | 'braised_fish'
-  normalized_source?: 'internal_table'
+  normalized_table_key?: NormalizedTableKey
+  normalized_source?: NormalizedSource
   normalization_version?: string
   normalization_confidence?: number
-  normalization_warning?: 'ambiguous_match' | 'household_unit_converted'
+  normalization_warning?: NormalizationWarning
 }
 
 interface AnalyzeResponse {
