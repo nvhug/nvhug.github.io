@@ -459,6 +459,13 @@ export function CalorieTracker() {
                         className="rounded border border-emerald-300 px-2 py-1 text-sm text-zinc-900 focus:outline-none focus:ring-1 focus:ring-emerald-400"
                         placeholder={t('calorieTracker.editFoodNamePlaceholder')}
                       />
+                      <input
+                        type="text"
+                        value={editingData?.notes ?? ''}
+                        onChange={(e) => setEditingData({ ...editingData, notes: e.target.value })}
+                        className="rounded border border-emerald-300 px-2 py-1 text-sm text-zinc-900 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                        placeholder={t('calorieTracker.editPortionPlaceholder') || 'Quantity/portion (e.g., ~300g)'}
+                      />
                       <div className="flex items-center gap-1.5">
                         <input
                           type="number"
