@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { CheckCircle2, Circle, Landmark, LogOut, Mail, Pencil, Plus, Trash2, TrendingDown, TrendingUp, Users, WalletCards, X } from 'lucide-react'
+import { CheckCircle2, ChevronDown, ChevronUp, Circle, Landmark, Mail, Pencil, Plus, RefreshCw, Trash2, TrendingDown, TrendingUp, Users, WalletCards, X } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { toast } from 'sonner'
 import { ConfirmModal } from '@/components/ui/confirm-modal'
@@ -24,6 +24,7 @@ type FundAsset = {
   name: string
   type: AssetType
   amount: number
+  gold_chi?: number | null
   note: string | null
 }
 
@@ -72,6 +73,21 @@ type FundShare = {
   created_at: string
 }
 
+type GoldPricePayload = {
+  price24kPerChi: number
+  priceRing9999PerChi: number
+  updatedAt: string
+}
+
+type GoldPriceRow = {
+  user_id: string
+  price24k_per_chi: number
+  price_ring9999_per_chi: number
+  updated_at: string
+}
+
+type GoldPriceField = '24k' | 'ring9999'
+
 const inputClass = 'h-9 w-full rounded-lg border border-emerald-200 bg-white px-3 text-sm text-zinc-900 outline-none transition-colors placeholder:text-zinc-400 focus:border-emerald-500'
 const cardClass = 'rounded-2xl border border-emerald-100 bg-white shadow-[0_18px_36px_-30px_rgba(16,185,129,0.28)]'
 
@@ -105,6 +121,42 @@ function inferAssetTypeFromName(name: string, assets: FundAsset[]): AssetType {
   if (normalized.includes('tien mat') || normalized.includes('cash') || normalized.includes('vi')) return 'cash'
   if (normalized.includes('ngan hang') || normalized.includes('bank') || normalized.includes('tai khoan') || normalized.includes('tiet kiem') || normalized.includes('saving')) return 'bank'
   return 'other'
+}
+
+function inferGoldVariantFromName(name: string): '24k' | 'ring9999' {
+  const normalized = normalizeSearchText(name.trim())
+  return normalized.includes('nhan') || normalized.includes('ring') ? 'ring9999' : '24k'
+}
+
+function parseChiAmount(value: string): number {
+  const normalized = value.replace(',', '.').trim()
+  if (!/^\d+(\.\d+)?$/.test(normalized)) return Number.NaN
+  return Number(normalized)
+}
+
+function formatChiAmount(value: number): string {
+  if (!Number.isFinite(value)) return ''
+  const nearestInt = Math.round(value)
+  if (Math.abs(value - nearestInt) < 0.01) return String(nearestInt)
+  return value.toFixed(4).replace(/\.?0+$/, '')
+}
+
+async function fetchLatestGoldPrice(): Promise<GoldPricePayload> {
+  const res = await fetch('/api/gold-price', { cache: 'no-store' })
+  const data = await res.json()
+  if (
+    !res.ok
+    || typeof data?.price24kPerChi !== 'number'
+    || typeof data?.priceRing9999PerChi !== 'number'
+    || typeof data?.updatedAt !== 'string'
+  ) {
+    throw new Error('could_not_fetch_gold_price')
+  }
+  return {
+    price24kPerChi: data.price24kPerChi,
+    priceRing9999PerChi: data.priceRing9999PerChi,
+    updatedAt: data.updatedAt,
+  }
 }
 
 function AssetSuggest({ value, assets, vi, onChange, onSelect }: {
@@ -279,7 +331,12 @@ export default function FundFutureClient() {
   const [assetName, setAssetName] = useState('')
   const [assetAmount, setAssetAmount] = useState('')
   const [assetNote, setAssetNote] = useState('')
-  const [goldPricePerChi, setGoldPricePerChi] = useState('9500000')
+  const [goldPrice24kPerChi, setGoldPrice24kPerChi] = useState(9_800_000)
+  const [goldPriceRing9999PerChi, setGoldPriceRing9999PerChi] = useState(9_500_000)
+  const [goldPriceLoading, setGoldPriceLoading] = useState(false)
+  const [goldPriceUpdatedAt, setGoldPriceUpdatedAt] = useState<string | null>(null)
+  const [editingGoldField, setEditingGoldField] = useState<GoldPriceField | null>(null)
+  const [editingGoldValue, setEditingGoldValue] = useState('')
 
   const [transactionFormOpen, setTransactionFormOpen] = useState(false)
   const [transactionId, setTransactionId] = useState<string | null>(null)
@@ -340,16 +397,129 @@ export default function FundFutureClient() {
   }
 
   async function fetchAll(ownerId: string) {
-    const [assetResult, transactionResult, debtResult, borrowingResult] = await Promise.all([
+    const [assetResult, transactionResult, debtResult, borrowingResult, goldPriceResult] = await Promise.all([
       supabase.from('fund_assets').select('*').eq('user_id', ownerId).order('created_at', { ascending: false }),
       supabase.from('fund_transactions').select('*').eq('user_id', ownerId).order('date', { ascending: false }),
       supabase.from('fund_debts').select('*').eq('user_id', ownerId).order('date', { ascending: false }),
       supabase.from('fund_borrowings').select('*').eq('user_id', ownerId).order('date', { ascending: false }),
+      supabase.from('fund_gold_prices').select('*').eq('user_id', ownerId).maybeSingle(),
     ])
     setAssets(assetResult.data ?? [])
     setTransactions(transactionResult.data ?? [])
     setDebts(debtResult.data ?? [])
     setBorrowings(borrowingResult.data ?? [])
+    const storedGoldPrice = goldPriceResult.data as GoldPriceRow | null
+    if (storedGoldPrice) {
+      const p24 = Number(storedGoldPrice.price24k_per_chi)
+      const pRing = Number(storedGoldPrice.price_ring9999_per_chi)
+      if (Number.isFinite(p24) && p24 > 0) {
+        setGoldPrice24kPerChi(p24)
+      }
+      if (Number.isFinite(pRing) && pRing > 0) {
+        setGoldPriceRing9999PerChi(pRing)
+      }
+      setGoldPriceUpdatedAt(storedGoldPrice.updated_at)
+    }
+  }
+
+  async function saveGoldPriceToDb(ownerId: string, price24k: number, priceRing9999: number, updatedAt: string) {
+    const { error } = await supabase.from('fund_gold_prices').upsert(
+      {
+        user_id: ownerId,
+        price24k_per_chi: Math.round(price24k),
+        price_ring9999_per_chi: Math.round(priceRing9999),
+        updated_at: updatedAt,
+      },
+      { onConflict: 'user_id' }
+    )
+    if (error) throw error
+  }
+
+  async function revalueGoldAssets(ownerId: string, next24k: number, nextRing9999: number, base24k: number, baseRing9999: number) {
+    const { data, error } = await supabase
+      .from('fund_assets')
+      .select('id, name, amount, gold_chi')
+      .eq('user_id', ownerId)
+      .eq('type', 'gold')
+
+    if (error || !data?.length) return
+    const goldAssets = data as Pick<FundAsset, 'id' | 'name' | 'amount' | 'gold_chi'>[]
+
+    await Promise.all(
+      goldAssets.map(async (asset) => {
+        const variant = inferGoldVariantFromName(asset.name)
+        const basePrice = variant === 'ring9999' ? baseRing9999 : base24k
+        const nextPrice = variant === 'ring9999' ? nextRing9999 : next24k
+        const storedChi = Number(asset.gold_chi)
+        const derivedChi = Number(asset.amount) / basePrice
+        const chi = Number.isFinite(storedChi) && storedChi > 0 ? storedChi : derivedChi
+        if (!Number.isFinite(chi) || chi <= 0 || !Number.isFinite(nextPrice) || nextPrice <= 0) return
+
+        await supabase
+          .from('fund_assets')
+          .update({
+            amount: Math.round(chi * nextPrice),
+            gold_chi: chi,
+          })
+          .eq('id', asset.id)
+      })
+    )
+  }
+
+  async function refreshGoldPrice() {
+    if (!effectiveOwnerId) return
+    setGoldPriceLoading(true)
+    try {
+      const base24k = goldPrice24kPerChi
+      const baseRing9999 = goldPriceRing9999PerChi
+      const latest = await fetchLatestGoldPrice()
+      await saveGoldPriceToDb(effectiveOwnerId, latest.price24kPerChi, latest.priceRing9999PerChi, latest.updatedAt)
+      await revalueGoldAssets(effectiveOwnerId, latest.price24kPerChi, latest.priceRing9999PerChi, base24k, baseRing9999)
+      setGoldPrice24kPerChi(latest.price24kPerChi)
+      setGoldPriceRing9999PerChi(latest.priceRing9999PerChi)
+      setGoldPriceUpdatedAt(latest.updatedAt)
+      setEditingGoldField(null)
+      await fetchAll(effectiveOwnerId)
+      toast.success(vi ? 'Đã cập nhật giá vàng mới nhất.' : 'Latest gold price updated.')
+    } catch {
+      toast.error(vi ? 'Không lấy được giá vàng mới nhất.' : 'Could not fetch the latest gold price.')
+    } finally {
+      setGoldPriceLoading(false)
+    }
+  }
+
+  function startInlineGoldEdit(field: GoldPriceField) {
+    if (goldPriceLoading) return
+    setEditingGoldField(field)
+    setEditingGoldValue(String(Math.round(field === '24k' ? goldPrice24kPerChi : goldPriceRing9999PerChi)))
+  }
+
+  async function commitInlineGoldEdit() {
+    if (!effectiveOwnerId || !editingGoldField) return
+    const nextValue = Number(editingGoldValue)
+    if (!Number.isFinite(nextValue) || nextValue <= 0) {
+      return toast.error(vi ? 'Giá vàng không hợp lệ.' : 'Invalid gold prices.')
+    }
+    const next24k = editingGoldField === '24k' ? Math.round(nextValue) : Math.round(goldPrice24kPerChi)
+    const nextRing = editingGoldField === 'ring9999' ? Math.round(nextValue) : Math.round(goldPriceRing9999PerChi)
+    setGoldPriceLoading(true)
+    try {
+      const base24k = goldPrice24kPerChi
+      const baseRing9999 = goldPriceRing9999PerChi
+      const updatedAt = new Date().toISOString()
+      await saveGoldPriceToDb(effectiveOwnerId, next24k, nextRing, updatedAt)
+      await revalueGoldAssets(effectiveOwnerId, next24k, nextRing, base24k, baseRing9999)
+      setGoldPrice24kPerChi(next24k)
+      setGoldPriceRing9999PerChi(nextRing)
+      setGoldPriceUpdatedAt(updatedAt)
+      setEditingGoldField(null)
+      await fetchAll(effectiveOwnerId)
+      toast.success(vi ? 'Đã lưu giá vàng mới.' : 'Gold prices saved.')
+    } catch {
+      toast.error(vi ? 'Không thể lưu giá vàng.' : 'Could not save gold prices.')
+    } finally {
+      setGoldPriceLoading(false)
+    }
   }
 
   async function sendInvite(event: React.FormEvent) {
@@ -398,13 +568,48 @@ export default function FundFutureClient() {
     setAssetId(null); setAssetName(''); setAssetAmount(''); setAssetNote(''); setAssetFormOpen(false)
   }
 
+  function getGoldPricePerChi(name: string): number {
+    return inferGoldVariantFromName(name) === 'ring9999' ? goldPriceRing9999PerChi : goldPrice24kPerChi
+  }
+
+  function getStoredGoldChi(asset: FundAsset): number | null {
+    const parsed = Number(asset.gold_chi)
+    if (Number.isFinite(parsed) && parsed > 0) return parsed
+    return null
+  }
+
+  function getEditableAmount(asset: FundAsset): string {
+    if (asset.type !== 'gold') return String(asset.amount)
+    const storedChi = getStoredGoldChi(asset)
+    if (storedChi !== null) return formatChiAmount(storedChi)
+    const perChi = getGoldPricePerChi(asset.name)
+    if (!Number.isFinite(perChi) || perChi <= 0) return ''
+    return formatChiAmount(Number(asset.amount) / perChi)
+  }
+
+  function startEditAsset(asset: FundAsset) {
+    setAssetId(asset.id)
+    setAssetName(asset.name)
+    setAssetAmount(getEditableAmount(asset))
+    setAssetNote(asset.note ?? '')
+    setAssetFormOpen(true)
+  }
+
   async function saveAsset(event: React.FormEvent) {
     event.preventDefault()
-    const amount = Number(assetAmount)
-    if (!assetName.trim() || !Number.isFinite(amount) || amount < 0) return toast.error(vi ? 'Dữ liệu tài sản không hợp lệ.' : 'Invalid asset data.')
-    setSaving(true)
     const resolvedType = inferAssetTypeFromName(assetName, assets)
-    const row = { user_id: effectiveOwnerId!, name: assetName.trim(), type: resolvedType, amount, note: assetNote.trim() || null }
+    let amount = Number(assetAmount)
+    let goldChi: number | null = null
+    if (resolvedType === 'gold') {
+      const chi = parseChiAmount(assetAmount)
+      if (!assetName.trim() || !Number.isFinite(chi) || chi <= 0) return toast.error(vi ? 'Vui lòng nhập số chỉ hợp lệ.' : 'Please enter a valid chi amount.')
+      goldChi = chi
+      amount = chi * getGoldPricePerChi(assetName)
+    } else if (!assetName.trim() || !Number.isFinite(amount) || amount < 0) {
+      return toast.error(vi ? 'Dữ liệu tài sản không hợp lệ.' : 'Invalid asset data.')
+    }
+    setSaving(true)
+    const row = { user_id: effectiveOwnerId!, name: assetName.trim(), type: resolvedType, amount, gold_chi: goldChi, note: assetNote.trim() || null }
     const { error } = assetId
       ? await supabase.from('fund_assets').update(row).eq('id', assetId)
       : await supabase.from('fund_assets').insert(row)
@@ -576,6 +781,7 @@ export default function FundFutureClient() {
   const filteredTransactions = transactionFilter === 'all' ? transactions : transactions.filter((item) => item.type === transactionFilter)
   const outstandingDebt = debts.filter((item) => !item.is_settled).reduce((sum, item) => sum + Number(item.amount), 0)
   const outstandingBorrowing = borrowings.filter((item) => !item.is_settled).reduce((sum, item) => sum + Number(item.amount), 0)
+  const assetIsGold = inferAssetTypeFromName(assetName, assets) === 'gold'
 
   if (userId === undefined) return <main className="min-h-svh bg-[#f7fef9] pt-24" />
 
@@ -584,8 +790,7 @@ export default function FundFutureClient() {
       <main className="flex min-h-svh items-center justify-center bg-[#f7fef9] px-4 pt-20">
         <div className={`${cardClass} max-w-sm p-8 text-center`}>
           <Landmark className="mx-auto h-10 w-10 text-emerald-600" />
-          <h1 className="mt-4 font-poppins text-2xl font-semibold text-zinc-900">{vi ? 'Quỹ Tương Lai' : 'Future Fund'}</h1>
-          <p className="mt-2 text-sm text-zinc-500">{vi ? 'Đăng nhập để quản lý tài sản của bạn.' : 'Sign in to manage your assets.'}</p>
+          <p className="mt-4 text-sm text-zinc-500">{vi ? 'Đăng nhập để quản lý tài sản của bạn.' : 'Sign in to manage your assets.'}</p>
           <a href="/login" className="mt-5 inline-flex rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700">
             {vi ? 'Đăng nhập' : 'Sign in'}
           </a>
@@ -603,7 +808,6 @@ export default function FundFutureClient() {
           <div className="flex size-10 items-center justify-center rounded-xl bg-emerald-600 text-white"><Landmark className="size-5" /></div>
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-emerald-600">{vi ? 'Tài sản cá nhân' : 'Personal assets'}</p>
-            <h1 className="font-poppins text-2xl font-semibold text-zinc-900">{vi ? 'Quỹ Tương Lai' : 'Future Fund'}</h1>
           </div>
         </header>
 
@@ -631,6 +835,96 @@ export default function FundFutureClient() {
               <p className="mt-2 text-xl font-semibold text-zinc-900">{formatMoney(Number(value))}</p>
             </div>
           ))}
+        </section>
+
+        <section className={`${cardClass} space-y-3 bg-gradient-to-r from-emerald-50/70 via-white to-amber-50/70 p-5`}>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-zinc-500">{vi ? 'Giá vàng tham chiếu (1 chỉ)' : 'Reference gold price (1 chi)'}</p>
+              {goldPriceUpdatedAt && (
+                <p className="mt-0.5 text-[11px] text-zinc-500">
+                  {vi ? 'Cập nhật:' : 'Updated:'} {new Date(goldPriceUpdatedAt).toLocaleString(vi ? 'vi-VN' : 'en-US')}
+                </p>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => void refreshGoldPrice()}
+                disabled={goldPriceLoading}
+                className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-emerald-600 px-3 text-xs font-semibold text-white transition-colors hover:bg-emerald-700 disabled:opacity-50"
+              >
+                <RefreshCw className={`size-3.5 ${goldPriceLoading ? 'animate-spin' : ''}`} />
+                {goldPriceLoading ? (vi ? 'Đang lấy giá...' : 'Fetching...') : (vi ? 'Lấy giá mới nhất' : 'Get latest price')}
+              </button>
+            </div>
+          </div>
+
+          <div className="grid gap-2 sm:grid-cols-2">
+            <div className="rounded-xl border border-emerald-200/70 bg-white/90 px-3 py-2.5 shadow-sm">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-zinc-500">Vàng 24K</p>
+              {editingGoldField === '24k' ? (
+                <input
+                  className="mt-1 h-8 w-full rounded-md border border-emerald-300 bg-white px-2 text-base font-semibold text-zinc-900 outline-none focus:border-emerald-500"
+                  inputMode="numeric"
+                  value={editingGoldValue}
+                  onChange={(event) => setEditingGoldValue(event.target.value.replace(/[^\d]/g, ''))}
+                  onBlur={() => void commitInlineGoldEdit()}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault()
+                      void commitInlineGoldEdit()
+                    }
+                    if (event.key === 'Escape') {
+                      setEditingGoldField(null)
+                    }
+                  }}
+                  autoFocus
+                />
+              ) : (
+                <button
+                  type="button"
+                  onDoubleClick={() => startInlineGoldEdit('24k')}
+                  className="mt-1 text-left text-base font-semibold text-zinc-900"
+                  title={vi ? 'Nhấp đúp để sửa giá' : 'Double-click to edit'}
+                >
+                  {formatMoney(goldPrice24kPerChi)}
+                </button>
+              )}
+            </div>
+            <div className="rounded-xl border border-amber-200/70 bg-white/90 px-3 py-2.5 shadow-sm">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-zinc-500">{vi ? 'Vàng nhẫn 9999' : 'Ring 9999 gold'}</p>
+              {editingGoldField === 'ring9999' ? (
+                <input
+                  className="mt-1 h-8 w-full rounded-md border border-amber-300 bg-white px-2 text-base font-semibold text-zinc-900 outline-none focus:border-amber-500"
+                  inputMode="numeric"
+                  value={editingGoldValue}
+                  onChange={(event) => setEditingGoldValue(event.target.value.replace(/[^\d]/g, ''))}
+                  onBlur={() => void commitInlineGoldEdit()}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault()
+                      void commitInlineGoldEdit()
+                    }
+                    if (event.key === 'Escape') {
+                      setEditingGoldField(null)
+                    }
+                  }}
+                  autoFocus
+                />
+              ) : (
+                <button
+                  type="button"
+                  onDoubleClick={() => startInlineGoldEdit('ring9999')}
+                  className="mt-1 text-left text-base font-semibold text-zinc-900"
+                  title={vi ? 'Nhấp đúp để sửa giá' : 'Double-click to edit'}
+                >
+                  {formatMoney(goldPriceRing9999PerChi)}
+                </button>
+              )}
+            </div>
+          </div>
+          <p className="text-[11px] text-zinc-500">{vi ? 'Nhấp đúp vào từng mức giá để chỉnh nhanh.' : 'Double-click a price to edit inline.'}</p>
         </section>
 
         {/* Allocation + quick analysis */}
@@ -685,29 +979,33 @@ export default function FundFutureClient() {
                 />
               </Field>
               <Field label={vi ? 'Giá trị' : 'Value'}>
-                <MoneyInput
-                  value={assetAmount}
-                  onChange={setAssetAmount}
-                  min="0"
-                  required
-                  isGold={inferAssetTypeFromName(assetName, assets) === 'gold'}
-                  pricePerChi={Number(goldPricePerChi) || 9_500_000}
-                  placeholder={inferAssetTypeFromName(assetName, assets) === 'gold' ? (vi ? 'Số chỉ hoặc VND' : 'Chỉ count or VND') : 'VD: 5 → 5,000,000'}
-                />
+                {assetIsGold ? (
+                  <input
+                    className={inputClass}
+                    inputMode="decimal"
+                    value={assetAmount}
+                    onChange={(event) => setAssetAmount(event.target.value.replace(/[^\d.,]/g, ''))}
+                    placeholder={vi ? 'VD: 1.5 chỉ' : 'e.g. 1.5 chi'}
+                    required
+                  />
+                ) : (
+                  <MoneyInput
+                    value={assetAmount}
+                    onChange={setAssetAmount}
+                    min="0"
+                    required
+                    placeholder="VD: 5 → 5,000,000"
+                  />
+                )}
               </Field>
-              {inferAssetTypeFromName(assetName, assets) === 'gold' && (
-                <Field label={vi ? 'Giá 1 chỉ (VND)' : 'Price/chỉ (VND)'}>
-                  <input className={inputClass} inputMode="numeric" value={goldPricePerChi} onChange={(event) => setGoldPricePerChi(event.target.value.replace(/\D/g, ''))} placeholder="9500000" />
-                </Field>
-              )}
               <Field label={vi ? 'Ghi chú' : 'Note'}><input className={inputClass} value={assetNote} onChange={(event) => setAssetNote(event.target.value)} placeholder={vi ? 'Ghi chú thêm...' : 'Optional note...'} /></Field>
             </CrudForm>
           )}
           {assets.length === 0 ? <Empty text={vi ? 'Chưa có tài sản.' : 'No assets yet.'} /> : (
             <div className="divide-y divide-zinc-100">
               {assets.map((item) => (
-                <Row key={item.id} title={item.name} subtitle={`${item.type}${item.note ? ` · ${item.note}` : ''}`} amount={formatMoney(item.amount)}
-                  actions={<ActionButtons onEdit={() => { setAssetId(item.id); setAssetName(item.name); setAssetAmount(String(item.amount)); setAssetNote(item.note ?? ''); setAssetFormOpen(true) }} onDelete={() => setDeleteTarget({ table: 'fund_assets', id: item.id })} />} />
+                <Row key={item.id} title={item.name} subtitle={`${item.type}${item.type === 'gold' ? ` · ${formatChiAmount(getStoredGoldChi(item) ?? (Number(item.amount) / getGoldPricePerChi(item.name)))} ${vi ? 'chỉ' : 'chi'}` : ''}${item.note ? ` · ${item.note}` : ''}`} amount={formatMoney(item.amount)}
+                  actions={<ActionButtons onEdit={() => startEditAsset(item)} onDelete={() => setDeleteTarget({ table: 'fund_assets', id: item.id })} />} />
               ))}
             </div>
           )}
@@ -883,67 +1181,79 @@ function ShareCard({ vi, userId, shares, inviteEmail, setInviteEmail, invitingBu
   const joined = shares.find((s) => s.member_id === userId && s.status === 'accepted')
   const pendingReceived = shares.filter((s) => s.member_id === userId && s.status === 'pending')
   const sent = shares.filter((s) => s.owner_id === userId && (s.status === 'pending' || s.status === 'accepted'))
+  const expandStateKey = `fund-share-card-expanded:${userId}`
+  const [expanded, setExpanded] = useState(() => {
+    if (typeof window === 'undefined') return true
+    const saved = window.localStorage.getItem(expandStateKey)
+    return saved === null ? true : saved === 'true'
+  })
   const statusLabel: Record<ShareStatus, string> = vi
     ? { pending: 'Đang chờ', accepted: 'Đã tham gia', declined: 'Đã từ chối', revoked: 'Đã huỷ' }
     : { pending: 'Pending', accepted: 'Joined', declined: 'Declined', revoked: 'Revoked' }
 
+  useEffect(() => {
+    window.localStorage.setItem(expandStateKey, String(expanded))
+  }, [expandStateKey, expanded])
+
+  if (joined) return null
+
   return (
     <section className={`${cardClass} p-5`}>
-      <div className="mb-3 flex items-center gap-2">
-        <Users className="size-4 text-emerald-600" />
-        <p className="text-sm font-semibold text-zinc-700">{vi ? 'Quản lý chung' : 'Shared management'}</p>
-      </div>
-
-      {joined ? (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-emerald-50 px-4 py-3">
-          <p className="text-sm text-zinc-700">
-            {vi ? 'Bạn đang quản lý chung với ' : 'You are jointly managing with '}
-            <strong>{joined.owner_email}</strong>
-          </p>
-          <button type="button" onClick={() => onEnd(joined.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-600 hover:bg-zinc-50">
-            <LogOut className="size-3.5" />{vi ? 'Rời nhóm' : 'Leave'}
-          </button>
+      <button
+        type="button"
+        onClick={() => setExpanded((value) => !value)}
+        className="mb-3 flex w-full items-center justify-between rounded-lg px-1 py-1 text-left"
+        aria-expanded={expanded}
+      >
+        <div className="flex items-center gap-2">
+          <Users className="size-4 text-emerald-600" />
+          <p className="text-sm font-semibold text-zinc-700">{vi ? 'Quản lý chung' : 'Shared management'}</p>
         </div>
-      ) : (
-        <form onSubmit={onInvite} className="flex flex-wrap items-end gap-2">
-          <div className="min-w-48 flex-1">
-            <label className="mb-1 block text-xs font-medium text-zinc-500">{vi ? 'Mời quản lý chung (email)' : 'Invite to co-manage (email)'}</label>
-            <input className={inputClass} type="email" value={inviteEmail} onChange={(event) => setInviteEmail(event.target.value)} placeholder={vi ? 'email@vidu.com' : 'email@example.com'} required />
-          </div>
-          <button type="submit" disabled={invitingBusy} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-emerald-600 px-4 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50">
-            <Mail className="size-4" />{invitingBusy ? (vi ? 'Đang gửi...' : 'Sending...') : (vi ? 'Gửi lời mời' : 'Send invite')}
-          </button>
-        </form>
-      )}
+        {expanded ? <ChevronUp className="size-4 text-zinc-400" /> : <ChevronDown className="size-4 text-zinc-400" />}
+      </button>
 
-      {pendingReceived.length > 0 && (
-        <div className="mt-4 space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-400">{vi ? 'Lời mời nhận được' : 'Invites received'}</p>
-          {pendingReceived.map((item) => (
-            <div key={item.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-emerald-100 px-3 py-2">
-              <p className="text-sm text-zinc-700"><strong>{item.owner_email}</strong>{vi ? ' mời bạn quản lý chung tài sản.' : ' invited you to co-manage their fund.'}</p>
-              <div className="flex gap-2">
-                <button type="button" onClick={() => onRespond(item.id, true)} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700">{vi ? 'Chấp nhận' : 'Accept'}</button>
-                <button type="button" onClick={() => onRespond(item.id, false)} className="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-semibold text-zinc-600 hover:bg-zinc-50">{vi ? 'Từ chối' : 'Decline'}</button>
-              </div>
+      {expanded && (
+        <>
+          <form onSubmit={onInvite} className="flex flex-wrap items-end gap-2">
+            <div className="min-w-48 flex-1">
+              <label className="mb-1 block text-xs font-medium text-zinc-500">{vi ? 'Mời quản lý chung (email)' : 'Invite to co-manage (email)'}</label>
+              <input className={inputClass} type="email" value={inviteEmail} onChange={(event) => setInviteEmail(event.target.value)} placeholder={vi ? 'email@vidu.com' : 'email@example.com'} required />
             </div>
-          ))}
-        </div>
-      )}
+            <button type="submit" disabled={invitingBusy} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-emerald-600 px-4 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50">
+              <Mail className="size-4" />{invitingBusy ? (vi ? 'Đang gửi...' : 'Sending...') : (vi ? 'Gửi lời mời' : 'Send invite')}
+            </button>
+          </form>
 
-      {!joined && sent.length > 0 && (
-        <div className="mt-4 space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-400">{vi ? 'Lời mời đã gửi' : 'Invites sent'}</p>
-          {sent.map((item) => (
-            <div key={item.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-zinc-100 px-3 py-2">
-              <p className="text-sm text-zinc-700">{item.member_email}</p>
-              <div className="flex items-center gap-2">
-                <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${item.status === 'accepted' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>{statusLabel[item.status]}</span>
-                <button type="button" onClick={() => onEnd(item.id)} className="text-xs font-medium text-zinc-400 hover:text-red-600">{vi ? 'Huỷ' : 'Cancel'}</button>
-              </div>
+          {pendingReceived.length > 0 && (
+            <div className="mt-4 space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-400">{vi ? 'Lời mời nhận được' : 'Invites received'}</p>
+              {pendingReceived.map((item) => (
+                <div key={item.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-emerald-100 px-3 py-2">
+                  <p className="text-sm text-zinc-700"><strong>{item.owner_email}</strong>{vi ? ' mời bạn quản lý chung tài sản.' : ' invited you to co-manage their fund.'}</p>
+                  <div className="flex gap-2">
+                    <button type="button" onClick={() => onRespond(item.id, true)} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700">{vi ? 'Chấp nhận' : 'Accept'}</button>
+                    <button type="button" onClick={() => onRespond(item.id, false)} className="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-semibold text-zinc-600 hover:bg-zinc-50">{vi ? 'Từ chối' : 'Decline'}</button>
+                  </div>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+          )}
+
+          {sent.length > 0 && (
+            <div className="mt-4 space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-400">{vi ? 'Lời mời đã gửi' : 'Invites sent'}</p>
+              {sent.map((item) => (
+                <div key={item.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-zinc-100 px-3 py-2">
+                  <p className="text-sm text-zinc-700">{item.member_email}</p>
+                  <div className="flex items-center gap-2">
+                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${item.status === 'accepted' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>{statusLabel[item.status]}</span>
+                    <button type="button" onClick={() => onEnd(item.id)} className="text-xs font-medium text-zinc-400 hover:text-red-600">{vi ? 'Huỷ' : 'Cancel'}</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
       )}
     </section>
   )
