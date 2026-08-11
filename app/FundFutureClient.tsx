@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { CheckCircle2, Circle, Landmark, Pencil, Plus, Trash2, TrendingDown, TrendingUp, WalletCards, X } from 'lucide-react'
+import { CheckCircle2, Circle, Landmark, LogOut, Mail, Pencil, Plus, Trash2, TrendingDown, TrendingUp, Users, WalletCards, X } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { toast } from 'sonner'
 import { ConfirmModal } from '@/components/ui/confirm-modal'
@@ -58,6 +58,18 @@ type FundBorrowing = {
   term: string | null
   date: string
   is_settled: boolean
+}
+
+type ShareStatus = 'pending' | 'accepted' | 'declined' | 'revoked'
+
+type FundShare = {
+  id: string
+  owner_id: string
+  owner_email: string
+  member_id: string
+  member_email: string
+  status: ShareStatus
+  created_at: string
 }
 
 const inputClass = 'h-9 w-full rounded-lg border border-emerald-200 bg-white px-3 text-sm text-zinc-900 outline-none transition-colors placeholder:text-zinc-400 focus:border-emerald-500'
@@ -296,6 +308,11 @@ export default function FundFutureClient() {
   const [borrowingTerm, setBorrowingTerm] = useState('')
   const [borrowingDate, setBorrowingDate] = useState(getTodayLocalISODate)
 
+  const [shares, setShares] = useState<FundShare[]>([])
+  const [sharesLoaded, setSharesLoaded] = useState(false)
+  const [inviteEmail, setInviteEmail] = useState('')
+  const [invitingBusy, setInvitingBusy] = useState(false)
+
   useEffect(() => {
     supabase.auth.getUser().then(({ data }: { data: { user: { id: string; email?: string | null } | null } }) => {
       setUserId(data.user?.id ?? null)
@@ -305,20 +322,76 @@ export default function FundFutureClient() {
 
   useEffect(() => {
     if (!userId) return
-    void fetchAll()
+    void fetchShares()
   }, [userId])
 
-  async function fetchAll() {
+  // Once an accepted invite exists where I'm the member, all reads/writes target the owner's data instead of mine
+  const effectiveOwnerId = shares.find((s) => s.member_id === userId && s.status === 'accepted')?.owner_id ?? userId ?? null
+
+  useEffect(() => {
+    if (!sharesLoaded || !effectiveOwnerId) return
+    void fetchAll(effectiveOwnerId)
+  }, [sharesLoaded, effectiveOwnerId])
+
+  async function fetchShares() {
+    const { data } = await supabase.from('fund_shares').select('*').order('created_at', { ascending: false })
+    setShares(data ?? [])
+    setSharesLoaded(true)
+  }
+
+  async function fetchAll(ownerId: string) {
     const [assetResult, transactionResult, debtResult, borrowingResult] = await Promise.all([
-      supabase.from('fund_assets').select('*').order('created_at', { ascending: false }),
-      supabase.from('fund_transactions').select('*').order('date', { ascending: false }),
-      supabase.from('fund_debts').select('*').order('date', { ascending: false }),
-      supabase.from('fund_borrowings').select('*').order('date', { ascending: false }),
+      supabase.from('fund_assets').select('*').eq('user_id', ownerId).order('created_at', { ascending: false }),
+      supabase.from('fund_transactions').select('*').eq('user_id', ownerId).order('date', { ascending: false }),
+      supabase.from('fund_debts').select('*').eq('user_id', ownerId).order('date', { ascending: false }),
+      supabase.from('fund_borrowings').select('*').eq('user_id', ownerId).order('date', { ascending: false }),
     ])
     setAssets(assetResult.data ?? [])
     setTransactions(transactionResult.data ?? [])
     setDebts(debtResult.data ?? [])
     setBorrowings(borrowingResult.data ?? [])
+  }
+
+  async function sendInvite(event: React.FormEvent) {
+    event.preventDefault()
+    if (!inviteEmail.trim()) return
+    setInvitingBusy(true)
+    const { error } = await supabase.rpc('fund_send_invite', { p_email: inviteEmail.trim() })
+    if (error) {
+      const messages: Record<string, string> = {
+        user_not_found: vi ? 'Không tìm thấy tài khoản với email này.' : 'No account found with this email.',
+        cannot_invite_self: vi ? 'Không thể tự mời chính mình.' : 'You cannot invite yourself.',
+        already_shared: vi ? 'Người này đã đang quản lý chung với bạn.' : 'This person is already co-managing with you.',
+      }
+      toast.error(messages[error.message] ?? (vi ? 'Không thể gửi lời mời.' : 'Could not send invite.'))
+    } else {
+      toast.success(vi ? 'Đã gửi lời mời.' : 'Invite sent.')
+      setInviteEmail('')
+      await fetchShares()
+    }
+    setInvitingBusy(false)
+  }
+
+  async function respondInvite(id: string, accept: boolean) {
+    const { error } = await supabase.rpc('fund_respond_invite', { p_invite_id: id, p_accept: accept })
+    if (error) {
+      const messages: Record<string, string> = {
+        already_in_a_shared_fund: vi ? 'Bạn đang quản lý chung với người khác. Hãy rời nhóm đó trước.' : 'You already belong to another shared fund. Leave it first.',
+      }
+      toast.error(messages[error.message] ?? (vi ? 'Không thể xử lý lời mời.' : 'Could not process the invite.'))
+    } else {
+      toast.success(accept ? (vi ? 'Đã chấp nhận. Đang chuyển sang dữ liệu chung.' : 'Accepted. Switching to shared data.') : (vi ? 'Đã từ chối lời mời.' : 'Invite declined.'))
+      await fetchShares()
+    }
+  }
+
+  async function endShare(id: string) {
+    const { error } = await supabase.rpc('fund_end_share', { p_invite_id: id })
+    if (error) toast.error(vi ? 'Không thể thực hiện.' : 'Could not complete the action.')
+    else {
+      toast.success(vi ? 'Đã cập nhật.' : 'Updated.')
+      await fetchShares()
+    }
   }
 
   function resetAsset() {
@@ -331,7 +404,7 @@ export default function FundFutureClient() {
     if (!assetName.trim() || !Number.isFinite(amount) || amount < 0) return toast.error(vi ? 'Dữ liệu tài sản không hợp lệ.' : 'Invalid asset data.')
     setSaving(true)
     const resolvedType = inferAssetTypeFromName(assetName, assets)
-    const row = { user_id: userId!, name: assetName.trim(), type: resolvedType, amount, note: assetNote.trim() || null }
+    const row = { user_id: effectiveOwnerId!, name: assetName.trim(), type: resolvedType, amount, note: assetNote.trim() || null }
     const { error } = assetId
       ? await supabase.from('fund_assets').update(row).eq('id', assetId)
       : await supabase.from('fund_assets').insert(row)
@@ -373,7 +446,7 @@ export default function FundFutureClient() {
         const resolvedType = inferAssetTypeFromName(transactionConvertToName, assets)
         const { data: created, error: createError } = await supabase
           .from('fund_assets')
-          .insert({ user_id: userId!, name: transactionConvertToName.trim(), type: resolvedType, amount: 0 })
+          .insert({ user_id: effectiveOwnerId!, name: transactionConvertToName.trim(), type: resolvedType, amount: 0 })
           .select('id')
           .single()
         if (createError || !created) {
@@ -401,7 +474,7 @@ export default function FundFutureClient() {
     }
 
     const actor = userAccountLabel || userId || (vi ? 'Tài khoản hiện tại' : 'Current account')
-    const row = { user_id: userId!, type: transactionType, amount, who: actor, reason: transactionReason.trim(), note: null, date: transactionDate, asset_id: srcId || null, dest_asset_id: dstId || null }
+    const row = { user_id: effectiveOwnerId!, type: transactionType, amount, who: actor, reason: transactionReason.trim(), note: null, date: transactionDate, asset_id: srcId || null, dest_asset_id: dstId || null }
     const { error } = transactionId
       ? await supabase.from('fund_transactions').update(row).eq('id', transactionId)
       : await supabase.from('fund_transactions').insert(row)
@@ -426,7 +499,7 @@ export default function FundFutureClient() {
     if (old?.asset_id && !old.is_settled) add(old.asset_id, Number(old.amount))
     if (!old?.is_settled) add(debtAssetId, -amount)
 
-    const row = { user_id: userId!, debtor: debtor.trim(), amount, reason: debtReason.trim(), note: debtNote.trim() || null, date: debtDate, asset_id: debtAssetId }
+    const row = { user_id: effectiveOwnerId!, debtor: debtor.trim(), amount, reason: debtReason.trim(), note: debtNote.trim() || null, date: debtDate, asset_id: debtAssetId }
     const { error } = debtId
       ? await supabase.from('fund_debts').update(row).eq('id', debtId)
       : await supabase.from('fund_debts').insert(row)
@@ -443,7 +516,7 @@ export default function FundFutureClient() {
     const amount = Number(borrowingAmount)
     if (!lender.trim() || !borrowingReason.trim() || !Number.isFinite(amount) || amount <= 0) return toast.error(vi ? 'Vui lòng nhập đủ thông tin khoản vay.' : 'Complete the borrowing details.')
     setSaving(true)
-    const row = { user_id: userId!, lender: lender.trim(), amount, reason: borrowingReason.trim(), term: borrowingTerm.trim() || null, date: borrowingDate }
+    const row = { user_id: effectiveOwnerId!, lender: lender.trim(), amount, reason: borrowingReason.trim(), term: borrowingTerm.trim() || null, date: borrowingDate }
     const { error } = borrowingId
       ? await supabase.from('fund_borrowings').update(row).eq('id', borrowingId)
       : await supabase.from('fund_borrowings').insert(row)
@@ -455,7 +528,7 @@ export default function FundFutureClient() {
     else {
       toast.success(vi ? 'Đã lưu.' : 'Saved.')
       reset()
-      await fetchAll()
+      await fetchAll(effectiveOwnerId!)
     }
     setSaving(false)
   }
@@ -480,7 +553,7 @@ export default function FundFutureClient() {
     if (error) toast.error(vi ? 'Không thể xoá.' : 'Could not delete.')
     else {
       toast.success(vi ? 'Đã xoá.' : 'Deleted.')
-      await fetchAll()
+      await fetchAll(effectiveOwnerId!)
     }
     setDeleteTarget(null)
   }
@@ -493,7 +566,7 @@ export default function FundFutureClient() {
       const assetId = debt?.asset_id ?? assets.find((a) => a.type === 'bank')?.id
       if (debt && assetId) await applyAssetDelta(assetId, settled ? -Number(debt.amount) : Number(debt.amount))
     }
-    await fetchAll()
+    await fetchAll(effectiveOwnerId!)
   }
 
   const totalAssets = assets.reduce((sum, item) => sum + Number(item.amount), 0)
@@ -521,6 +594,8 @@ export default function FundFutureClient() {
     )
   }
 
+  if (!sharesLoaded) return <main className="min-h-svh bg-[#f7fef9] pt-24" />
+
   return (
     <main className="min-h-svh bg-[#f7fef9] pb-16 pt-24">
       <div className="mx-auto w-full max-w-6xl space-y-4 px-4 sm:px-6">
@@ -531,6 +606,18 @@ export default function FundFutureClient() {
             <h1 className="font-poppins text-2xl font-semibold text-zinc-900">{vi ? 'Quỹ Tương Lai' : 'Future Fund'}</h1>
           </div>
         </header>
+
+        <ShareCard
+          vi={vi}
+          userId={userId}
+          shares={shares}
+          inviteEmail={inviteEmail}
+          setInviteEmail={setInviteEmail}
+          invitingBusy={invitingBusy}
+          onInvite={sendInvite}
+          onRespond={respondInvite}
+          onEnd={endShare}
+        />
 
         <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {([
@@ -779,6 +866,86 @@ export default function FundFutureClient() {
 
       <ConfirmModal open={!!deleteTarget} onConfirm={removeItem} onCancel={() => setDeleteTarget(null)} />
     </main>
+  )
+}
+
+function ShareCard({ vi, userId, shares, inviteEmail, setInviteEmail, invitingBusy, onInvite, onRespond, onEnd }: {
+  vi: boolean
+  userId: string
+  shares: FundShare[]
+  inviteEmail: string
+  setInviteEmail: (value: string) => void
+  invitingBusy: boolean
+  onInvite: (event: React.FormEvent) => void
+  onRespond: (id: string, accept: boolean) => void
+  onEnd: (id: string) => void
+}) {
+  const joined = shares.find((s) => s.member_id === userId && s.status === 'accepted')
+  const pendingReceived = shares.filter((s) => s.member_id === userId && s.status === 'pending')
+  const sent = shares.filter((s) => s.owner_id === userId && (s.status === 'pending' || s.status === 'accepted'))
+  const statusLabel: Record<ShareStatus, string> = vi
+    ? { pending: 'Đang chờ', accepted: 'Đã tham gia', declined: 'Đã từ chối', revoked: 'Đã huỷ' }
+    : { pending: 'Pending', accepted: 'Joined', declined: 'Declined', revoked: 'Revoked' }
+
+  return (
+    <section className={`${cardClass} p-5`}>
+      <div className="mb-3 flex items-center gap-2">
+        <Users className="size-4 text-emerald-600" />
+        <p className="text-sm font-semibold text-zinc-700">{vi ? 'Quản lý chung' : 'Shared management'}</p>
+      </div>
+
+      {joined ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-emerald-50 px-4 py-3">
+          <p className="text-sm text-zinc-700">
+            {vi ? 'Bạn đang quản lý chung với ' : 'You are jointly managing with '}
+            <strong>{joined.owner_email}</strong>
+          </p>
+          <button type="button" onClick={() => onEnd(joined.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-600 hover:bg-zinc-50">
+            <LogOut className="size-3.5" />{vi ? 'Rời nhóm' : 'Leave'}
+          </button>
+        </div>
+      ) : (
+        <form onSubmit={onInvite} className="flex flex-wrap items-end gap-2">
+          <div className="min-w-48 flex-1">
+            <label className="mb-1 block text-xs font-medium text-zinc-500">{vi ? 'Mời quản lý chung (email)' : 'Invite to co-manage (email)'}</label>
+            <input className={inputClass} type="email" value={inviteEmail} onChange={(event) => setInviteEmail(event.target.value)} placeholder={vi ? 'email@vidu.com' : 'email@example.com'} required />
+          </div>
+          <button type="submit" disabled={invitingBusy} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-emerald-600 px-4 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50">
+            <Mail className="size-4" />{invitingBusy ? (vi ? 'Đang gửi...' : 'Sending...') : (vi ? 'Gửi lời mời' : 'Send invite')}
+          </button>
+        </form>
+      )}
+
+      {pendingReceived.length > 0 && (
+        <div className="mt-4 space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-400">{vi ? 'Lời mời nhận được' : 'Invites received'}</p>
+          {pendingReceived.map((item) => (
+            <div key={item.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-emerald-100 px-3 py-2">
+              <p className="text-sm text-zinc-700"><strong>{item.owner_email}</strong>{vi ? ' mời bạn quản lý chung tài sản.' : ' invited you to co-manage their fund.'}</p>
+              <div className="flex gap-2">
+                <button type="button" onClick={() => onRespond(item.id, true)} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700">{vi ? 'Chấp nhận' : 'Accept'}</button>
+                <button type="button" onClick={() => onRespond(item.id, false)} className="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-semibold text-zinc-600 hover:bg-zinc-50">{vi ? 'Từ chối' : 'Decline'}</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {!joined && sent.length > 0 && (
+        <div className="mt-4 space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-400">{vi ? 'Lời mời đã gửi' : 'Invites sent'}</p>
+          {sent.map((item) => (
+            <div key={item.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-zinc-100 px-3 py-2">
+              <p className="text-sm text-zinc-700">{item.member_email}</p>
+              <div className="flex items-center gap-2">
+                <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${item.status === 'accepted' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>{statusLabel[item.status]}</span>
+                <button type="button" onClick={() => onEnd(item.id)} className="text-xs font-medium text-zinc-400 hover:text-red-600">{vi ? 'Huỷ' : 'Cancel'}</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
   )
 }
 

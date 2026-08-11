@@ -25,6 +25,7 @@ function getClient() {
 export const supabase = {
   from: (table: string) => getClient().from(table),
   storage: (bucket: string) => getClient().storage.from(bucket),
+  rpc: (fn: string, params?: Record<string, unknown>) => getClient().rpc(fn, params),
   get auth() { return getClient().auth },
 }
 
