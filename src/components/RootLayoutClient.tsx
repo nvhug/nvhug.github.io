@@ -172,14 +172,14 @@ export function RootLayoutClient({ children }: { children: React.ReactNode }) {
                   <span className="hidden sm:inline">nvhug</span>
                 </Link>
 
-                <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto whitespace-nowrap sm:hidden">
+                <div className="grid min-w-0 flex-1 grid-cols-3 gap-1 sm:hidden">
                   {navItems.map((item) => {
                     const isActive = pathname.startsWith(item.href)
                     return (
                       <Link
                         key={item.href}
                         href={item.href}
-                        className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
+                        className={`inline-flex min-w-0 items-center justify-center gap-1 rounded-full px-2 py-1.5 text-sm font-medium transition-colors ${
                           isActive
                             ? 'bg-emerald-100 text-emerald-700'
                             : 'text-zinc-600 hover:bg-emerald-50 hover:text-zinc-900'
@@ -201,7 +201,7 @@ export function RootLayoutClient({ children }: { children: React.ReactNode }) {
                       <Link
                         key={item.href}
                         href={item.href}
-                        className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                        className={`rounded-lg px-3 py-2 text-base font-medium transition-colors ${
                           isActive
                             ? 'bg-emerald-100 text-emerald-700'
                             : 'text-zinc-600 hover:bg-emerald-50 hover:text-zinc-900'
