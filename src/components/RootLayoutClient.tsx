@@ -172,21 +172,27 @@ export function RootLayoutClient({ children }: { children: React.ReactNode }) {
                   <span className="hidden sm:inline">nvhug</span>
                 </Link>
 
-                <div className="grid min-w-0 flex-1 grid-cols-3 gap-1 sm:hidden">
+                <div className="grid min-w-0 flex-1 grid-cols-3 gap-1.5 sm:hidden">
                   {navItems.map((item) => {
                     const isActive = pathname.startsWith(item.href)
                     return (
                       <Link
                         key={item.href}
                         href={item.href}
-                        className={`inline-flex min-w-0 items-center justify-center gap-1 rounded-full px-2 py-1.5 text-sm font-medium transition-colors ${
+                        className={`relative inline-flex h-10 w-full min-w-0 items-center justify-center gap-1 px-2.5 py-2 text-sm font-medium transition-colors touch-manipulation ${
                           isActive
-                            ? 'bg-emerald-100 text-emerald-700'
-                            : 'text-zinc-600 hover:bg-emerald-50 hover:text-zinc-900'
+                            ? 'text-emerald-700'
+                            : 'text-zinc-600 hover:text-zinc-900'
                         }`}
                       >
                         <item.icon className={`h-3.5 w-3.5 ${isActive ? 'text-emerald-600' : 'text-zinc-400'}`} />
                         {item.label}
+                        <span
+                          aria-hidden
+                          className={`absolute bottom-0 left-1/2 h-0.5 -translate-x-1/2 rounded-full bg-emerald-500 transition-all ${
+                            isActive ? 'w-8 opacity-100' : 'w-0 opacity-0'
+                          }`}
+                        />
                       </Link>
                     )
                   })}
@@ -201,13 +207,19 @@ export function RootLayoutClient({ children }: { children: React.ReactNode }) {
                       <Link
                         key={item.href}
                         href={item.href}
-                        className={`rounded-lg px-3 py-2 text-base font-medium transition-colors ${
+                        className={`relative px-3 py-2 text-base font-medium transition-colors ${
                           isActive
-                            ? 'bg-emerald-100 text-emerald-700'
-                            : 'text-zinc-600 hover:bg-emerald-50 hover:text-zinc-900'
+                            ? 'text-emerald-700'
+                            : 'text-zinc-600 hover:text-zinc-900'
                         }`}
                       >
                         {item.label}
+                        <span
+                          aria-hidden
+                          className={`absolute bottom-0 left-1/2 h-0.5 -translate-x-1/2 rounded-full bg-emerald-500 transition-all ${
+                            isActive ? 'w-10 opacity-100' : 'w-0 opacity-0'
+                          }`}
+                        />
                       </Link>
                     )
                   })}
