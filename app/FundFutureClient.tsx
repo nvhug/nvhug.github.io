@@ -7,7 +7,9 @@ import { toast } from 'sonner'
 import { ConfirmModal } from '@/components/ui/confirm-modal'
 import { DatePicker } from '@/components/ui/date-picker'
 import { getTodayLocalISODate } from '@/lib/date'
+import { buildTransactionDeleteAdjustments, buildTransactionDeltaMap } from '@/lib/fund-transaction-deltas'
 import { useLanguage } from '@/lib/i18n/language-context'
+import { formatDigitInput, getAssetBreakdownEmptyText } from '@/lib/fund-ui'
 import { supabase } from '@/lib/supabase'
 
 type AssetType = 'gold' | 'cash' | 'bank' | 'other'
@@ -245,6 +247,7 @@ function MoneyInput({ value, onChange, required, min = '0', placeholder = 'VD: 5
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
   const digits = value.replace(/\D/g, '')
+  const displayValue = formatDigitInput(value)
 
   const suggestions = digits
     ? isGold
@@ -273,7 +276,7 @@ function MoneyInput({ value, onChange, required, min = '0', placeholder = 'VD: 5
         className={inputClass}
         type="text"
         inputMode="numeric"
-        value={value}
+        value={displayValue}
         required={required}
         placeholder={placeholder}
         autoComplete="off"
@@ -620,10 +623,11 @@ export default function FundFutureClient() {
     setTransactionId(null); setTransactionType('in'); setTransactionAmount(''); setTransactionReason(''); setTransactionDate(getTodayLocalISODate()); setTransactionConvertFromId(''); setTransactionConvertToName(''); setTransactionFormOpen(false)
   }
 
-  async function applyAssetDelta(assetId: string, delta: number) {
+  async function applyAssetDelta(assetId: string, delta: number, options?: { floorAtZero?: boolean }) {
     const { data } = await supabase.from('fund_assets').select('amount').eq('id', assetId).single()
     if (!data) return
-    await supabase.from('fund_assets').update({ amount: Number(data.amount) + delta }).eq('id', assetId)
+    const nextAmount = Number(data.amount) + delta
+    await supabase.from('fund_assets').update({ amount: options?.floorAtZero ? Math.max(0, nextAmount) : nextAmount }).eq('id', assetId)
   }
 
   async function applyDeltas(deltas: Map<string, number>) {
@@ -638,7 +642,27 @@ export default function FundFutureClient() {
     setSaving(true)
 
     const isConvert = transactionType === 'convert'
-    const srcId = isConvert ? transactionConvertFromId : (assets.find((a) => a.type === 'bank')?.id ?? '')
+    let defaultAssetId = assets.find((a) => a.type === 'bank')?.id ?? ''
+    if (!isConvert && !defaultAssetId) {
+      const { data: created, error: createError } = await supabase
+        .from('fund_assets')
+        .insert({
+          user_id: effectiveOwnerId!,
+          name: vi ? 'Tài khoản chính' : 'Main account',
+          type: 'bank',
+          amount: 0,
+        })
+        .select('id')
+        .single()
+      if (createError || !created) {
+        toast.error(vi ? 'Không thể tạo tài sản mặc định cho giao dịch.' : 'Could not create a default asset for this transaction.')
+        setSaving(false)
+        return
+      }
+      defaultAssetId = created.id
+    }
+
+    const srcId = isConvert ? transactionConvertFromId : defaultAssetId
 
     // Destination asset may not exist yet (e.g. buying gold for the first time) — create it with a 0 balance
     let dstId = ''
@@ -664,19 +688,13 @@ export default function FundFutureClient() {
     }
 
     // Compute all deltas upfront from current snapshot — avoids stale-state bugs on same-asset edits
-    const deltas = new Map<string, number>()
-    const add = (id: string, d: number) => deltas.set(id, (deltas.get(id) ?? 0) + d)
-    if (transactionId) {
-      const old = transactions.find((t) => t.id === transactionId)
-      if (old?.asset_id) add(old.asset_id, old.type === 'in' ? -Number(old.amount) : Number(old.amount))
-      if (old?.dest_asset_id) add(old.dest_asset_id, -Number(old.amount))
-    }
-    if (isConvert) {
-      if (srcId) add(srcId, -amount)
-      if (dstId) add(dstId, amount)
-    } else {
-      if (srcId) add(srcId, transactionType === 'in' ? amount : -amount)
-    }
+    const deltas = buildTransactionDeltaMap({
+      transactionType,
+      amount,
+      srcId,
+      dstId,
+      previousTransaction: transactionId ? transactions.find((t) => t.id === transactionId) ?? null : null,
+    })
 
     const actor = userAccountLabel || userId || (vi ? 'Tài khoản hiện tại' : 'Current account')
     const row = { user_id: effectiveOwnerId!, type: transactionType, amount, who: actor, reason: transactionReason.trim(), note: null, date: transactionDate, asset_id: srcId || null, dest_asset_id: dstId || null }
@@ -740,27 +758,46 @@ export default function FundFutureClient() {
 
   async function removeItem() {
     if (!deleteTarget) return
+    const target = deleteTarget
+    setDeleteTarget(null)
+
     if (deleteTarget.table === 'fund_transactions') {
       const tx = transactions.find((t) => t.id === deleteTarget.id)
-      if (tx) {
-        const deltas = new Map<string, number>()
-        const add = (id: string, d: number) => deltas.set(id, (deltas.get(id) ?? 0) + d)
-        if (tx.asset_id) add(tx.asset_id, tx.type === 'in' ? -Number(tx.amount) : Number(tx.amount))
-        if (tx.dest_asset_id) add(tx.dest_asset_id, -Number(tx.amount))
-        await applyDeltas(deltas)
+      const { error } = await supabase.from(target.table).delete().eq('id', target.id)
+      if (error) {
+        toast.error(vi ? 'Không thể xoá.' : 'Could not delete.')
+        return
       }
+      if (tx) {
+        for (const adjustment of buildTransactionDeleteAdjustments(tx)) {
+          await applyAssetDelta(adjustment.assetId, adjustment.delta, {
+            floorAtZero: adjustment.floorAtZero,
+          })
+        }
+      }
+      toast.success(vi ? 'Đã xoá.' : 'Deleted.')
+      await fetchAll(effectiveOwnerId!)
+      return
     } else if (deleteTarget.table === 'fund_debts') {
       const debt = debts.find((d) => d.id === deleteTarget.id)
+      const { error } = await supabase.from(target.table).delete().eq('id', target.id)
+      if (error) {
+        toast.error(vi ? 'Không thể xoá.' : 'Could not delete.')
+        return
+      }
       const assetId = debt?.asset_id ?? assets.find((a) => a.type === 'bank')?.id
       if (debt && !debt.is_settled && assetId) await applyAssetDelta(assetId, Number(debt.amount))
+      toast.success(vi ? 'Đã xoá.' : 'Deleted.')
+      await fetchAll(effectiveOwnerId!)
+      return
     }
-    const { error } = await supabase.from(deleteTarget.table).delete().eq('id', deleteTarget.id)
+
+    const { error } = await supabase.from(target.table).delete().eq('id', target.id)
     if (error) toast.error(vi ? 'Không thể xoá.' : 'Could not delete.')
     else {
       toast.success(vi ? 'Đã xoá.' : 'Deleted.')
       await fetchAll(effectiveOwnerId!)
     }
-    setDeleteTarget(null)
   }
 
   async function toggleSettled(table: 'fund_debts' | 'fund_borrowings', id: string, settled: boolean) {
@@ -823,7 +860,7 @@ export default function FundFutureClient() {
           onEnd={endShare}
         />
 
-        <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <section className="grid grid-cols-2 gap-3 xl:grid-cols-5">
           {([
             [vi ? 'Tổng tài sản' : 'Total assets', totalAssets, WalletCards, 'text-emerald-600'],
             [vi ? 'Tiền vào' : 'Money in', totalIn, TrendingUp, 'text-emerald-600'],
@@ -831,100 +868,109 @@ export default function FundFutureClient() {
             [vi ? 'Nợ chưa thu' : 'Receivables', outstandingDebt, Circle, 'text-amber-600'],
           ] as [string, number, LucideIcon, string][]).map(([label, value, Icon, color]) => (
             <div key={String(label)} className={`${cardClass} p-4`}>
-              <div className="flex items-center justify-between"><p className="text-xs text-zinc-500">{String(label)}</p><Icon className={`size-4 ${color}`} /></div>
-              <p className="mt-2 text-xl font-semibold text-zinc-900">{formatMoney(Number(value))}</p>
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs font-semibold text-zinc-600">{String(label)}</p>
+                <Icon className={`size-4 ${color}`} />
+              </div>
+              <p className="mt-3 text-lg font-semibold text-zinc-900">{formatMoney(Number(value))}</p>
             </div>
           ))}
-        </section>
 
-        <section className={`${cardClass} space-y-3 bg-gradient-to-r from-emerald-50/70 via-white to-amber-50/70 p-5`}>
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-zinc-500">{vi ? 'Giá vàng tham chiếu (1 chỉ)' : 'Reference gold price (1 chi)'}</p>
-              {goldPriceUpdatedAt && (
-                <p className="mt-0.5 text-[11px] text-zinc-500">
-                  {vi ? 'Cập nhật:' : 'Updated:'} {new Date(goldPriceUpdatedAt).toLocaleString(vi ? 'vi-VN' : 'en-US')}
-                </p>
-              )}
-            </div>
-            <div className="flex gap-2">
+          <div className={`${cardClass} col-span-2 p-4 xl:col-span-1`}>
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <p className="text-xs font-semibold text-zinc-600">{vi ? 'Giá vàng' : 'Gold price'}</p>
+                {goldPriceUpdatedAt && (
+                  <p className="mt-1 text-[10px] text-zinc-400">
+                    {new Date(goldPriceUpdatedAt).toLocaleTimeString(vi ? 'vi-VN' : 'en-US', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </p>
+                )}
+              </div>
               <button
                 type="button"
                 onClick={() => void refreshGoldPrice()}
                 disabled={goldPriceLoading}
-                className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-emerald-600 px-3 text-xs font-semibold text-white transition-colors hover:bg-emerald-700 disabled:opacity-50"
+                className="inline-flex size-7 items-center justify-center rounded-full border border-zinc-200 bg-zinc-50 text-zinc-600 transition-colors hover:bg-zinc-100 disabled:opacity-50"
+                title={goldPriceLoading
+                  ? (vi ? 'Đang lấy giá mới nhất' : 'Fetching latest gold price')
+                  : (vi ? 'Lấy giá vàng mới nhất' : 'Fetch latest gold price')}
+                aria-label={goldPriceLoading
+                  ? (vi ? 'Đang lấy giá vàng mới nhất' : 'Fetching latest gold price')
+                  : (vi ? 'Lấy giá vàng mới nhất' : 'Fetch latest gold price')}
               >
                 <RefreshCw className={`size-3.5 ${goldPriceLoading ? 'animate-spin' : ''}`} />
-                {goldPriceLoading ? (vi ? 'Đang lấy giá...' : 'Fetching...') : (vi ? 'Lấy giá mới nhất' : 'Get latest price')}
               </button>
             </div>
-          </div>
 
-          <div className="grid gap-2 sm:grid-cols-2">
-            <div className="rounded-xl border border-emerald-200/70 bg-white/90 px-3 py-2.5 shadow-sm">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-zinc-500">Vàng 24K</p>
-              {editingGoldField === '24k' ? (
-                <input
-                  className="mt-1 h-8 w-full rounded-md border border-emerald-300 bg-white px-2 text-base font-semibold text-zinc-900 outline-none focus:border-emerald-500"
-                  inputMode="numeric"
-                  value={editingGoldValue}
-                  onChange={(event) => setEditingGoldValue(event.target.value.replace(/[^\d]/g, ''))}
-                  onBlur={() => void commitInlineGoldEdit()}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter') {
-                      event.preventDefault()
-                      void commitInlineGoldEdit()
-                    }
-                    if (event.key === 'Escape') {
-                      setEditingGoldField(null)
-                    }
-                  }}
-                  autoFocus
-                />
-              ) : (
-                <button
-                  type="button"
-                  onDoubleClick={() => startInlineGoldEdit('24k')}
-                  className="mt-1 text-left text-base font-semibold text-zinc-900"
-                  title={vi ? 'Nhấp đúp để sửa giá' : 'Double-click to edit'}
-                >
-                  {formatMoney(goldPrice24kPerChi)}
-                </button>
-              )}
-            </div>
-            <div className="rounded-xl border border-amber-200/70 bg-white/90 px-3 py-2.5 shadow-sm">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-zinc-500">{vi ? 'Vàng nhẫn 9999' : 'Ring 9999 gold'}</p>
-              {editingGoldField === 'ring9999' ? (
-                <input
-                  className="mt-1 h-8 w-full rounded-md border border-amber-300 bg-white px-2 text-base font-semibold text-zinc-900 outline-none focus:border-amber-500"
-                  inputMode="numeric"
-                  value={editingGoldValue}
-                  onChange={(event) => setEditingGoldValue(event.target.value.replace(/[^\d]/g, ''))}
-                  onBlur={() => void commitInlineGoldEdit()}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter') {
-                      event.preventDefault()
-                      void commitInlineGoldEdit()
-                    }
-                    if (event.key === 'Escape') {
-                      setEditingGoldField(null)
-                    }
-                  }}
-                  autoFocus
-                />
-              ) : (
-                <button
-                  type="button"
-                  onDoubleClick={() => startInlineGoldEdit('ring9999')}
-                  className="mt-1 text-left text-base font-semibold text-zinc-900"
-                  title={vi ? 'Nhấp đúp để sửa giá' : 'Double-click to edit'}
-                >
-                  {formatMoney(goldPriceRing9999PerChi)}
-                </button>
-              )}
+            <div className="mt-3 space-y-1.5">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs text-zinc-500">24K</span>
+                {editingGoldField === '24k' ? (
+                  <input
+                    className="h-7 w-28 rounded-md border border-emerald-300 bg-white px-2 text-right text-xs font-semibold text-zinc-900 outline-none focus:border-emerald-500"
+                    inputMode="numeric"
+                    value={formatDigitInput(editingGoldValue)}
+                    onChange={(event) => setEditingGoldValue(event.target.value.replace(/[^\d]/g, ''))}
+                    onBlur={() => void commitInlineGoldEdit()}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') {
+                        event.preventDefault()
+                        void commitInlineGoldEdit()
+                      }
+                      if (event.key === 'Escape') {
+                        setEditingGoldField(null)
+                      }
+                    }}
+                    autoFocus
+                  />
+                ) : (
+                  <button
+                    type="button"
+                    onDoubleClick={() => startInlineGoldEdit('24k')}
+                    className="text-right text-xs font-semibold text-zinc-900"
+                    title={vi ? 'Nhấp đúp để sửa giá 24K' : 'Double-click to edit 24K price'}
+                  >
+                    {formatMoney(goldPrice24kPerChi)}
+                  </button>
+                )}
+              </div>
+
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs text-zinc-500">{vi ? 'Nhẫn' : 'Ring'}</span>
+                {editingGoldField === 'ring9999' ? (
+                  <input
+                    className="h-7 w-28 rounded-md border border-amber-300 bg-white px-2 text-right text-xs font-semibold text-zinc-900 outline-none focus:border-amber-500"
+                    inputMode="numeric"
+                    value={formatDigitInput(editingGoldValue)}
+                    onChange={(event) => setEditingGoldValue(event.target.value.replace(/[^\d]/g, ''))}
+                    onBlur={() => void commitInlineGoldEdit()}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') {
+                        event.preventDefault()
+                        void commitInlineGoldEdit()
+                      }
+                      if (event.key === 'Escape') {
+                        setEditingGoldField(null)
+                      }
+                    }}
+                    autoFocus
+                  />
+                ) : (
+                  <button
+                    type="button"
+                    onDoubleClick={() => startInlineGoldEdit('ring9999')}
+                    className="text-right text-xs font-semibold text-zinc-900"
+                    title={vi ? 'Nhấp đúp để sửa giá vàng nhẫn' : 'Double-click to edit ring gold price'}
+                  >
+                    {formatMoney(goldPriceRing9999PerChi)}
+                  </button>
+                )}
+              </div>
             </div>
           </div>
-          <p className="text-[11px] text-zinc-500">{vi ? 'Nhấp đúp vào từng mức giá để chỉnh nhanh.' : 'Double-click a price to edit inline.'}</p>
         </section>
 
         {/* Allocation + quick analysis */}
@@ -932,7 +978,7 @@ export default function FundFutureClient() {
           <div className={`${cardClass} p-5`}>
             <p className="mb-3 text-sm font-semibold text-zinc-700">{vi ? 'Phân bổ tài sản' : 'Asset breakdown'}</p>
             {assets.length === 0 ? (
-              <Empty text={vi ? 'Chưa có tài sản.' : 'No assets yet.'} />
+              <Empty text={getAssetBreakdownEmptyText({ hasTransactions: transactions.length > 0, vi })} />
             ) : (
               <DonutChart
                 slices={(['gold', 'cash', 'bank', 'other'] as AssetType[])
@@ -1198,11 +1244,11 @@ function ShareCard({ vi, userId, shares, inviteEmail, setInviteEmail, invitingBu
   if (joined) return null
 
   return (
-    <section className={`${cardClass} p-5`}>
+    <section className={`${cardClass} ${expanded ? 'p-3 sm:p-4' : 'p-2.5 sm:p-3'}`}>
       <button
         type="button"
         onClick={() => setExpanded((value) => !value)}
-        className="mb-3 flex w-full items-center justify-between rounded-lg px-1 py-1 text-left"
+        className={`flex w-full items-center justify-between rounded-lg px-1 text-left ${expanded ? 'mb-2 py-0.5 sm:mb-2.5 sm:py-0.5' : 'py-0 sm:py-0'}`}
         aria-expanded={expanded}
       >
         <div className="flex items-center gap-2">
@@ -1214,22 +1260,22 @@ function ShareCard({ vi, userId, shares, inviteEmail, setInviteEmail, invitingBu
 
       {expanded && (
         <>
-          <form onSubmit={onInvite} className="flex flex-wrap items-end gap-2">
+          <form onSubmit={onInvite} className="flex flex-wrap items-end gap-1.5 sm:gap-2">
             <div className="min-w-48 flex-1">
-              <label className="mb-1 block text-xs font-medium text-zinc-500">{vi ? 'Mời quản lý chung (email)' : 'Invite to co-manage (email)'}</label>
+              <label className="mb-1 block text-[11px] font-medium text-zinc-500 sm:text-xs">{vi ? 'Mời quản lý chung (email)' : 'Invite to co-manage (email)'}</label>
               <input className={inputClass} type="email" value={inviteEmail} onChange={(event) => setInviteEmail(event.target.value)} placeholder={vi ? 'email@vidu.com' : 'email@example.com'} required />
             </div>
-            <button type="submit" disabled={invitingBusy} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-emerald-600 px-4 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50">
+            <button type="submit" disabled={invitingBusy} className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-emerald-600 px-3 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 sm:h-8.5 sm:px-3.5 sm:text-sm">
               <Mail className="size-4" />{invitingBusy ? (vi ? 'Đang gửi...' : 'Sending...') : (vi ? 'Gửi lời mời' : 'Send invite')}
             </button>
           </form>
 
           {pendingReceived.length > 0 && (
-            <div className="mt-4 space-y-2">
+            <div className="mt-3 space-y-1.5 sm:mt-3 sm:space-y-1.5">
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-400">{vi ? 'Lời mời nhận được' : 'Invites received'}</p>
               {pendingReceived.map((item) => (
-                <div key={item.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-emerald-100 px-3 py-2">
-                  <p className="text-sm text-zinc-700"><strong>{item.owner_email}</strong>{vi ? ' mời bạn quản lý chung tài sản.' : ' invited you to co-manage their fund.'}</p>
+                <div key={item.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-emerald-100 px-2.5 py-2 sm:px-3">
+                  <p className="text-xs text-zinc-700 sm:text-sm"><strong>{item.owner_email}</strong>{vi ? ' mời bạn quản lý chung tài sản.' : ' invited you to co-manage their fund.'}</p>
                   <div className="flex gap-2">
                     <button type="button" onClick={() => onRespond(item.id, true)} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700">{vi ? 'Chấp nhận' : 'Accept'}</button>
                     <button type="button" onClick={() => onRespond(item.id, false)} className="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-semibold text-zinc-600 hover:bg-zinc-50">{vi ? 'Từ chối' : 'Decline'}</button>
@@ -1240,11 +1286,11 @@ function ShareCard({ vi, userId, shares, inviteEmail, setInviteEmail, invitingBu
           )}
 
           {sent.length > 0 && (
-            <div className="mt-4 space-y-2">
+            <div className="mt-3 space-y-1.5 sm:mt-3 sm:space-y-1.5">
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-400">{vi ? 'Lời mời đã gửi' : 'Invites sent'}</p>
               {sent.map((item) => (
-                <div key={item.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-zinc-100 px-3 py-2">
-                  <p className="text-sm text-zinc-700">{item.member_email}</p>
+                <div key={item.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-zinc-100 px-2.5 py-2 sm:px-3">
+                  <p className="text-xs text-zinc-700 sm:text-sm">{item.member_email}</p>
                   <div className="flex items-center gap-2">
                     <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${item.status === 'accepted' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>{statusLabel[item.status]}</span>
                     <button type="button" onClick={() => onEnd(item.id)} className="text-xs font-medium text-zinc-400 hover:text-red-600">{vi ? 'Huỷ' : 'Cancel'}</button>

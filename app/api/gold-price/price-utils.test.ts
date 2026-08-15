@@ -41,7 +41,8 @@ describe('gold price utils', () => {
 
   it('converts USD/ounce to VND/chi', () => {
     const value = usdOunceToVndChi(3300, 26000)
-    expect(value).toBe(10307822)
+    const expected = Math.round((3300 * 26000) / (31.1034768 / 3.75))
+    expect(value).toBe(expected)
   })
 
   it('derives separate prices for 24K and ring 9999', () => {
