@@ -42,6 +42,10 @@ type FundTransaction = {
   dest_asset_id: string | null
 }
 
+function getFundActorLabel(value: string) {
+  return value.trim().toLowerCase() === 'nvhug001@gmail.com' ? 'Văn Hưng' : value
+}
+
 type FundDebt = {
   id: string
   debtor: string
@@ -350,6 +354,7 @@ export default function FundFutureClient() {
   const [transactionConvertFromId, setTransactionConvertFromId] = useState('')
   const [transactionConvertToName, setTransactionConvertToName] = useState('')
   const [transactionFilter, setTransactionFilter] = useState<'all' | 'in' | 'out' | 'convert'>('all')
+  const [transactionActorFilter, setTransactionActorFilter] = useState('all')
 
   const [debtFormOpen, setDebtFormOpen] = useState(false)
   const [debtId, setDebtId] = useState<string | null>(null)
@@ -374,9 +379,9 @@ export default function FundFutureClient() {
   const [invitingBusy, setInvitingBusy] = useState(false)
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }: { data: { user: { id: string; email?: string | null } | null } }) => {
+    supabase.auth.getUser().then(({ data }: { data: { user: { id: string; email?: string | null; user_metadata?: { full_name?: string | null } } | null } }) => {
       setUserId(data.user?.id ?? null)
-      setUserAccountLabel(data.user?.email ?? data.user?.id ?? '')
+      setUserAccountLabel(getFundActorLabel(data.user?.user_metadata?.full_name?.trim() || data.user?.email || data.user?.id || ''))
     })
   }, [])
 
@@ -815,7 +820,11 @@ export default function FundFutureClient() {
   const totalIn = transactions.filter((item) => item.type === 'in').reduce((sum, item) => sum + Number(item.amount), 0)
   const totalOut = transactions.filter((item) => item.type === 'out').reduce((sum, item) => sum + Number(item.amount), 0)
   const totalConvert = transactions.filter((item) => item.type === 'convert').reduce((sum, item) => sum + Number(item.amount), 0)
-  const filteredTransactions = transactionFilter === 'all' ? transactions : transactions.filter((item) => item.type === transactionFilter)
+  const transactionActors = [...new Set(transactions.map((item) => getFundActorLabel(item.who)).filter(Boolean))]
+  const filteredTransactions = transactions.filter((item) => (
+    (transactionFilter === 'all' || item.type === transactionFilter) &&
+    (transactionActorFilter === 'all' || getFundActorLabel(item.who) === transactionActorFilter)
+  ))
   const outstandingDebt = debts.filter((item) => !item.is_settled).reduce((sum, item) => sum + Number(item.amount), 0)
   const outstandingBorrowing = borrowings.filter((item) => !item.is_settled).reduce((sum, item) => sum + Number(item.amount), 0)
   const assetIsGold = inferAssetTypeFromName(assetName, assets) === 'gold'
@@ -1128,6 +1137,21 @@ export default function FundFutureClient() {
                 {label}<span className="tabular-nums">{formatMoney(total)}</span>
               </button>
             ))}
+            {transactionActors.length > 0 && (
+              <>
+                <span className="self-center text-xs text-zinc-300">|</span>
+                <button type="button" onClick={() => setTransactionActorFilter('all')}
+                  className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${transactionActorFilter === 'all' ? 'border-sky-200 bg-sky-50 text-sky-700' : 'border-zinc-200 bg-white text-zinc-500 hover:bg-zinc-50'}`}>
+                  All
+                </button>
+                {transactionActors.map((actor) => (
+                  <button key={actor} type="button" onClick={() => setTransactionActorFilter((current) => current === actor ? 'all' : actor)}
+                    className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${transactionActorFilter === actor ? 'border-sky-200 bg-sky-50 text-sky-700' : 'border-zinc-200 bg-white text-zinc-500 hover:bg-zinc-50'}`}>
+                    {actor}
+                  </button>
+                ))}
+              </>
+            )}
           </div>
           {filteredTransactions.length === 0 ? <Empty text={vi ? 'Chưa có giao dịch.' : 'No transactions.'} /> : (
             <div className="divide-y divide-zinc-100">
@@ -1139,7 +1163,7 @@ export default function FundFutureClient() {
                 const amountStr = isConvert ? formatMoney(item.amount) : `${item.type === 'in' ? '+' : '-'}${formatMoney(item.amount)}`
                 const amountCls = isConvert ? 'text-amber-600' : item.type === 'in' ? 'text-emerald-600' : 'text-red-500'
                 return (
-                  <Row key={item.id} title={item.reason} subtitle={`${assetLabel ? assetLabel + ' · ' : ''}${item.date}`} amount={amountStr} amountClass={amountCls}
+                  <Row key={item.id} title={item.reason} subtitle={`${assetLabel ? assetLabel + ' · ' : ''}${item.date} · ${vi ? 'Người nộp' : 'Submitted by'}: ${getFundActorLabel(item.who)}`} amount={amountStr} amountClass={amountCls}
                     actions={<ActionButtons onEdit={() => { setTransactionId(item.id); setTransactionType(item.type); setTransactionAmount(String(item.amount)); setTransactionReason(item.reason); setTransactionDate(item.date); setTransactionConvertFromId(isConvert ? (item.asset_id ?? '') : ''); setTransactionConvertToName(isConvert ? (toAsset?.name ?? '') : ''); setTransactionFormOpen(true) }} onDelete={() => setDeleteTarget({ table: 'fund_transactions', id: item.id })} />} />
                 )
               })}
