@@ -112,7 +112,7 @@ async function sendEmailAlert(alerts: AlertItem[]) {
   })
 }
 
-export async function POST(request: Request) {
+async function runStockAlertCheck(request: Request) {
   const secret = process.env.ALERT_SECRET
   if (!secret || request.headers.get('Authorization') !== `Bearer ${secret}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -169,4 +169,12 @@ export async function POST(request: Request) {
     message: `Đã gửi ${alerts.length} cảnh báo`,
     alerts: alerts.map((a) => ({ ticker: a.ticker, pct: `${a.pct_change.toFixed(2)}%`, direction: a.direction })),
   })
+}
+
+export async function GET(request: Request) {
+  return runStockAlertCheck(request)
+}
+
+export async function POST(request: Request) {
+  return runStockAlertCheck(request)
 }
