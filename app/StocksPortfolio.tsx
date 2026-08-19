@@ -35,12 +35,8 @@ export function StocksPortfolio() {
   const [sortKey, setSortKey] = useState<SortKey>('value')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
 
-  const [fTicker, setFTicker] = useState('')
-  const [fCompany, setFCompany] = useState('')
-  const [fShares, setFShares] = useState('')
-  const [fAvgCost, setFAvgCost] = useState('')
-  const [fSector, setFSector] = useState('')
-  const [fNote, setFNote] = useState('')
+  const EMPTY_FORM = { ticker: '', company: '', shares: '', avgCost: '', sector: '', note: '' }
+  const [form, setForm] = useState(EMPTY_FORM)
 
   useEffect(() => {
     supabase
@@ -110,32 +106,30 @@ export function StocksPortfolio() {
 
   function openAdd() {
     setEditingId(null)
-    setFTicker(''); setFCompany(''); setFShares(''); setFAvgCost(''); setFSector(''); setFNote('')
+    setForm(EMPTY_FORM)
     setFormOpen(true)
   }
 
   function openEdit(h: StockHolding) {
     setEditingId(h.id)
-    setFTicker(h.ticker); setFCompany(h.company_name ?? '')
-    setFShares(String(h.shares)); setFAvgCost(String(h.avg_cost))
-    setFSector(h.sector ?? ''); setFNote(h.note ?? '')
+    setForm({ ticker: h.ticker, company: h.company_name ?? '', shares: String(h.shares), avgCost: String(h.avg_cost), sector: h.sector ?? '', note: h.note ?? '' })
     setFormOpen(true)
   }
 
   function closeForm() { setFormOpen(false); setEditingId(null) }
 
   async function handleSave() {
-    const ticker = fTicker.trim().toUpperCase()
+    const ticker = form.ticker.trim().toUpperCase()
     if (!ticker) { toast.error('Nhập mã cổ phiếu'); return }
-    const shares = parseFloat(fShares.replace(',', '.'))
-    const avgCost = parseFloat(fAvgCost.replace(',', '.'))
+    const shares = parseFloat(form.shares.replace(',', '.'))
+    const avgCost = parseFloat(form.avgCost.replace(',', '.'))
     if (isNaN(shares) || shares < 0) { toast.error('Số lượng không hợp lệ'); return }
     if (isNaN(avgCost) || avgCost < 0) { toast.error('Giá vốn không hợp lệ'); return }
 
     setSaving(true)
     const payload = {
-      ticker, company_name: fCompany.trim() || null, shares, avg_cost: avgCost,
-      sector: fSector || null, note: fNote.trim() || null, updated_at: new Date().toISOString(),
+      ticker, company_name: form.company.trim() || null, shares, avg_cost: avgCost,
+      sector: form.sector || null, note: form.note.trim() || null, updated_at: new Date().toISOString(),
     }
 
     if (editingId) {
@@ -436,12 +430,12 @@ export function StocksPortfolio() {
               <div className="grid grid-cols-2 gap-3">
                 <label className="flex flex-col gap-1.5 text-xs font-medium text-zinc-500">
                   Mã cổ phiếu *
-                  <input value={fTicker} onChange={(e) => setFTicker(e.target.value.toUpperCase())}
+                  <input value={form.ticker} onChange={(e) => setForm((f) => ({ ...f, ticker: e.target.value.toUpperCase() }))}
                     placeholder="VNM" maxLength={10} className={inputCls + ' font-bold tracking-wider'} />
                 </label>
                 <label className="flex flex-col gap-1.5 text-xs font-medium text-zinc-500">
                   Số lượng CP *
-                  <input type="number" value={fShares} onChange={(e) => setFShares(e.target.value)}
+                  <input type="number" value={form.shares} onChange={(e) => setForm((f) => ({ ...f, shares: e.target.value }))}
                     placeholder="1000" min="0" step="1" className={inputCls} />
                 </label>
               </div>
@@ -449,12 +443,12 @@ export function StocksPortfolio() {
               <div className="grid grid-cols-2 gap-3">
                 <label className="flex flex-col gap-1.5 text-xs font-medium text-zinc-500">
                   Giá vốn bình quân (đ)
-                  <input type="number" value={fAvgCost} onChange={(e) => setFAvgCost(e.target.value)}
+                  <input type="number" value={form.avgCost} onChange={(e) => setForm((f) => ({ ...f, avgCost: e.target.value }))}
                     placeholder="50000" min="0" className={inputCls} />
                 </label>
                 <label className="flex flex-col gap-1.5 text-xs font-medium text-zinc-500">
                   Ngành
-                  <select value={fSector} onChange={(e) => setFSector(e.target.value)} className={inputCls}>
+                  <select value={form.sector} onChange={(e) => setForm((f) => ({ ...f, sector: e.target.value }))} className={inputCls}>
                     {SECTORS.map((s) => (<option key={s} value={s}>{s || '— Chọn ngành —'}</option>))}
                   </select>
                 </label>
@@ -462,13 +456,13 @@ export function StocksPortfolio() {
 
               <label className="flex flex-col gap-1.5 text-xs font-medium text-zinc-500">
                 Tên công ty
-                <input value={fCompany} onChange={(e) => setFCompany(e.target.value)}
+                <input value={form.company} onChange={(e) => setForm((f) => ({ ...f, company: e.target.value }))}
                   placeholder="Vinamilk" className={inputCls} />
               </label>
 
               <label className="flex flex-col gap-1.5 text-xs font-medium text-zinc-500">
                 Ghi chú
-                <input value={fNote} onChange={(e) => setFNote(e.target.value)}
+                <input value={form.note} onChange={(e) => setForm((f) => ({ ...f, note: e.target.value }))}
                   placeholder="Ghi chú thêm..." className={inputCls} />
               </label>
             </div>

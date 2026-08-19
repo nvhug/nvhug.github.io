@@ -41,12 +41,10 @@ function WatchCard({ ticker, pd, onRemove, onSelect }: {
   return (
     <button type="button" onClick={onSelect}
       className={`group relative shrink-0 w-20 rounded-lg border border-zinc-100 border-t-2 bg-white p-2 text-left transition-all hover:shadow-sm ${topCls}`}>
-      <span onClick={(event) => { event.stopPropagation(); onRemove() }}
-        onKeyDown={activateOnEnterOrSpace(onRemove)}
-        role="button" tabIndex={0}
+      <button type="button" onClick={(event) => { event.stopPropagation(); onRemove() }}
         className="absolute right-1 top-1 hidden text-zinc-300 hover:text-zinc-600 group-hover:block">
         <X className="size-2.5" />
-      </span>
+      </button>
 
       <div className="flex items-center justify-between gap-1">
         <span className="text-[10px] font-bold tracking-wide text-zinc-500">{ticker}</span>

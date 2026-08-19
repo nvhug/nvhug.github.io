@@ -1,24 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createSupabaseServerClient } from '@/lib/supabase-server'
+import type { DailyPricePoint, PriceData } from '../../stockTypes'
 
 export const runtime = 'nodejs'
-
-type PriceData = {
-  close: number
-  change: number
-  pct_change: number
-  date: string
-  volume?: number
-  high?: number
-  low?: number
-}
-
-export type DailyPricePoint = {
-  date: string
-  close: number
-  volume?: number
-  high?: number
-  low?: number
-}
 
 const YF_HEADERS = {
   'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -125,6 +109,10 @@ async function fetchDailyHistory(ticker: string): Promise<DailyPricePoint[] | nu
 }
 
 export async function GET(req: NextRequest) {
+  const supabase = await createSupabaseServerClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
   const raw = req.nextUrl.searchParams.get('tickers')
   if (!raw) return NextResponse.json({ error: 'Missing tickers' }, { status: 400 })
 
@@ -132,6 +120,7 @@ export async function GET(req: NextRequest) {
     .split(',')
     .map((t) => t.trim().toUpperCase())
     .filter((t) => /^[A-Z0-9]{1,10}$/.test(t))
+    .slice(0, 30)
 
   if (tickers.length === 0) return NextResponse.json({ error: 'No valid tickers' }, { status: 400 })
 

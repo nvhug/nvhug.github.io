@@ -29,12 +29,11 @@ type StockAnalysisStats = {
 }
 
 type CategoryScores = {
-  governance: number
-  liquidity: number
-  valuation: number
-  profitability: number
-  capitalSafety: number
-  assetQuality: number
+  liquidity: number | null
+  valuation: number | null
+  profitability: number | null
+  capitalSafety: number | null
+  assetQuality: number | null
 }
 
 type PeerRanking = {
@@ -46,10 +45,10 @@ type PeerRanking = {
 
 type StockAnalysis = {
   grade: 'A' | 'B' | 'C' | 'D'
-  overallScore: number
+  overallScore: number | null
   scores: CategoryScores
   industryScores: CategoryScores
-  industryOverallScore: number
+  industryOverallScore: number | null
   summary: string
   confidence: { score: number; level: 'Cao' | 'Trung bình' | 'Thấp'; rationale: string }
   scoreRationales: Record<keyof CategoryScores, string>
@@ -68,6 +67,21 @@ type StockAnalysis = {
   strengths: string[]
   risks: string[]
   dataQuality: { coverage: string; missing: string[]; reliabilityNote: string }
+  fundamentals?: {
+    source: 'Vietcap'
+    reportPeriod: string
+    pe: number | null
+    pb: number | null
+    roePct: number | null
+    roaPct: number | null
+    nimPct: number | null
+    nplPct: number | null
+    assetQualityScore: number | null
+  }
+  governanceDisclosures?: {
+    source: 'Vietstock'
+    documents: { title: string; url: string; publishedAt: string | null }[]
+  }
   recommendation: string
   sectorName: string
   peers: PeerRanking[]
@@ -85,53 +99,6 @@ const GRADE_DESCRIPTIONS: Record<StockAnalysis['grade'], string> = {
   B: 'Khá — nhìn chung ổn nhưng có 1-2 tiêu chí yếu hơn mặt bằng ngành, cần theo dõi thêm.',
   C: 'Trung bình — nhiều tiêu chí chỉ ở mức trung tính hoặc thấp hơn ngành, nên cân nhắc kỹ trước khi giải ngân thêm.',
   D: 'Yếu — phần lớn tiêu chí dưới mức trung bình ngành hoặc rủi ro/biến động cao, cần thận trọng.',
-}
-
-// Hexagon radar chart: 6 axes clockwise from top. Two series — stock (solid blue) vs industry ref (lighter blue).
-function RadarChart({ scores, size = 260 }: { scores: { label: string; value: number; industry: number }[]; size?: number }) {
-  const cx = size / 2
-  const cy = size / 2
-  const maxR = size / 2 - 46
-  const angleFor = (i: number) => -Math.PI / 2 + i * ((2 * Math.PI) / scores.length)
-  const pointFor = (i: number, value: number) => {
-    const r = (Math.max(0, Math.min(10, value)) / 10) * maxR
-    const angle = angleFor(i)
-    return { x: cx + r * Math.cos(angle), y: cy + r * Math.sin(angle) }
-  }
-  const rings = [2.5, 5, 7.5, 10]
-  const dataPoints = scores.map((s, i) => pointFor(i, s.value))
-  const industryPoints = scores.map((s, i) => pointFor(i, s.industry))
-
-  return (
-    <svg viewBox={`0 0 ${size} ${size}`} className="w-full max-w-[280px]" role="img" aria-label="Biểu đồ radar xếp hạng">
-      {rings.map((ring) => (
-        <polygon key={ring} points={scores.map((_, i) => { const p = pointFor(i, ring); return `${p.x},${p.y}` }).join(' ')}
-          fill="none" stroke="#e4e4e7" strokeWidth="1" />
-      ))}
-      {scores.map((s, i) => {
-        const outer = pointFor(i, 10)
-        return <line key={s.label} x1={cx} y1={cy} x2={outer.x} y2={outer.y} stroke="#e4e4e7" strokeWidth="1" />
-      })}
-      <polygon points={industryPoints.map((p) => `${p.x},${p.y}`).join(' ')} fill="none" stroke="#93c5fd" strokeWidth="1.5" />
-      <polygon points={dataPoints.map((p) => `${p.x},${p.y}`).join(' ')} fill="#3b82f6" fillOpacity="0.18" stroke="#3b82f6" strokeWidth="2" />
-      {dataPoints.map((p, i) => <circle key={scores[i].label} cx={p.x} cy={p.y} r="3" fill="#fff" stroke="#3b82f6" strokeWidth="2" />)}
-      {scores.map((s, i) => {
-        const labelPoint = pointFor(i, 12.6)
-        const anchor = labelPoint.x < cx - 4 ? 'end' : labelPoint.x > cx + 4 ? 'start' : 'middle'
-        const dy = labelPoint.y < cy - 4 ? -2 : labelPoint.y > cy + 4 ? 10 : 4
-        return (
-          <g key={s.label}>
-            <text x={labelPoint.x} y={labelPoint.y + dy - 10} textAnchor={anchor} fontSize="10" fontWeight="700" fill="#3b82f6">
-              {s.value.toFixed(1)}
-            </text>
-            <text x={labelPoint.x} y={labelPoint.y + dy} textAnchor={anchor} fontSize="9" fill="#71717a">
-              {s.label}
-            </text>
-          </g>
-        )
-      })}
-    </svg>
-  )
 }
 
 export function RankingTab({ ticker, company, allPoints, historyMax, historyMin, active, onSelectTicker }: {
@@ -258,21 +225,21 @@ export function RankingTab({ ticker, company, allPoints, historyMax, historyMin,
   }, [active, ticker])
 
   const gradeStyle = analysis ? GRADE_STYLES[analysis.grade] : null
-  const radarScores = analysis ? [
-    { label: 'Quản trị', value: analysis.scores.governance, industry: analysis.industryScores.governance },
-    { label: 'Thanh khoản', value: analysis.scores.liquidity, industry: analysis.industryScores.liquidity },
-    { label: 'Định giá', value: analysis.scores.valuation, industry: analysis.industryScores.valuation },
-    { label: 'Sinh lợi', value: analysis.scores.profitability, industry: analysis.industryScores.profitability },
-    { label: 'An toàn vốn', value: analysis.scores.capitalSafety, industry: analysis.industryScores.capitalSafety },
-    { label: 'Chất lượng tài sản', value: analysis.scores.assetQuality, industry: analysis.industryScores.assetQuality },
-  ] : []
+  const formatScore = (value: number | null) => value == null ? 'N/A' : value.toFixed(1)
+  const scoreEntries = [
+    ['liquidity', 'Thanh khoản'],
+    ['valuation', 'Định giá'],
+    ['profitability', 'Sinh lợi'],
+    ['capitalSafety', 'An toàn vốn'],
+    ['assetQuality', 'Chất lượng tài sản'],
+  ] as const
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-zinc-200 bg-zinc-50/60 px-4 py-3">
         <div>
           <p className="font-poppins text-sm font-semibold text-zinc-700">Xếp hạng cơ bản {ticker}</p>
-          <p className="mt-0.5 text-[11px] text-zinc-400">AI ước tính từ dữ liệu giá &amp; khối lượng lịch sử — không thay thế báo cáo tài chính chính thức</p>
+          <p className="mt-0.5 text-[11px] text-zinc-400">Chỉ hiển thị các tiêu chí có dữ liệu quan sát được; các chỉ số tài chính/giao dịch không có nguồn chứng thực sẽ là N/A.</p>
         </div>
         <button type="button" onClick={runAnalysis} disabled={analyzing || loadingSaved || !stats || !canAnalyze}
           title={!canAnalyze && nextAnalyzeAt ? `Có thể phân tích lại từ ${formatDateTime(nextAnalyzeAt)}` : undefined}
@@ -325,7 +292,7 @@ export function RankingTab({ ticker, company, allPoints, historyMax, historyMin,
               </div>
               <div className="min-w-0">
                 <div className="flex items-baseline gap-1.5">
-                  <span className={`text-2xl font-bold tabular-nums ${gradeStyle.text}`}>{analysis.overallScore.toFixed(1)}</span>
+                  <span className={`text-2xl font-bold tabular-nums ${gradeStyle.text}`}>{formatScore(analysis.overallScore)}</span>
                   <span className={`text-sm font-medium opacity-60 ${gradeStyle.text}`}>/10</span>
                 </div>
                 <p className={`mt-1 text-xs leading-5 ${gradeStyle.text}`}>{analysis.summary}</p>
@@ -363,64 +330,47 @@ export function RankingTab({ ticker, company, allPoints, historyMax, historyMin,
             <p className="mt-1 text-xs leading-5 text-zinc-600">{analysis.confidence.rationale}</p>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-[auto_1fr]">
-            <div className="flex flex-col items-center gap-2 rounded-xl border border-zinc-100 p-3">
-              <RadarChart scores={radarScores} />
-              <div className="flex items-center gap-3 text-[10px] text-zinc-400">
-                <span className="flex items-center gap-1"><span className="size-2 rounded-full bg-blue-500" /> {ticker}</span>
-                <span className="flex items-center gap-1"><span className="size-2 rounded-full bg-blue-200" /> Ngành</span>
-              </div>
-            </div>
-
-            <div className="overflow-hidden rounded-xl border border-zinc-100">
+          <div className="overflow-hidden rounded-xl border border-zinc-100">
               <table className="w-full text-xs">
                 <thead>
                   <tr className="border-b border-zinc-100 bg-zinc-50/70">
                     <th className="px-3 py-2 text-left font-semibold text-zinc-500">Tiêu chí</th>
                     <th className="px-3 py-2 text-right font-semibold text-zinc-500">{ticker}</th>
-                    <th className="px-3 py-2 text-right font-semibold text-zinc-500">Ngành</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-50">
-                  {radarScores.map((s) => (
-                    <tr key={s.label}>
-                      <td className="px-3 py-2 text-zinc-500">{s.label}</td>
-                      <td className="px-3 py-2 text-right font-semibold tabular-nums text-zinc-800">{s.value.toFixed(2)}</td>
-                      <td className="px-3 py-2 text-right tabular-nums text-zinc-400">{s.industry.toFixed(2)}</td>
-                    </tr>
+                  {scoreEntries.map(([key, label]) => (
+                      <tr key={key}>
+                        <td className="px-3 py-2 text-zinc-500">{label}</td>
+                        <td className="px-3 py-2 text-right font-semibold tabular-nums text-zinc-800">{formatScore(analysis?.scores[key] ?? null)}</td>
+                      </tr>
                   ))}
                   <tr className="bg-zinc-50/70">
-                    <td className="px-3 py-2 font-semibold text-zinc-700">Điểm cơ bản</td>
-                    <td className="px-3 py-2 text-right font-bold tabular-nums text-zinc-900">{analysis.overallScore.toFixed(2)}</td>
-                    <td className="px-3 py-2 text-right font-semibold tabular-nums text-zinc-500">{analysis.industryOverallScore.toFixed(2)}</td>
+                    <td className="px-3 py-2 font-semibold text-zinc-700">Điểm tổng hợp dữ liệu hiện có</td>
+                    <td className="px-3 py-2 text-right font-bold tabular-nums text-zinc-900">{formatScore(analysis.overallScore)}</td>
                   </tr>
                 </tbody>
               </table>
-            </div>
           </div>
 
           <div>
             <p className="mb-2 border-l-2 border-blue-400 pl-2 font-poppins text-sm font-semibold text-zinc-700">Luận giải điểm số</p>
             <div className="grid gap-px overflow-hidden rounded-xl border border-zinc-100 bg-zinc-100 sm:grid-cols-2">
-              {([
-                ['governance', 'Quản trị'],
-                ['liquidity', 'Thanh khoản'],
-                ['valuation', 'Định giá'],
-                ['profitability', 'Sinh lợi'],
-                ['capitalSafety', 'An toàn vốn'],
-                ['assetQuality', 'Chất lượng tài sản'],
-              ] as const).map(([key, label]) => (
-                <div key={key} className="bg-white p-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-xs font-semibold text-zinc-700">{label}</p>
-                    <span className="text-xs font-bold tabular-nums text-blue-600">{analysis.scores[key].toFixed(1)}/10</span>
+              {scoreEntries.map(([key, label]) => {
+                const value = analysis.scores[key]
+                return (
+                  <div key={key} className="bg-white p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs font-semibold text-zinc-700">{label}</p>
+                      <span className="text-xs font-bold tabular-nums text-blue-600">{value == null ? 'N/A' : `${value.toFixed(1)}/10`}</span>
+                    </div>
+                    <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-zinc-100">
+                      <div className="h-full rounded-full bg-blue-500 transition-all" style={{ width: `${(value ?? 0) * 10}%` }} />
+                    </div>
+                    <p className="mt-1.5 text-[11px] leading-4 text-zinc-500">{value == null ? 'Dữ liệu tài chính chính thức chưa đủ để chấm điểm trung thực.' : analysis.scoreRationales[key]}</p>
                   </div>
-                  <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-zinc-100">
-                    <div className="h-full rounded-full bg-blue-500 transition-all" style={{ width: `${analysis.scores[key] * 10}%` }} />
-                  </div>
-                  <p className="mt-1.5 text-[11px] leading-4 text-zinc-500">{analysis.scoreRationales[key]}</p>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
 
@@ -549,6 +499,44 @@ export function RankingTab({ ticker, company, allPoints, historyMax, historyMin,
             <p className="mt-1 text-xs leading-5 text-zinc-500">{analysis.dataQuality.missing.join(' · ')}</p>
           </div>
 
+          {analysis.fundamentals && (
+            <div className="rounded-xl border border-emerald-100 bg-emerald-50/30 p-3">
+              <div className="flex flex-wrap items-baseline justify-between gap-1">
+                <p className="text-xs font-semibold text-emerald-800">Số liệu cơ bản đã xác minh</p>
+                <p className="text-[10px] text-emerald-700">Nguồn {analysis.fundamentals.source} · {analysis.fundamentals.reportPeriod}</p>
+              </div>
+              <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs sm:grid-cols-3">
+                {[
+                  ['P/E', analysis.fundamentals.pe, 'x'],
+                  ['P/B', analysis.fundamentals.pb, 'x'],
+                  ['ROE', analysis.fundamentals.roePct, '%'],
+                  ['ROA', analysis.fundamentals.roaPct, '%'],
+                  ['NIM', analysis.fundamentals.nimPct, '%'],
+                  ['NPL', analysis.fundamentals.nplPct, '%'],
+                ].map(([label, value, suffix]) => (
+                  <p key={label as string} className="text-zinc-600"><span className="text-zinc-400">{label}: </span><span className="font-semibold tabular-nums text-zinc-800">{typeof value === 'number' ? `${value.toFixed(2)}${suffix}` : 'N/A'}</span></p>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {analysis.governanceDisclosures && (
+            <div className="rounded-xl border border-blue-100 bg-blue-50/30 p-3">
+              <div className="flex flex-wrap items-baseline justify-between gap-1">
+                <p className="text-xs font-semibold text-blue-800">Tài liệu quản trị đã xác minh</p>
+                <p className="text-[10px] text-blue-700">Nguồn {analysis.governanceDisclosures.source}</p>
+              </div>
+              <ul className="mt-2 space-y-1.5">
+                {analysis.governanceDisclosures.documents.map((document) => (
+                  <li key={document.url} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 text-xs">
+                    <a href={document.url} target="_blank" rel="noreferrer" className="min-w-0 text-blue-700 underline-offset-2 hover:underline">{document.title}</a>
+                    {document.publishedAt && <span className="shrink-0 text-[10px] text-zinc-400">{formatDateTime(document.publishedAt)}</span>}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           {analysis.peers.length > 0 && (
             <div className="overflow-hidden rounded-xl border border-zinc-100">
               <div className="border-b border-zinc-100 bg-zinc-50/70 px-3 py-2">
@@ -565,7 +553,6 @@ export function RankingTab({ ticker, company, allPoints, historyMax, historyMin,
                       <th className="px-2 py-2 text-right font-semibold text-zinc-400">Điểm cơ bản</th>
                       <th className="px-2 py-2 text-right font-semibold text-zinc-400">An toàn vốn</th>
                       <th className="px-2 py-2 text-right font-semibold text-zinc-400">Chất lượng TS</th>
-                      <th className="px-2 py-2 text-right font-semibold text-zinc-400">Quản trị</th>
                       <th className="px-2 py-2 text-right font-semibold text-zinc-400">Sinh lợi</th>
                       <th className="px-2 py-2 text-right font-semibold text-zinc-400">Thanh khoản</th>
                       <th className="px-2 py-2 text-right font-semibold text-zinc-400">Định giá</th>
@@ -583,12 +570,11 @@ export function RankingTab({ ticker, company, allPoints, historyMax, historyMin,
                         </td>
                         <td className={`px-2 py-2 font-semibold ${GRADE_STYLES[peer.grade].text}`}>{peer.grade}</td>
                         <td className="px-2 py-2 text-right font-semibold tabular-nums text-zinc-800">{peer.overallScore.toFixed(2)}</td>
-                        <td className="px-2 py-2 text-right tabular-nums text-zinc-600">{peer.scores.capitalSafety.toFixed(2)}</td>
-                        <td className="px-2 py-2 text-right tabular-nums text-zinc-600">{peer.scores.assetQuality.toFixed(2)}</td>
-                        <td className="px-2 py-2 text-right tabular-nums text-zinc-600">{peer.scores.governance.toFixed(2)}</td>
-                        <td className="px-2 py-2 text-right tabular-nums text-zinc-600">{peer.scores.profitability.toFixed(2)}</td>
-                        <td className="px-2 py-2 text-right tabular-nums text-zinc-600">{peer.scores.liquidity.toFixed(2)}</td>
-                        <td className="px-2 py-2 text-right tabular-nums text-zinc-600">{peer.scores.valuation.toFixed(2)}</td>
+                        <td className="px-2 py-2 text-right tabular-nums text-zinc-600">{formatScore(peer.scores.capitalSafety)}</td>
+                        <td className="px-2 py-2 text-right tabular-nums text-zinc-600">{formatScore(peer.scores.assetQuality)}</td>
+                        <td className="px-2 py-2 text-right tabular-nums text-zinc-600">{formatScore(peer.scores.profitability)}</td>
+                        <td className="px-2 py-2 text-right tabular-nums text-zinc-600">{formatScore(peer.scores.liquidity)}</td>
+                        <td className="px-2 py-2 text-right tabular-nums text-zinc-600">{formatScore(peer.scores.valuation)}</td>
                       </tr>
                     ))}
                   </tbody>

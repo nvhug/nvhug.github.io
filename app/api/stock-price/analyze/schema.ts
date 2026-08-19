@@ -1,15 +1,35 @@
 import { z } from 'zod'
 
-const score = z.number().min(0).max(10)
+const score = z.number().min(0).max(10).nullable()
 const grade = z.enum(['A', 'B', 'C', 'D'])
 
 const categoryScoresSchema = z.object({
-  governance: score,
   liquidity: score,
   valuation: score,
   profitability: score,
   capitalSafety: score,
   assetQuality: score,
+})
+
+const financialSnapshotSchema = z.object({
+  source: z.literal('Vietcap'),
+  reportPeriod: z.string().min(1),
+  pe: z.number().positive().nullable(),
+  pb: z.number().positive().nullable(),
+  roePct: z.number().nullable(),
+  roaPct: z.number().nullable(),
+  nimPct: z.number().nullable(),
+  nplPct: z.number().nullable(),
+  assetQualityScore: z.number().min(0).max(10).nullable(),
+})
+
+const governanceDisclosuresSchema = z.object({
+  source: z.literal('Vietstock'),
+  documents: z.array(z.object({
+    title: z.string().min(1),
+    url: z.string().url(),
+    publishedAt: z.string().datetime().nullable(),
+  })).min(1),
 })
 
 export const stockAnalysisSchema = z.object({
@@ -25,7 +45,6 @@ export const stockAnalysisSchema = z.object({
     rationale: z.string().min(1),
   }),
   scoreRationales: z.object({
-    governance: z.string().min(1),
     liquidity: z.string().min(1),
     valuation: z.string().min(1),
     profitability: z.string().min(1),
@@ -68,14 +87,16 @@ export const stockAnalysisSchema = z.object({
     missing: z.array(z.string().min(1)).min(1),
     reliabilityNote: z.string().min(1),
   }),
+  fundamentals: financialSnapshotSchema.optional(),
+  governanceDisclosures: governanceDisclosuresSchema.optional(),
   recommendation: z.enum(['Mua thêm', 'Nắm giữ', 'Theo dõi thêm', 'Thận trọng']),
   sectorName: z.string().min(1),
   peers: z.array(z.object({
     ticker: z.string().min(1).max(10),
     grade,
-    overallScore: score,
+    overallScore: z.number().min(0).max(10),
     scores: categoryScoresSchema,
-  })).min(1),
+  })).min(0),
 })
 
 export type StockAnalysisResult = z.infer<typeof stockAnalysisSchema>

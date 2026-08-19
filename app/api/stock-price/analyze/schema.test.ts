@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
+import { formatCompanyContextForPrompt } from './companyContext'
 import { stockAnalysisSchema } from './schema'
 
 const scores = {
-  governance: 5,
   liquidity: 7,
   valuation: 6,
   profitability: 6,
@@ -19,7 +19,6 @@ const validAnalysis = {
   summary: 'Xu hướng trung tính với thanh khoản khá.',
   confidence: { score: 62, level: 'Trung bình', rationale: 'Chỉ có dữ liệu giá và khối lượng.' },
   scoreRationales: {
-    governance: 'Thiếu dữ liệu cơ bản.',
     liquidity: 'Thanh khoản gần đây khá.',
     valuation: 'Giá nằm giữa biên lịch sử.',
     profitability: 'Hiệu suất trung hạn trung tính.',
@@ -71,5 +70,18 @@ describe('stockAnalysisSchema', () => {
   it('rejects incomplete or out-of-range reports', () => {
     const invalid = { ...validAnalysis, confidence: { ...validAnalysis.confidence, score: 120 } }
     expect(stockAnalysisSchema.safeParse(invalid).success).toBe(false)
+  })
+
+  it('formats public company identity without treating it as financial evidence', () => {
+    const companyContext = {
+      ticker: 'MBB',
+      sector: 'Financial Services',
+      industry: 'Banks - Regional',
+      exchange: 'HNX',
+      longName: 'MBBank',
+      quoteType: 'EQUITY',
+    }
+
+    expect(formatCompanyContextForPrompt(companyContext)).toContain('Financial Services')
   })
 })

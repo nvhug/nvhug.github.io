@@ -12,6 +12,7 @@ import { getIntlLocale } from '@/lib/i18n/locale'
 import type { Lang } from '@/lib/i18n/language-context'
 import { useFeatureAccess } from '@/lib/useFeatureAccess'
 import { getSupabaseBrowserClient } from '@/lib/supabase-browser'
+import { useUserRole } from '@/lib/useUserRole'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -226,6 +227,7 @@ function rowToInsight(row: {
 export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note[] }) {
   const { t, lang } = useLanguage()
   const { allowed: canUseAI } = useFeatureAccess('notes.ai_analysis')
+  const { role } = useUserRole()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const periodOptions = useMemo(() => generatePeriodOptions(t), [lang])
 
@@ -303,7 +305,7 @@ export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note
   }
 
   async function analyze() {
-    if (cooldown.isBlocked) {
+    if (role !== 'admin' && cooldown.isBlocked) {
       setError(t('notesAIInsights.cooldownError', { cooldown: cooldownLabel }))
       return
     }
@@ -374,7 +376,7 @@ export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note
         {/* Analyze button — visible to everyone; users without permission get a donate modal on click */}
         <button
           onClick={handleAnalyzeClick}
-          disabled={loading || fetching || totalItems < MIN_NOTES_REQUIRED || (canUseAI && cooldown.isBlocked)}
+          disabled={loading || fetching || totalItems < MIN_NOTES_REQUIRED || (canUseAI && role !== 'admin' && cooldown.isBlocked)}
           className="ml-auto flex items-center gap-1.5 rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-violet-700 disabled:opacity-60"
         >
           {loading

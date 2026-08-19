@@ -1,5 +1,9 @@
 import { NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase-server'
+import { formatCompanyContextForPrompt, type CompanyContext } from './companyContext'
+import { fetchFinancialSnapshot, type FinancialSnapshot } from './fundamentals'
+import { fetchGovernanceDisclosures, type GovernanceDisclosures } from './governanceDisclosures'
+import { gradeFromOverallScore, overallScoreFromScores } from './scoring'
 import { stockAnalysisSchema } from './schema'
 import { cooldownMetadata } from './cooldown'
 
@@ -8,6 +12,41 @@ export const runtime = 'nodejs'
 type StoredAnalysis = {
   result: unknown
   analyzed_at: string
+}
+
+function applyEvidence(result: unknown, fundamentals: FinancialSnapshot | null, governanceDisclosures: GovernanceDisclosures | null): unknown {
+  const parsed = stockAnalysisSchema.safeParse(result)
+  if (!parsed.success) return result
+
+  const assetQualityRationale = fundamentals?.nplPct != null
+    ? `Dựa trên tỷ lệ nợ xấu (NPL) ${fundamentals.nplPct.toFixed(2)}% trong báo cáo ${fundamentals.reportPeriod} từ Vietcap.`
+    : 'Chưa có tỷ lệ nợ xấu hoặc chỉ tiêu chất lượng tài sản có thể kiểm chứng trong nguồn dữ liệu hiện tại.'
+  const scores = { ...parsed.data.scores, assetQuality: fundamentals?.assetQualityScore ?? null }
+  const overallScore = overallScoreFromScores(scores)
+  return {
+    ...parsed.data,
+    grade: gradeFromOverallScore(overallScore),
+    overallScore,
+    scores,
+    industryScores: { liquidity: null, valuation: null, profitability: null, capitalSafety: null, assetQuality: null },
+    industryOverallScore: null,
+    scoreRationales: {
+      ...parsed.data.scoreRationales,
+      assetQuality: assetQualityRationale,
+    },
+    dataQuality: fundamentals
+      ? {
+          coverage: `Dữ liệu giá/khối lượng lịch sử và snapshot chỉ số cơ bản Vietcap kỳ ${fundamentals.reportPeriod}.`,
+          missing: [
+            ...(fundamentals.nplPct == null ? ['Tỷ lệ nợ xấu (NPL)'] : []),
+          ],
+          reliabilityNote: 'P/E, P/B, ROE, ROA, NIM và NPL (nếu có) lấy từ Vietcap; các nhận định còn lại phải được diễn giải trong phạm vi dữ liệu này.',
+        }
+      : parsed.data.dataQuality,
+    peers: [],
+    fundamentals: fundamentals ?? undefined,
+    governanceDisclosures: governanceDisclosures ?? undefined,
+  }
 }
 
 async function getStoredAnalysis(userId: string, ticker: string): Promise<StoredAnalysis | null> {
@@ -23,10 +62,53 @@ async function getStoredAnalysis(userId: string, ticker: string): Promise<Stored
   return data as StoredAnalysis | null
 }
 
+async function fetchCompanyContext(ticker: string): Promise<CompanyContext | null> {
+  const url = `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(ticker)}&quotesCount=10&newsCount=0`
+
+  try {
+    const res = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        Accept: 'application/json',
+        'Accept-Language': 'en-US,en;q=0.9',
+      },
+      next: { revalidate: 86400 },
+    })
+
+    if (!res.ok) return null
+    const json = await res.json() as { quotes?: Array<{ symbol?: string; longname?: string; shortname?: string; sector?: string; industry?: string; exchange?: string; quoteType?: string; name?: string }> }
+    const quotes = json.quotes ?? []
+    if (quotes.length === 0) return null
+
+    const direct = quotes.find((quote) => {
+      const symbol = quote.symbol ?? ''
+      return symbol.toUpperCase() === ticker || symbol.toUpperCase() === `${ticker}.VN` || symbol.toUpperCase() === `${ticker}.HNX`
+    }) ?? quotes.find((quote) => quote.quoteType === 'EQUITY')
+
+    if (!direct) return null
+
+    return {
+      ticker,
+      longName: direct.longname ?? direct.name ?? null,
+      shortName: direct.shortname ?? null,
+      sector: direct.sector ?? null,
+      industry: direct.industry ?? null,
+      exchange: direct.exchange ?? null,
+      quoteType: direct.quoteType ?? null,
+    }
+  } catch (error) {
+    console.warn('[stock-analysis] company context lookup failed:', error)
+    return null
+  }
+}
+
 export async function GET(request: Request) {
   const supabase = await createSupabaseServerClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const { data: profile } = await supabase.from('user_profiles').select('role').eq('id', user.id).maybeSingle()
+  const isAdmin = profile?.role === 'admin'
 
   const ticker = new URL(request.url).searchParams.get('ticker')?.trim().toUpperCase()
   if (!ticker || !/^[A-Z0-9]{1,10}$/.test(ticker)) {
@@ -36,7 +118,8 @@ export async function GET(request: Request) {
   try {
     const stored = await getStoredAnalysis(user.id, ticker)
     if (!stored) return NextResponse.json({ analysis: null, canAnalyze: true })
-    return NextResponse.json({ analysis: stored.result, ...cooldownMetadata(stored.analyzed_at) })
+    const [fundamentals, governanceDisclosures] = await Promise.all([fetchFinancialSnapshot(ticker), fetchGovernanceDisclosures(ticker)])
+    return NextResponse.json({ analysis: applyEvidence(stored.result, fundamentals, governanceDisclosures), ...cooldownMetadata(stored.analyzed_at, Date.now(), isAdmin) })
   } catch (error) {
     console.error('[stock-analysis] cache read failed:', error)
     return NextResponse.json({ error: 'Không tải được phân tích đã lưu.' }, { status: 500 })
@@ -75,6 +158,9 @@ export async function POST(request: Request) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const { data: profile } = await supabase.from('user_profiles').select('role').eq('id', user.id).maybeSingle()
+  const isAdmin = profile?.role === 'admin'
+
   let body: AnalyzeRequest
   try {
     body = await request.json()
@@ -97,12 +183,13 @@ export async function POST(request: Request) {
   }
 
   if (stored) {
-    const metadata = cooldownMetadata(stored.analyzed_at)
-    if (!metadata.canAnalyze) {
+    const metadata = cooldownMetadata(stored.analyzed_at, Date.now(), isAdmin)
+    if (!metadata.canAnalyze && metadata.nextAnalyzeAt) {
       const retryAfterSeconds = Math.ceil((new Date(metadata.nextAnalyzeAt).getTime() - Date.now()) / 1000)
+      const [fundamentals, governanceDisclosures] = await Promise.all([fetchFinancialSnapshot(normalizedTicker), fetchGovernanceDisclosures(normalizedTicker)])
       return NextResponse.json({
         error: 'Mỗi mã cổ phiếu chỉ được phân tích lại một lần trong 30 ngày.',
-        analysis: stored.result,
+        analysis: applyEvidence(stored.result, fundamentals, governanceDisclosures),
         ...metadata,
         retryAfterSeconds,
       }, {
@@ -115,97 +202,133 @@ export async function POST(request: Request) {
   const apiKey = process.env.DEEPSEEK_API_KEY
   if (!apiKey) return NextResponse.json({ error: 'DEEPSEEK_API_KEY not configured' }, { status: 500 })
 
-  const prompt = `Bạn là chuyên gia phân tích chứng khoán Việt Nam. Dựa CHỈ trên dữ liệu giá/khối lượng lịch sử dưới đây (không có báo cáo tài chính), hãy đánh giá cổ phiếu ${normalizedTicker}${companyName ? ` (${companyName})` : ''}.
+  const [companyContext, fundamentals, governanceDisclosures] = await Promise.all([
+    fetchCompanyContext(normalizedTicker),
+    fetchFinancialSnapshot(normalizedTicker),
+    fetchGovernanceDisclosures(normalizedTicker),
+  ])
+  const companyContextBlock = companyContext
+    ? [
+        '=== THÔNG TIN CÔNG TY CÓ SẴN TỪ NGUỒN CÔNG KHAI ===',
+        formatCompanyContextForPrompt(companyContext),
+        'Thông tin này chỉ xác nhận định danh doanh nghiệp/ngành/sàn. Nó không phải bằng chứng để chấm điểm chất lượng tài sản hoặc sức khỏe tài chính.',
+      ].filter(Boolean).join('\n')
+    : '=== THÔNG TIN CÔNG TY ===\nKhông có metadata công ty từ nguồn công khai để kiểm tra định danh ngành / doanh nghiệp.'
 
-=== DỮ LIỆU GIÁ & KHỐI LƯỢNG (đơn vị giá: VNĐ) ===
-${JSON.stringify(stats, null, 2)}
+  const safeName = companyName?.replace(/[\n\r]/g, ' ').slice(0, 100) ?? null
+  const companyLabel = safeName ? ` (${safeName})` : ''
+  const fundamentalsBlock = fundamentals
+    ? [
+        '=== SỐ LIỆU CƠ BẢN ĐÃ XÁC MINH ===',
+        `Nguồn: ${fundamentals.source}; kỳ báo cáo: ${fundamentals.reportPeriod}.`,
+        `P/E: ${fundamentals.pe ?? 'không có'}; P/B: ${fundamentals.pb ?? 'không có'}; ROE: ${fundamentals.roePct?.toFixed(2) ?? 'không có'}%; ROA: ${fundamentals.roaPct?.toFixed(2) ?? 'không có'}%; NIM: ${fundamentals.nimPct?.toFixed(2) ?? 'không có'}%; NPL: ${fundamentals.nplPct?.toFixed(2) ?? 'không có'}%.`,
+        'Đây là số liệu duy nhất được phép dùng cho nhận định cơ bản; nêu rõ nguồn và kỳ báo cáo khi viện dẫn.',
+      ].join('\n')
+    : '=== SỐ LIỆU CƠ BẢN ===\nKhông truy xuất được snapshot báo cáo tài chính có thể kiểm chứng.'
+  const prompt = [
+    `Bạn là chuyên gia phân tích chứng khoán Việt Nam. Dựa trên dữ liệu giá/khối lượng lịch sử và snapshot số liệu cơ bản đã xác minh (nếu có) dưới đây, hãy đánh giá cổ phiếu ${normalizedTicker}${companyLabel}.`,
+    '',
+    '=== DỮ LIỆU GIÁ & KHỐI LƯỢNG (đơn vị giá: VNĐ) ===',
+    JSON.stringify(stats, null, 2),
+    '',
+    `Dữ liệu từ ${stats.dataFrom} đến ${stats.dataTo}.`,
+    '',
+    companyContextBlock,
+    '',
+    fundamentalsBlock,
+    '',
+    'NGUYÊN TẮC BẮT BUỘC:',
+    '- Phân biệt rõ "số liệu quan sát được" và "nhận định/ước tính".',
+    '- Không bịa P/E, P/B, ROE, tăng trưởng lợi nhuận, nợ vay, thị phần hoặc số liệu báo cáo tài chính không có trong input.',
+    '- Khi thiếu dữ liệu cơ bản, phải ghi rõ giới hạn và giảm confidence.',
+    '- Mọi nhận định quan trọng phải viện dẫn ít nhất một số liệu có trong input.',
+    '- Metadata về ngành, quy mô hay việc là ngân hàng lớn KHÔNG phải bằng chứng để chấm assetQuality.',
+    '- Bắt buộc trả về null cho assetQuality. Không được suy diễn điểm này từ tên công ty, ngành, quy mô, giá hoặc khối lượng.',
+    '- Giọng điệu như báo cáo của chuyên gia đầu tư cấp cao: súc tích, phản biện, có điều kiện xác nhận/vô hiệu, không khẳng định chắc chắn tương lai.',
+    '',
+    'Hãy chấm điểm 0–10 cho 5 nhóm tiêu chí sau, dựa trên xu hướng giá/khối lượng có sẵn:',
+    '- valuation (Định giá): vị trí giá hiện tại so với vùng đỉnh/đáy lịch sử — giá gần đáy có thể coi là định giá hấp dẫn hơn.',
+    '- profitability (Sinh lợi): hiệu suất tăng giá theo các khung thời gian (1M/3M/6M/YTD/1Y/5Y).',
+    '- liquidity (Thanh khoản): khối lượng giao dịch trung bình gần đây so với quy mô thị trường VN.',
+    '- capitalSafety (An toàn vốn): mức biến động/drawdown so với đỉnh lịch sử — biến động thấp và gần đỉnh ổn định thì an toàn hơn.',
+    '- assetQuality (Chất lượng tài sản): trả về null; hệ thống sẽ tự chấm lại từ NPL đã xác minh nếu nguồn có NPL.',
+    '',
+    'Không tạo industryScores hoặc peer scores từ kiến thức chung. Trả về null cho toàn bộ industryScores.',
+    '',
+    'Trả về peers là mảng rỗng vì hệ thống chưa có dữ liệu thị trường đồng nhất cho từng mã cùng ngành.',
+    '',
+    'Trả về CHỈ JSON hợp lệ theo đúng cấu trúc sau (không thêm field, không markdown):',
+    '{',
+    '  "grade": "A" | "B" | "C" | "D",',
+    '  "overallScore": số 0-10 (trung bình có trọng số của các điểm có dữ liệu),',
+    '  "scores": { "liquidity": number, "valuation": number, "profitability": number, "capitalSafety": number, "assetQuality": null },',
+    '  "industryScores": { "liquidity": null, "valuation": null, "profitability": null, "capitalSafety": null, "assetQuality": null },',
+    '  "industryOverallScore": null,',
+    '  "summary": "2-3 câu tổng quan tiếng Việt",',
+    '  "confidence": { "score": number 0-100, "level": "Cao" | "Trung bình" | "Thấp", "rationale": "lý do về độ tin cậy và dữ liệu thiếu" },',
+    '  "scoreRationales": {',
+    '    "liquidity": "lý do chấm điểm có số liệu",',
+    '    "valuation": "lý do chấm điểm có số liệu",',
+    '    "profitability": "lý do chấm điểm có số liệu",',
+    '    "capitalSafety": "lý do chấm điểm có số liệu",',
+    '    "assetQuality": "lý do chấm điểm"',
+    '  },',
+    '  "marketView": {',
+    '    "trend": "Tăng" | "Đi ngang" | "Giảm",',
+    '    "momentum": "Mạnh" | "Trung tính" | "Yếu",',
+    '    "cycle": "Tích lũy" | "Tăng giá" | "Phân phối" | "Giảm giá",',
+    '    "relativePosition": "nhận định vị trí giá với đỉnh/đáy có số liệu",',
+    '    "volumeSignal": "nhận định dòng tiền có số liệu",',
+    '    "volatilitySignal": "nhận định biến động/drawdown có số liệu"',
+    '  },',
+    '  "investmentThesis": {',
+    '    "bullCase": ["3 luận điểm tăng giá có bằng chứng"],',
+    '    "bearCase": ["3 luận điểm giảm giá/rủi ro có bằng chứng"],',
+    '    "invalidation": "điều kiện làm luận điểm hiện tại không còn đúng"',
+    '  },',
+    '  "catalysts": { "positive": ["2-4 động lực cần theo dõi"], "negative": ["2-4 rủi ro kích hoạt"] },',
+    '  "scenarios": [',
+    '    { "name": "Tích cực", "probability": number, "priceZone": "vùng giá tham khảo", "conditions": ["điều kiện"] },',
+    '    { "name": "Cơ sở", "probability": number, "priceZone": "vùng giá tham khảo", "conditions": ["điều kiện"] },',
+    '    { "name": "Tiêu cực", "probability": number, "priceZone": "vùng giá tham khảo", "conditions": ["điều kiện"] }',
+    '  ],',
+    '  "actionPlan": {',
+    '    "shortTerm": "kế hoạch 1-4 tuần",',
+    '    "mediumTerm": "kế hoạch 3-12 tháng",',
+    '    "longTerm": "kế hoạch trên 1 năm",',
+    '    "riskManagement": ["3 nguyên tắc quản trị vị thế cụ thể"]',
+    '  },',
+    '  "strengths": ["3-5 điểm mạnh có số liệu"],',
+    '  "risks": ["3-5 rủi ro/giới hạn dữ liệu"],',
+    '  "dataQuality": { "coverage": "mô tả kỳ dữ liệu", "missing": ["dữ liệu quan trọng còn thiếu"], "reliabilityNote": "cách diễn giải kết quả" },',
+    '  "recommendation": "Mua thêm | Nắm giữ | Theo dõi thêm | Thận trọng",',
+    '  "sectorName": "tên ngành bằng tiếng Việt, VD: Tổ chức tín dụng",',
+    '  "peers": [',
+    '    { "ticker": "MÃ", "grade": "A" | "B" | "C" | "D", "overallScore": number, "scores": { "liquidity": number, "valuation": number, "profitability": number, "capitalSafety": number, "assetQuality": number } }',
+    '  ]',
+    '}',
+  ].join('\n')
 
-Dữ liệu từ ${stats.dataFrom} đến ${stats.dataTo}.
-
-NGUYÊN TẮC BẮT BUỘC:
-- Phân biệt rõ "số liệu quan sát được" và "nhận định/ước tính".
-- Không bịa P/E, P/B, ROE, tăng trưởng lợi nhuận, nợ vay, thị phần hoặc số liệu báo cáo tài chính không có trong input.
-- Khi thiếu dữ liệu cơ bản, phải ghi rõ giới hạn và giảm confidence.
-- Mọi nhận định quan trọng phải viện dẫn ít nhất một số liệu có trong input.
-- Giọng điệu như báo cáo của chuyên gia đầu tư cấp cao: súc tích, phản biện, có điều kiện xác nhận/vô hiệu, không khẳng định chắc chắn tương lai.
-
-Hãy chấm điểm 0–10 cho 6 nhóm tiêu chí sau, dựa trên xu hướng giá/khối lượng có sẵn:
-- valuation (Định giá): vị trí giá hiện tại so với vùng đỉnh/đáy lịch sử — giá gần đáy có thể coi là định giá hấp dẫn hơn.
-- profitability (Sinh lợi): hiệu suất tăng giá theo các khung thời gian (1M/3M/6M/YTD/1Y/5Y).
-- liquidity (Thanh khoản): khối lượng giao dịch trung bình gần đây so với quy mô thị trường VN.
-- capitalSafety (An toàn vốn): mức biến động/drawdown so với đỉnh lịch sử — biến động thấp và gần đỉnh ổn định thì an toàn hơn.
-- assetQuality (Chất lượng tài sản) và governance (Quản trị): KHÔNG thể suy ra chính xác chỉ từ dữ liệu giá — chấm điểm trung tính (quanh 5) trừ khi có hiểu biết chung đáng tin cậy về doanh nghiệp, và nêu rõ giới hạn này trong phần risks.
-
-Ngoài ra, ước tính thêm điểm "industryScores" — mức điểm trung bình THAM KHẢO của các doanh nghiệp cùng ngành tại Việt Nam cho cùng 6 tiêu chí trên, dựa trên hiểu biết chung (không cần chính xác tuyệt đối, chỉ mang tính tham chiếu so sánh).
-
-Cuối cùng, liệt kê "peers" — 8 đến 10 mã cổ phiếu niêm yết tại Việt Nam cùng ngành với ${normalizedTicker} (bao gồm cả ${normalizedTicker}), mỗi mã kèm điểm 6 tiêu chí và điểm cơ bản ước tính tương tự trên, dựa trên hiểu biết chung về ngành này.
-
-Trả về CHỈ JSON hợp lệ theo đúng cấu trúc sau (không thêm field, không markdown):
-{
-  "grade": "A" | "B" | "C" | "D",
-  "overallScore": số 0-10 (trung bình có trọng số của 6 điểm trên),
-  "scores": { "governance": number, "liquidity": number, "valuation": number, "profitability": number, "capitalSafety": number, "assetQuality": number },
-  "industryScores": { "governance": number, "liquidity": number, "valuation": number, "profitability": number, "capitalSafety": number, "assetQuality": number },
-  "industryOverallScore": số 0-10 (trung bình của industryScores),
-  "summary": "2-3 câu tổng quan tiếng Việt",
-  "confidence": { "score": number 0-100, "level": "Cao" | "Trung bình" | "Thấp", "rationale": "lý do về độ tin cậy và dữ liệu thiếu" },
-  "scoreRationales": {
-    "governance": "lý do chấm điểm",
-    "liquidity": "lý do chấm điểm có số liệu",
-    "valuation": "lý do chấm điểm có số liệu",
-    "profitability": "lý do chấm điểm có số liệu",
-    "capitalSafety": "lý do chấm điểm có số liệu",
-    "assetQuality": "lý do chấm điểm"
-  },
-  "marketView": {
-    "trend": "Tăng" | "Đi ngang" | "Giảm",
-    "momentum": "Mạnh" | "Trung tính" | "Yếu",
-    "cycle": "Tích lũy" | "Tăng giá" | "Phân phối" | "Giảm giá",
-    "relativePosition": "nhận định vị trí giá với đỉnh/đáy có số liệu",
-    "volumeSignal": "nhận định dòng tiền có số liệu",
-    "volatilitySignal": "nhận định biến động/drawdown có số liệu"
-  },
-  "investmentThesis": {
-    "bullCase": ["3 luận điểm tăng giá có bằng chứng"],
-    "bearCase": ["3 luận điểm giảm giá/rủi ro có bằng chứng"],
-    "invalidation": "điều kiện làm luận điểm hiện tại không còn đúng"
-  },
-  "catalysts": { "positive": ["2-4 động lực cần theo dõi"], "negative": ["2-4 rủi ro kích hoạt"] },
-  "scenarios": [
-    { "name": "Tích cực", "probability": number, "priceZone": "vùng giá tham khảo", "conditions": ["điều kiện"] },
-    { "name": "Cơ sở", "probability": number, "priceZone": "vùng giá tham khảo", "conditions": ["điều kiện"] },
-    { "name": "Tiêu cực", "probability": number, "priceZone": "vùng giá tham khảo", "conditions": ["điều kiện"] }
-  ],
-  "actionPlan": {
-    "shortTerm": "kế hoạch 1-4 tuần",
-    "mediumTerm": "kế hoạch 3-12 tháng",
-    "longTerm": "kế hoạch trên 1 năm",
-    "riskManagement": ["3 nguyên tắc quản trị vị thế cụ thể"]
-  },
-  "strengths": ["3-5 điểm mạnh có số liệu"],
-  "risks": ["3-5 rủi ro/giới hạn dữ liệu"],
-  "dataQuality": { "coverage": "mô tả kỳ dữ liệu", "missing": ["dữ liệu quan trọng còn thiếu"], "reliabilityNote": "cách diễn giải kết quả" },
-  "recommendation": "Mua thêm | Nắm giữ | Theo dõi thêm | Thận trọng",
-  "sectorName": "tên ngành bằng tiếng Việt, VD: Tổ chức tín dụng",
-  "peers": [
-    { "ticker": "MÃ", "grade": "A" | "B" | "C" | "D", "overallScore": number, "scores": { "governance": number, "liquidity": number, "valuation": number, "profitability": number, "capitalSafety": number, "assetQuality": number } }
-  ]
-}`
-
-  const res = await fetch('https://api.deepseek.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: 'deepseek-chat',
-      messages: [{ role: 'user', content: prompt }],
-      response_format: { type: 'json_object' },
-      temperature: 0.3,
-      max_tokens: 3500,
-    }),
-  })
+  let res: Response
+  try {
+    res = await fetch('https://api.deepseek.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: 'deepseek-chat',
+        messages: [{ role: 'user', content: prompt }],
+        response_format: { type: 'json_object' },
+        temperature: 0.3,
+        max_tokens: 3500,
+      }),
+      signal: AbortSignal.timeout(50_000),
+    })
+  } catch {
+    return NextResponse.json({ error: 'AI phân tích quá lâu hoặc không phản hồi. Vui lòng thử lại.' }, { status: 504 })
+  }
 
   if (!res.ok) {
     const err = await res.text()
@@ -230,13 +353,14 @@ Trả về CHỈ JSON hợp lệ theo đúng cấu trúc sau (không thêm field
   }
 
   const analyzedAt = new Date().toISOString()
+  const finalResult = applyEvidence(result.data, fundamentals, governanceDisclosures)
   const { error: saveError } = await supabase
     .from('stock_analysis_history')
     .upsert({
       user_id: user.id,
       ticker: normalizedTicker,
       company_name: companyName,
-      result: result.data,
+      result: finalResult,
       analyzed_at: analyzedAt,
     }, { onConflict: 'user_id,ticker' })
 
@@ -245,7 +369,7 @@ Trả về CHỈ JSON hợp lệ theo đúng cấu trúc sau (không thêm field
     return NextResponse.json({ error: 'Phân tích xong nhưng không lưu được kết quả.' }, { status: 500 })
   }
 
-  return NextResponse.json({ analysis: result.data, ...cooldownMetadata(analyzedAt) }, {
+  return NextResponse.json({ analysis: finalResult, ...cooldownMetadata(analyzedAt, Date.now(), isAdmin) }, {
     headers: { 'Cache-Control': 'private, no-store' },
   })
 }

@@ -1,5 +1,16 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { z } from 'zod'
+
+const suggestedTickerSchema = z.object({
+  ticker: z.string().min(1),
+  sentiment: z.enum(['Tăng', 'Đi ngang', 'Cân nhắc']),
+  reason: z.string(),
+  currentPrice: z.number().positive(),
+  targetPrice: z.number().positive(),
+  catalyst: z.string(),
+  targetUpdatedAt: z.string(),
+})
 
 export const runtime = 'nodejs'
 
@@ -170,11 +181,16 @@ export async function POST(request: Request) {
   const apiKey = process.env.DEEPSEEK_API_KEY
   if (!apiKey) return NextResponse.json({ error: 'DEEPSEEK_API_KEY not configured' }, { status: 500 })
 
-  // Fetch weekly price/volume data for all selected tickers in parallel
-  const results = await Promise.allSettled(screenerTickers.map((t) => fetchWeeklyStats(t)))
-  const stats: TickerStats[] = results
-    .map((r) => (r.status === 'fulfilled' ? r.value : null))
-    .filter((s): s is TickerStats => s !== null)
+  // Fetch in batches of 15 to avoid IP-level rate limiting on Yahoo Finance
+  const stats: TickerStats[] = []
+  for (let i = 0; i < screenerTickers.length; i += 15) {
+    const chunk = screenerTickers.slice(i, i + 15)
+    const chunkResults = await Promise.allSettled(chunk.map((t) => fetchWeeklyStats(t)))
+    for (const r of chunkResults) {
+      if (r.status === 'fulfilled' && r.value) stats.push(r.value)
+    }
+    if (i + 15 < screenerTickers.length) await new Promise<void>((resolve) => setTimeout(resolve, 200))
+  }
 
   if (stats.length < 5) {
     return NextResponse.json({ error: `Không đủ dữ liệu (${stats.length}/${screenerTickers.length} tickers)` }, { status: 502 })
@@ -223,20 +239,26 @@ Trả về CHỈ JSON hợp lệ (không markdown, không giải thích):
   ]
 }`
 
-  const aiRes = await fetch('https://api.deepseek.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: 'deepseek-chat',
-      messages: [{ role: 'user', content: prompt }],
-      response_format: { type: 'json_object' },
-      temperature: 0.1,
-      max_tokens: 2000,
-    }),
-  })
+  let aiRes: Response
+  try {
+    aiRes = await fetch('https://api.deepseek.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: 'deepseek-chat',
+        messages: [{ role: 'user', content: prompt }],
+        response_format: { type: 'json_object' },
+        temperature: 0.1,
+        max_tokens: 2000,
+      }),
+      signal: AbortSignal.timeout(50_000),
+    })
+  } catch {
+    return NextResponse.json({ error: 'AI không phản hồi. Vui lòng thử lại sau.' }, { status: 504 })
+  }
 
   if (!aiRes.ok) {
     const err = await aiRes.text()
@@ -254,9 +276,18 @@ Trả về CHỈ JSON hợp lệ (không markdown, không giải thích):
     return NextResponse.json({ error: 'AI returned invalid JSON' }, { status: 502 })
   }
 
-  const suggestions = parsed.suggestions
-  if (!Array.isArray(suggestions) || suggestions.length === 0) {
+  const rawSuggestions = parsed.suggestions
+  if (!Array.isArray(rawSuggestions) || rawSuggestions.length === 0) {
     return NextResponse.json({ error: 'AI returned no suggestions' }, { status: 502 })
+  }
+
+  const suggestions = rawSuggestions
+    .map((s) => suggestedTickerSchema.safeParse(s))
+    .filter((r) => r.success)
+    .map((r) => r.data)
+
+  if (suggestions.length === 0) {
+    return NextResponse.json({ error: 'AI returned no valid suggestions' }, { status: 502 })
   }
 
   const { error: insertError } = await supabase

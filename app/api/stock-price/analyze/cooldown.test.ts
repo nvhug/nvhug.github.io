@@ -15,4 +15,12 @@ describe('cooldownMetadata', () => {
   it('allows analysis at the 30-day boundary', () => {
     expect(cooldownMetadata(analyzedAt, analyzedAtMs + ANALYSIS_COOLDOWN_MS).canAnalyze).toBe(true)
   })
+
+  it('bypasses the cooldown for admins', () => {
+    expect(cooldownMetadata(analyzedAt, analyzedAtMs + 1, true)).toEqual({
+      analyzedAt,
+      nextAnalyzeAt: null,
+      canAnalyze: true,
+    })
+  })
 })

@@ -549,7 +549,7 @@ export async function POST(request: Request) {
     .limit(1)
     .maybeSingle()
 
-  if (latestAnalysis?.created_at) {
+  if (role !== 'admin' && latestAnalysis?.created_at) {
     const lastAnalyzeAt = new Date(latestAnalysis.created_at).getTime()
     const remainingMs = lastAnalyzeAt + ANALYZE_COOLDOWN_MS - Date.now()
 

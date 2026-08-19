@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { Resend } from 'resend'
+import { alertArrow, alertTeamsColor, formatPct, formatVNPrice } from './utils'
 
 export const runtime = 'nodejs'
 
@@ -61,9 +62,10 @@ async function sendTeamsAlert(alerts: AlertItem[]) {
             },
             ...alerts.map((a) => ({
               type: 'TextBlock',
-              text: `**${a.ticker}**  ${a.direction === 'rise' ? '▲' : '▼'} ${Math.abs(a.pct_change).toFixed(2)}%  —  ${new Intl.NumberFormat('vi-VN').format(a.price)}đ`,
-              color: a.direction === 'rise' ? 'Good' : 'Attention',
+              text: `**${a.ticker}**  ${alertArrow(a.direction)} ${formatPct(a.pct_change)}%  —  ${formatVNPrice(a.price)}đ`,
+              color: alertTeamsColor(a.direction),
               spacing: 'Small',
+              wrap: true,
             })),
           ],
         },
@@ -82,9 +84,9 @@ async function sendEmailAlert(alerts: AlertItem[]) {
     <tr style="border-top:1px solid #f4f4f5">
       <td style="padding:8px 12px;font-weight:700;font-size:14px">${a.ticker}</td>
       <td style="padding:8px 12px;color:${a.direction === 'rise' ? '#059669' : '#e11d48'};font-weight:700;font-size:14px">
-        ${a.direction === 'rise' ? '▲' : '▼'} ${Math.abs(a.pct_change).toFixed(2)}%
+        ${alertArrow(a.direction)} ${formatPct(a.pct_change)}%
       </td>
-      <td style="padding:8px 12px;font-size:14px;color:#3f3f46">${new Intl.NumberFormat('vi-VN').format(a.price)}đ</td>
+      <td style="padding:8px 12px;font-size:14px;color:#3f3f46">${formatVNPrice(a.price)}đ</td>
     </tr>`).join('')
 
   await new Resend(apiKey).emails.send({
@@ -118,11 +120,12 @@ async function runStockAlertCheck(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } },
-  )
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!supabaseUrl || !serviceKey) {
+    return NextResponse.json({ error: 'Server misconfigured' }, { status: 500 })
+  }
+  const supabase = createClient(supabaseUrl, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } })
 
   const { data: watchlist, error: wErr } = await supabase
     .from('stock_watchlist')
