@@ -4,7 +4,7 @@ import { Resend } from 'resend'
 
 export const runtime = 'nodejs'
 
-const ALERT_THRESHOLD_PCT = 5
+const ALERT_THRESHOLD_PCT = 0 // TEMP: testing — revert to 5 after
 
 type PriceSnapshot = { close: number; pct_change: number }
 type AlertItem = { ticker: string; pct_change: number; price: number; direction: 'rise' | 'fall' }
