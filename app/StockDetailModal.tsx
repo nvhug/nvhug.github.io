@@ -176,7 +176,7 @@ export function StockDetailModal({ ticker, company, price, onClose, onSelectTick
                 ) : (
                   <>
                     <div className="relative select-none">
-                      <svg ref={svgRef} viewBox={`0 0 ${CHART_W} ${CHART_H}`} className="h-80 w-full touch-none"
+                      <svg ref={svgRef} viewBox={`0 0 ${CHART_W} ${CHART_H}`} className="aspect-960/340 w-full touch-none"
                         role="img" aria-label={`Biểu đồ giá ${ticker}`}
                         onMouseMove={(e) => updateHoverFromClientX(e.clientX)}
                         onMouseLeave={() => setHoverIdx(null)}
