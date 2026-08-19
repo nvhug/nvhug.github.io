@@ -318,25 +318,44 @@ export function RankingTab({ ticker, company, allPoints, historyMax, historyMin,
 
       {analysis && gradeStyle && (
         <>
-          <div className={`flex items-start gap-3 rounded-xl ${gradeStyle.bg} px-4 py-3 ring-1 ${gradeStyle.ring}`}>
-            <div className={`flex size-10 shrink-0 items-center justify-center rounded-full bg-white text-lg font-bold ${gradeStyle.text} ring-1 ${gradeStyle.ring}`}>
-              {analysis.grade}
+          <div className={`rounded-xl ${gradeStyle.bg} px-4 py-4 ring-1 ${gradeStyle.ring}`}>
+            <div className="flex items-center gap-4">
+              <div className={`flex size-16 shrink-0 items-center justify-center rounded-2xl bg-white text-3xl font-bold ${gradeStyle.text} ring-2 ${gradeStyle.ring} shadow-sm`}>
+                {analysis.grade}
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-baseline gap-1.5">
+                  <span className={`text-2xl font-bold tabular-nums ${gradeStyle.text}`}>{analysis.overallScore.toFixed(1)}</span>
+                  <span className={`text-sm font-medium opacity-60 ${gradeStyle.text}`}>/10</span>
+                </div>
+                <p className={`mt-1 text-xs leading-5 ${gradeStyle.text}`}>{analysis.summary}</p>
+              </div>
             </div>
-            <p className={`text-xs leading-5 ${gradeStyle.text}`}>{analysis.summary}</p>
           </div>
 
           <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-zinc-200 bg-zinc-200 sm:grid-cols-4">
-            {[
-              ['Khuyến nghị', analysis.recommendation],
-              ['Độ tin cậy', `${analysis.confidence.score}/100 · ${analysis.confidence.level}`],
-              ['Xu hướng', `${analysis.marketView.trend} · ${analysis.marketView.cycle}`],
-              ['Động lượng', analysis.marketView.momentum],
-            ].map(([label, value]) => (
-              <div key={label} className="bg-white px-3 py-2.5">
-                <p className="text-[10px] font-medium uppercase text-zinc-400">{label}</p>
-                <p className="mt-1 text-xs font-bold text-zinc-800">{value}</p>
-              </div>
-            ))}
+            <div className="bg-white px-3 py-2.5">
+              <p className="text-[10px] font-medium uppercase text-zinc-400">Khuyến nghị</p>
+              <p className="mt-1 text-xs font-bold text-zinc-800">{analysis.recommendation}</p>
+            </div>
+            <div className="bg-white px-3 py-2.5">
+              <p className="text-[10px] font-medium uppercase text-zinc-400">Độ tin cậy</p>
+              <p className={`mt-1 text-xs font-bold tabular-nums ${analysis.confidence.level === 'Cao' ? 'text-emerald-700' : analysis.confidence.level === 'Trung bình' ? 'text-amber-700' : 'text-red-600'}`}>
+                {analysis.confidence.score}/100 · {analysis.confidence.level}
+              </p>
+            </div>
+            <div className="bg-white px-3 py-2.5">
+              <p className="text-[10px] font-medium uppercase text-zinc-400">Xu hướng</p>
+              <p className={`mt-1 text-xs font-bold ${analysis.marketView.trend === 'Tăng' ? 'text-emerald-700' : analysis.marketView.trend === 'Giảm' ? 'text-red-600' : 'text-zinc-600'}`}>
+                {analysis.marketView.trend} · {analysis.marketView.cycle}
+              </p>
+            </div>
+            <div className="bg-white px-3 py-2.5">
+              <p className="text-[10px] font-medium uppercase text-zinc-400">Động lượng</p>
+              <p className={`mt-1 text-xs font-bold ${analysis.marketView.momentum === 'Mạnh' ? 'text-emerald-700' : analysis.marketView.momentum === 'Yếu' ? 'text-red-600' : 'text-zinc-600'}`}>
+                {analysis.marketView.momentum}
+              </p>
+            </div>
           </div>
 
           <div className="rounded-xl border border-zinc-100 px-3 py-2.5">
@@ -381,7 +400,7 @@ export function RankingTab({ ticker, company, allPoints, historyMax, historyMin,
           </div>
 
           <div>
-            <p className="mb-2 font-poppins text-sm font-semibold text-zinc-700">Luận giải điểm số</p>
+            <p className="mb-2 border-l-2 border-blue-400 pl-2 font-poppins text-sm font-semibold text-zinc-700">Luận giải điểm số</p>
             <div className="grid gap-px overflow-hidden rounded-xl border border-zinc-100 bg-zinc-100 sm:grid-cols-2">
               {([
                 ['governance', 'Quản trị'],
@@ -396,14 +415,17 @@ export function RankingTab({ ticker, company, allPoints, historyMax, historyMin,
                     <p className="text-xs font-semibold text-zinc-700">{label}</p>
                     <span className="text-xs font-bold tabular-nums text-blue-600">{analysis.scores[key].toFixed(1)}/10</span>
                   </div>
-                  <p className="mt-1 text-[11px] leading-4 text-zinc-500">{analysis.scoreRationales[key]}</p>
+                  <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-zinc-100">
+                    <div className="h-full rounded-full bg-blue-500 transition-all" style={{ width: `${analysis.scores[key] * 10}%` }} />
+                  </div>
+                  <p className="mt-1.5 text-[11px] leading-4 text-zinc-500">{analysis.scoreRationales[key]}</p>
                 </div>
               ))}
             </div>
           </div>
 
           <div>
-            <p className="mb-2 font-poppins text-sm font-semibold text-zinc-700">Trạng thái thị trường</p>
+            <p className="mb-2 border-l-2 border-blue-400 pl-2 font-poppins text-sm font-semibold text-zinc-700">Trạng thái thị trường</p>
             <div className="divide-y divide-zinc-100 rounded-xl border border-zinc-100 bg-white">
               {[
                 ['Vị trí giá', analysis.marketView.relativePosition],
@@ -439,7 +461,7 @@ export function RankingTab({ ticker, company, allPoints, historyMax, historyMin,
           </div>
 
           <div>
-            <p className="mb-2 font-poppins text-sm font-semibold text-zinc-700">Kịch bản định lượng</p>
+            <p className="mb-2 border-l-2 border-blue-400 pl-2 font-poppins text-sm font-semibold text-zinc-700">Kịch bản định lượng</p>
             <div className="overflow-hidden rounded-xl border border-zinc-100">
               <table className="w-full text-xs">
                 <thead>
@@ -480,15 +502,18 @@ export function RankingTab({ ticker, company, allPoints, historyMax, historyMin,
           </div>
 
           <div>
-            <p className="mb-2 font-poppins text-sm font-semibold text-zinc-700">Kế hoạch hành động theo thời hạn</p>
+            <p className="mb-2 border-l-2 border-blue-400 pl-2 font-poppins text-sm font-semibold text-zinc-700">Kế hoạch hành động theo thời hạn</p>
             <div className="grid gap-px overflow-hidden rounded-xl border border-zinc-100 bg-zinc-100 sm:grid-cols-3">
-              {[
-                ['1–4 tuần', analysis.actionPlan.shortTerm],
-                ['3–12 tháng', analysis.actionPlan.mediumTerm],
-                ['Trên 1 năm', analysis.actionPlan.longTerm],
-              ].map(([label, value]) => (
+              {([
+                { label: '1–4 tuần', value: analysis.actionPlan.shortTerm, dot: 'bg-blue-400' },
+                { label: '3–12 tháng', value: analysis.actionPlan.mediumTerm, dot: 'bg-amber-400' },
+                { label: 'Trên 1 năm', value: analysis.actionPlan.longTerm, dot: 'bg-emerald-400' },
+              ]).map(({ label, value, dot }) => (
                 <div key={label} className="bg-white p-3">
-                  <p className="text-xs font-semibold text-zinc-700">{label}</p>
+                  <div className="flex items-center gap-1.5">
+                    <span className={`size-1.5 rounded-full ${dot}`} />
+                    <p className="text-xs font-semibold text-zinc-700">{label}</p>
+                  </div>
                   <p className="mt-1 text-xs leading-5 text-zinc-600">{value}</p>
                 </div>
               ))}
@@ -527,7 +552,7 @@ export function RankingTab({ ticker, company, allPoints, historyMax, historyMin,
           {analysis.peers.length > 0 && (
             <div className="overflow-hidden rounded-xl border border-zinc-100">
               <div className="border-b border-zinc-100 bg-zinc-50/70 px-3 py-2">
-                <p className="font-poppins text-sm font-semibold text-zinc-700">Xếp hạng cổ phiếu ngành {analysis.sectorName}</p>
+                <p className="border-l-2 border-blue-400 pl-2 font-poppins text-sm font-semibold text-zinc-700">Xếp hạng cổ phiếu ngành {analysis.sectorName}</p>
                 <p className="text-[10px] text-zinc-400">AI ước tính tham khảo — không phải dữ liệu thị trường thời gian thực</p>
               </div>
               <div className="overflow-x-auto">
@@ -548,7 +573,7 @@ export function RankingTab({ ticker, company, allPoints, historyMax, historyMin,
                   </thead>
                   <tbody className="divide-y divide-zinc-50">
                     {[...analysis.peers].sort((a, b) => b.overallScore - a.overallScore).map((peer, i) => (
-                      <tr key={peer.ticker} className={peer.ticker === ticker ? 'bg-emerald-50/60' : undefined}>
+                      <tr key={peer.ticker} className={peer.ticker === ticker ? 'bg-emerald-50 font-medium' : 'hover:bg-zinc-50/60'}>
                         <td className="px-2 py-2 text-zinc-400">{i + 1}</td>
                         <td className="px-2 py-2">
                           <button type="button" onClick={() => onSelectTicker(peer.ticker)}
@@ -573,7 +598,7 @@ export function RankingTab({ ticker, company, allPoints, historyMax, historyMin,
           )}
 
           <div className="rounded-xl border border-zinc-100 p-3">
-            <p className="mb-2 font-poppins text-sm font-semibold text-zinc-700">Thang xếp hạng A / B / C / D là gì?</p>
+            <p className="mb-2 border-l-2 border-zinc-300 pl-2 font-poppins text-sm font-semibold text-zinc-500">Thang xếp hạng A / B / C / D là gì?</p>
             <div className="grid gap-2 sm:grid-cols-2">
               {(Object.keys(GRADE_STYLES) as StockAnalysis['grade'][]).map((grade) => (
                 <div key={grade} className="flex items-start gap-2">
