@@ -4,7 +4,7 @@ import { Resend } from 'resend'
 
 export const runtime = 'nodejs'
 
-const ALERT_THRESHOLD_PCT = 0 // TEMP: testing — revert to 5 after
+const ALERT_THRESHOLD_PCT = 5
 
 type PriceSnapshot = { close: number; pct_change: number }
 type AlertItem = { ticker: string; pct_change: number; price: number; direction: 'rise' | 'fall' }
@@ -51,20 +51,20 @@ async function sendTeamsAlert(alerts: AlertItem[]) {
           type: 'AdaptiveCard',
           version: '1.4',
           body: [
-            { type: 'TextBlock', text: '📊 Cảnh báo giá cổ phiếu', size: 'Large', weight: 'Bolder' },
+            { type: 'TextBlock', text: 'Cảnh báo giá cổ phiếu', size: 'Large', weight: 'Bolder' },
             {
               type: 'TextBlock',
               text: `Biến động ≥ ${ALERT_THRESHOLD_PCT}% so với phiên trước`,
               isSubtle: true,
               size: 'Small',
+              spacing: 'None',
             },
-            {
-              type: 'FactSet',
-              facts: alerts.map((a) => ({
-                name: a.ticker,
-                value: `${a.direction === 'rise' ? '▲' : '▼'} ${Math.abs(a.pct_change).toFixed(2)}% — ${new Intl.NumberFormat('vi-VN').format(a.price)}đ`,
-              })),
-            },
+            ...alerts.map((a) => ({
+              type: 'TextBlock',
+              text: `**${a.ticker}**  ${a.direction === 'rise' ? '▲' : '▼'} ${Math.abs(a.pct_change).toFixed(2)}%  —  ${new Intl.NumberFormat('vi-VN').format(a.price)}đ`,
+              color: a.direction === 'rise' ? 'Good' : 'Attention',
+              spacing: 'Small',
+            })),
           ],
         },
       }],
