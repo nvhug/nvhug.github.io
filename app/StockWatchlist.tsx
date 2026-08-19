@@ -1,15 +1,24 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Plus, RefreshCw, Sparkles, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
-import { getSuggestedTickers, getUpsidePct, MIN_SUGGESTION_UPSIDE_PCT, type SuggestedTicker } from './stockSuggestions'
+import { getUpsidePct, type SuggestedTicker } from './stockSuggestions'
 import { fmt } from './stockChartUtils'
 import { type PriceData, type WatchRow } from './stockTypes'
 
 // localStorage key kept as migration fallback only
 const WATCH_KEY = 'stock-watchlist-v1'
+const SCREENER_TICKERS_KEY = 'stock-screener-tickers-v1'
+
+function parseScreenerTickers(value: string): string[] {
+  return [...new Set(value
+    .split(/[\s,;]+/)
+    .map((ticker) => ticker.trim().toUpperCase())
+    .filter((ticker) => /^[A-Z0-9]{2,5}$/.test(ticker)))]
+    .slice(0, 50)
+}
 
 function activateOnEnterOrSpace(handler: () => void) {
   return (event: React.KeyboardEvent) => {
@@ -118,11 +127,9 @@ function SuggestionCard({ suggestion, onAdd, onSelect, disabled }: {
 
 // ── Watchlist section ──────────────────────────────────────────
 export function WatchlistSection({
-  onSuggestionsChange,
   onWatchlistActionChange,
   onSelectTicker,
 }: {
-  onSuggestionsChange?: (list: SuggestedTicker[]) => void
   onWatchlistActionChange?: (addTicker: (ticker: string) => void) => void
   onSelectTicker?: (ticker: string) => void
 }) {
@@ -136,18 +143,6 @@ export function WatchlistSection({
   const inputRef = useRef<HTMLInputElement>(null)
   const addTickerRef = useRef<(ticker: string) => void>(() => undefined)
 
-  const baseSuggestions = useMemo(() => getSuggestedTickers(rows.map((r) => r.ticker)), [rows])
-  const suggestions = useMemo(() => baseSuggestions
-    .map((suggestion) => ({
-      ...suggestion,
-      currentPrice: prices[suggestion.ticker]?.close ?? suggestion.currentPrice,
-    }))
-    .filter((suggestion) => getUpsidePct(suggestion) >= MIN_SUGGESTION_UPSIDE_PCT), [baseSuggestions, prices])
-
-  useEffect(() => {
-    onSuggestionsChange?.(suggestions)
-  }, [suggestions, onSuggestionsChange])
-
   useEffect(() => {
     onWatchlistActionChange?.((ticker) => { addTickerRef.current(ticker) })
   }, [onWatchlistActionChange])
@@ -155,7 +150,7 @@ export function WatchlistSection({
   const fetchPrices = useCallback(async (list: string[]) => {
     if (list.length === 0) return
     try {
-      const res = await fetch(`/api/stock-price?tickers=${list.join(',')}`)
+      const res = await fetch(`/api/stock-price?tickers=${list.join(',')}&_ts=${Date.now()}`, { cache: 'no-store' })
       if (res.ok) {
         const data = await res.json() as Record<string, PriceData>
         setPrices((prev) => ({ ...prev, ...data }))
@@ -203,12 +198,6 @@ export function WatchlistSection({
   useEffect(() => {
     if (showInput) setTimeout(() => inputRef.current?.focus(), 50)
   }, [showInput])
-
-  useEffect(() => {
-    // Network refresh intentionally updates the price state asynchronously.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (baseSuggestions.length > 0) fetchPrices(baseSuggestions.map((suggestion) => suggestion.ticker))
-  }, [baseSuggestions, fetchPrices])
 
   async function addTicker(nextTicker?: string) {
     const t = (nextTicker ?? input).trim().toUpperCase()
@@ -318,31 +307,170 @@ export function WatchlistSection({
 }
 
 // ── Sector suggestions section ─────────────────────────────────
-export function SuggestionsSection({ suggestions, onAdd, onSelect }: {
-  suggestions: SuggestedTicker[]
+export function SuggestionsSection({ onAdd, onSelect }: {
   onAdd: (ticker: string) => void
   onSelect: (ticker: string) => void
 }) {
-  if (suggestions.length === 0) return null
+  const [suggestions, setSuggestions] = useState<SuggestedTicker[]>([])
+  const [generatedAt, setGeneratedAt] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+  const [generating, setGenerating] = useState(false)
+  const [screenerTickers, setScreenerTickers] = useState<string[]>([])
+  const [tickerDraft, setTickerDraft] = useState('')
+  const [tickerCount, setTickerCount] = useState(0)
+  const [showTickerSettings, setShowTickerSettings] = useState(false)
+
+  async function loadCache() {
+    const res = await fetch('/api/stock-suggestions')
+    if (!res.ok) return
+    const data = await res.json() as { suggestions: SuggestedTicker[]; generatedAt: string | null; tickerCount?: number; screenerTickers?: string[] }
+    setSuggestions(data.suggestions ?? [])
+    setGeneratedAt(data.generatedAt ?? null)
+    const saved = window.localStorage.getItem(SCREENER_TICKERS_KEY)
+    let tickers = data.screenerTickers ?? []
+    if (saved) {
+      try {
+        const savedTickers = JSON.parse(saved) as unknown
+        if (Array.isArray(savedTickers)) tickers = parseScreenerTickers(savedTickers.join(' '))
+      } catch { /* use server defaults */ }
+    }
+    setScreenerTickers(tickers)
+    setTickerDraft(tickers.join(', '))
+    setTickerCount(data.tickerCount ?? tickers.length)
+  }
+
+  useEffect(() => {
+    setLoading(true)
+    loadCache().finally(() => setLoading(false))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  async function handleRefresh() {
+    setRefreshing(true)
+    try { await loadCache() } finally { setRefreshing(false) }
+  }
+
+  async function handleGenerate() {
+    setGenerating(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('/api/stock-suggestions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
+        body: JSON.stringify({ tickers: screenerTickers }),
+      })
+      const data = await res.json() as { suggestions?: SuggestedTicker[]; error?: string }
+      if (!res.ok) { toast.error(data.error ?? 'Không tạo được gợi ý'); return }
+      setSuggestions(data.suggestions ?? [])
+      setGeneratedAt(new Date().toISOString())
+      setTickerCount(screenerTickers.length)
+      toast.success('Đã tạo gợi ý mới từ AI')
+    } catch {
+      toast.error('Lỗi kết nối')
+    } finally {
+      setGenerating(false)
+    }
+  }
+
+  function saveScreenerTickers() {
+    const tickers = parseScreenerTickers(tickerDraft)
+    if (tickers.length < 5) {
+      toast.error('Cần ít nhất 5 mã hợp lệ')
+      return
+    }
+    setScreenerTickers(tickers)
+    setTickerDraft(tickers.join(', '))
+    setTickerCount(tickers.length)
+    window.localStorage.setItem(SCREENER_TICKERS_KEY, JSON.stringify(tickers))
+    toast.success(`Đã lưu danh sách ${tickers.length} mã`)
+  }
+
+  if (loading) {
+    return (
+      <div className="rounded-2xl border border-amber-100 bg-white p-4">
+        <div className="mb-3 flex items-center gap-2">
+          <Sparkles className="size-3.5 text-amber-400" />
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">Gợi ý tiềm năng</p>
+        </div>
+        <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-5">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="h-36 animate-pulse rounded-xl bg-zinc-100" />
+          ))}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="rounded-2xl border border-amber-100 bg-white p-4 shadow-[0_8px_24px_-8px_rgba(251,191,36,0.2)]">
       <div className="mb-3 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <Sparkles className="size-3.5 text-amber-500" />
           <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">Gợi ý tiềm năng</p>
+          <button type="button" onClick={handleRefresh} disabled={refreshing || generating}
+            title="Làm mới"
+            className="text-zinc-400 transition-colors hover:text-zinc-600 disabled:opacity-50">
+            <RefreshCw className={`size-3 ${refreshing ? 'animate-spin' : ''}`} />
+          </button>
         </div>
-        <span className="text-[10px] text-zinc-400">Gợi ý mẫu, không phải lời khuyên đầu tư</span>
+        <div className="flex items-center gap-2">
+          {generatedAt && (
+            <span className="hidden text-[10px] text-zinc-400 sm:inline">
+              {new Date(generatedAt).toLocaleDateString('vi-VN')}
+            </span>
+          )}
+          <button type="button" onClick={handleGenerate} disabled={generating || refreshing}
+            className="inline-flex items-center gap-1 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-semibold text-amber-700 transition-colors hover:bg-amber-100 disabled:opacity-50">
+            {generating ? <RefreshCw className="size-3 animate-spin" /> : <Sparkles className="size-3" />}
+            {generating ? 'Đang phân tích...' : 'Tạo AI mới'}
+          </button>
+        </div>
       </div>
-      <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-5">
-        {suggestions.map((suggestion) => (
-          <SuggestionCard
-            key={suggestion.ticker}
-            suggestion={suggestion}
-            onAdd={() => onAdd(suggestion.ticker)}
-            onSelect={() => onSelect(suggestion.ticker)}
-          />
-        ))}
+
+      <div className="mb-3 rounded-xl border border-zinc-100 bg-zinc-50/70 p-3">
+        <button type="button" onClick={() => setShowTickerSettings((open) => !open)}
+          className="flex w-full items-center justify-between text-left text-xs font-semibold text-zinc-600">
+          <span>Danh sách mã phân tích ({screenerTickers.length}/50) · lần gần nhất: {tickerCount} mã</span>
+          <span className="text-emerald-700">{showTickerSettings ? 'Thu gọn' : 'Xem và chỉnh sửa'}</span>
+        </button>
+        {showTickerSettings && (
+          <div className="mt-3 space-y-2">
+            <textarea value={tickerDraft} onChange={(event) => setTickerDraft(event.target.value)} rows={3}
+              className="w-full resize-y rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs uppercase text-zinc-700 outline-none ring-emerald-200 focus:ring-2"
+              aria-label="Danh sách mã cổ phiếu phân tích" />
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[10px] text-zinc-400">Nhập mã cách nhau bằng dấu phẩy hoặc khoảng trắng. Tối đa 50 mã.</p>
+              <button type="button" onClick={saveScreenerTickers}
+                className="shrink-0 rounded-lg bg-emerald-600 px-3 py-1.5 text-[10px] font-semibold text-white hover:bg-emerald-700">
+                Lưu danh sách
+              </button>
+            </div>
+          </div>
+        )}
       </div>
+
+      {suggestions.length === 0 ? (
+        <div className="flex flex-col items-center gap-2 py-8 text-center">
+          <Sparkles className="size-8 text-amber-200" />
+          <p className="text-sm text-zinc-500">Chưa có gợi ý nào.</p>
+          <p className="text-xs text-zinc-400">Nhấn <strong>Tạo AI mới</strong> để phân tích danh sách mã bên trên.</p>
+        </div>
+      ) : (
+        <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-5">
+          {suggestions.map((suggestion) => (
+            <SuggestionCard
+              key={suggestion.ticker}
+              suggestion={suggestion}
+              onAdd={() => onAdd(suggestion.ticker)}
+              onSelect={() => onSelect(suggestion.ticker)}
+            />
+          ))}
+        </div>
+      )}
     </div>
   )
 }

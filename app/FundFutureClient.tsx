@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { CheckCircle2, ChevronDown, ChevronUp, Circle, Landmark, Mail, Pencil, Plus, RefreshCw, Trash2, TrendingDown, TrendingUp, Users, WalletCards, X } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { toast } from 'sonner'
@@ -15,6 +15,14 @@ import { supabase } from '@/lib/supabase'
 
 type AssetType = 'gold' | 'cash' | 'bank' | 'other'
 type DeleteTarget = { table: string; id: string } | null
+type FundTab = 'fund' | 'stocks'
+
+function getTabFromUrl(): FundTab {
+  if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('tab') === 'stocks') {
+    return 'stocks'
+  }
+  return 'fund'
+}
 
 type AssetSuggestion = {
   name: string
@@ -333,7 +341,21 @@ export default function FundFutureClient() {
   const [borrowings, setBorrowings] = useState<FundBorrowing[]>([])
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget>(null)
   const [saving, setSaving] = useState(false)
-  const [activeTab, setActiveTab] = useState<'fund' | 'stocks'>('fund')
+  const activeTab = useSyncExternalStore((onStoreChange) => {
+    window.addEventListener('popstate', onStoreChange)
+    return () => window.removeEventListener('popstate', onStoreChange)
+  }, getTabFromUrl, () => 'fund')
+
+  function selectTab(tab: FundTab) {
+    const url = new URL(window.location.href)
+    if (tab === 'fund') {
+      url.searchParams.delete('tab')
+    } else {
+      url.searchParams.set('tab', tab)
+    }
+    window.history.pushState({}, '', `${url.pathname}${url.search}${url.hash}`)
+    window.dispatchEvent(new PopStateEvent('popstate'))
+  }
 
   const [assetFormOpen, setAssetFormOpen] = useState(false)
   const [assetId, setAssetId] = useState<string | null>(null)
@@ -876,7 +898,7 @@ export default function FundFutureClient() {
             <button
               key={tab}
               type="button"
-              onClick={() => setActiveTab(tab)}
+              onClick={() => selectTab(tab)}
               className={`flex-1 rounded-lg py-2 text-sm font-semibold transition-all ${activeTab === tab ? 'bg-white text-emerald-700 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'}`}
             >
               {tab === 'fund' ? (vi ? 'Quỹ Tương Lai' : 'Fund') : '📈 Cổ phiếu'}

@@ -5,7 +5,6 @@ import { AlertCircle, BarChart2, Pencil, Plus, RefreshCw, Trash2, X } from 'luci
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import { ConfirmModal } from '@/components/ui/confirm-modal'
-import { type SuggestedTicker } from './stockSuggestions'
 import { compact, fmt, pnlCls } from './stockChartUtils'
 import { type PriceData, type SortDir, type SortKey, type StockHolding } from './stockTypes'
 import { DonutChart, SortableHeader, StatCard } from './StockUiPrimitives'
@@ -28,7 +27,6 @@ export function StocksPortfolio() {
   const [deleteTarget, setDeleteTarget] = useState<StockHolding | null>(null)
   const [detailTarget, setDetailTarget] = useState<{ ticker: string; company: string | null } | null>(null)
   const [saving, setSaving] = useState(false)
-  const [suggestions, setSuggestions] = useState<SuggestedTicker[]>([])
   const [addToWatchlist, setAddToWatchlist] = useState<(ticker: string) => void>(() => () => undefined)
   const registerWatchlistAction = useCallback((action: (ticker: string) => void) => {
     setAddToWatchlist(() => action)
@@ -62,7 +60,7 @@ export function StocksPortfolio() {
     setFetchingPrices(true)
     setPriceError(false)
     try {
-      const res = await fetch(`/api/stock-price?tickers=${tickers.join(',')}`)
+      const res = await fetch(`/api/stock-price?tickers=${tickers.join(',')}&_ts=${Date.now()}`, { cache: 'no-store' })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
       setPrices(data as Record<string, PriceData>)
@@ -210,7 +208,6 @@ export function StocksPortfolio() {
 
       {/* Watchlist */}
       <WatchlistSection
-        onSuggestionsChange={setSuggestions}
         onWatchlistActionChange={registerWatchlistAction}
         onSelectTicker={(ticker) => setDetailTarget({ ticker, company: null })}
       />
@@ -406,7 +403,6 @@ export function StocksPortfolio() {
       )}
 
       <SuggestionsSection
-        suggestions={suggestions}
         onAdd={(ticker) => addToWatchlist(ticker)}
         onSelect={(ticker) => setDetailTarget({ ticker, company: null })}
       />
