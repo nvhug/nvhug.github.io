@@ -1,11 +1,11 @@
 import type { Metadata } from 'next'
-import FundFutureClient from './FundFutureClient'
+import NotesPage from './notes/page'
 
 export const metadata: Metadata = {
-  title: 'Quỹ Tương Lai',
-  description: 'Trang quỹ chung cho đầu tư, dự phòng, nợ vay và phân tích tài sản.',
+  title: 'Notes',
+  description: 'Không gian ghi chú, công việc, mục tiêu và theo dõi cá nhân.',
 }
 
 export default function Home() {
-  return <FundFutureClient />
+  return <NotesPage />
 }

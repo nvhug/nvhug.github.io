@@ -19,8 +19,9 @@ export const vi = {
 
   header: {
     navHome: 'Trang chủ',
-    navBlog: 'Blog',
-    navNotes: 'Notes',
+    navBlog: 'Bài viết',
+    navNotes: 'Sổ tay',
+    navFinance: 'Sổ tài chính',
     navQuotes: 'Quotes',
     admin: 'Quản trị',
     profile: 'Hồ sơ',
@@ -29,7 +30,7 @@ export const vi = {
   },
 
   footer: {
-    copyright: '© 2026 nvhug. Chia sẻ ý tưởng và những điều học được mỗi ngày.',
+    copyright: '© 2026 nvhug. Những điều đáng để ghi lại.',
   },
 
   home: {
@@ -41,6 +42,7 @@ export const vi = {
     pageIndicator: 'Trang {current} / {total}',
     noArticlesFound: 'Không tìm thấy bài viết nào.',
     noArticlesYet: 'Chưa có bài viết nào được đăng.',
+    createArticle: 'Tạo bài viết',
     writeFirstArticle: 'Viết bài đầu tiên →',
     previous: '← Trước',
     next: 'Tiếp →',

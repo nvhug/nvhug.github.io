@@ -862,7 +862,7 @@ export default function FundFutureClient() {
           <div className="mx-auto mb-5 flex size-14 items-center justify-center rounded-2xl bg-emerald-600 text-white">
             <Landmark className="size-7" />
           </div>
-          <h1 className="text-xl font-semibold text-zinc-900">Quỹ Tương Lai</h1>
+          <h1 className="text-xl font-semibold text-zinc-900">Sổ tài chính</h1>
           <p className="mt-2 text-sm text-zinc-500">
             {vi ? 'Theo dõi tài sản, giao dịch và khoản nợ cá nhân.' : 'Track your personal assets, transactions and loans.'}
           </p>
@@ -887,7 +887,7 @@ export default function FundFutureClient() {
             <Landmark className="size-5" />
           </div>
           <div>
-            <h1 className="text-base font-semibold text-zinc-900">{vi ? 'Quỹ Tương Lai' : 'Personal Fund'}</h1>
+            <h1 className="text-base font-semibold text-zinc-900">{vi ? 'Sổ tài chính' : 'Finance Ledger'}</h1>
             <p className="text-xs text-zinc-500">{vi ? 'Tài sản cá nhân' : 'Personal assets'}</p>
           </div>
         </header>
@@ -901,7 +901,7 @@ export default function FundFutureClient() {
               onClick={() => selectTab(tab)}
               className={`flex-1 rounded-lg py-2 text-sm font-semibold transition-all ${activeTab === tab ? 'bg-white text-emerald-700 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'}`}
             >
-              {tab === 'fund' ? (vi ? 'Quỹ Tương Lai' : 'Fund') : '📈 Cổ phiếu'}
+              {tab === 'fund' ? (vi ? 'Tài sản' : 'Assets') : (vi ? '📈 Đầu tư' : '📈 Investments')}
             </button>
           ))}
         </div>

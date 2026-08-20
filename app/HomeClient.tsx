@@ -104,8 +104,8 @@ export default function HomeClient({
           </div>
 
           <div className="mt-5 space-y-2">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="flex flex-wrap items-center gap-2">
+            <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
                 <button
                   onClick={() => setSelectedTag('all')}
                   className={`rounded-md border px-3 py-1 text-sm font-medium transition-colors ${
@@ -131,24 +131,32 @@ export default function HomeClient({
                     </button>
                   )
                 })}
+                <div className="flex w-full flex-wrap items-center gap-2">
+                  <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
+                    {t('home.articleCount', { count: filteredPosts.length })}
+                  </span>
+                  {totalPages > 1 && (
+                    <span className="rounded-full border border-zinc-200 bg-white px-2.5 py-0.5 text-xs font-medium text-zinc-600">
+                      {t('home.pageIndicator', { current: currentPage, total: totalPages })}
+                    </span>
+                  )}
+                </div>
               </div>
-              <input
-                type="text"
-                placeholder={t('home.searchPlaceholder')}
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="h-8 w-full rounded-lg border border-emerald-200 bg-emerald-50/60 px-3 text-sm text-zinc-900 outline-none transition-colors placeholder:text-zinc-400 focus-visible:border-emerald-500 sm:w-auto"
-              />
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
-                {t('home.articleCount', { count: filteredPosts.length })}
-              </span>
-              {totalPages > 1 && (
-                <span className="rounded-full border border-zinc-200 bg-white px-2.5 py-0.5 text-xs font-medium text-zinc-600">
-                  {t('home.pageIndicator', { current: currentPage, total: totalPages })}
-                </span>
-              )}
+              <div className="flex w-full flex-col items-end gap-2.5 sm:w-auto">
+                <input
+                  type="text"
+                  placeholder={t('home.searchPlaceholder')}
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="h-8 min-w-0 flex-1 rounded-lg border border-emerald-200 bg-emerald-50/60 px-3 text-sm text-zinc-900 outline-none transition-colors placeholder:text-zinc-400 focus-visible:border-emerald-500 sm:w-44 sm:flex-none"
+                />
+                <Link
+                  href="/admin/create"
+                  className="inline-flex h-8 items-center justify-center rounded-lg border border-emerald-200 bg-white px-3 text-sm font-semibold text-emerald-700 shadow-sm transition-all hover:-translate-y-px hover:border-emerald-300 hover:bg-emerald-50 hover:shadow-md"
+                >
+                  {t('home.createArticle')}
+                </Link>
+              </div>
             </div>
           </div>
         </div>

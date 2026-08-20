@@ -23,6 +23,7 @@ export const en: Dictionary = {
     navHome: 'Home',
     navBlog: 'Blog',
     navNotes: 'Notes',
+    navFinance: 'Finance Ledger',
     navQuotes: 'Quotes',
     admin: 'Admin',
     profile: 'Profile',
@@ -31,7 +32,7 @@ export const en: Dictionary = {
   },
 
   footer: {
-    copyright: '© 2026 nvhug. Sharing ideas and everyday learning.',
+    copyright: '© 2026 nvhug. Everything Worth Noting.',
   },
 
   home: {
@@ -43,6 +44,7 @@ export const en: Dictionary = {
     pageIndicator: 'Page {current} / {total}',
     noArticlesFound: 'No articles found.',
     noArticlesYet: 'No articles published yet.',
+    createArticle: 'Create article',
     writeFirstArticle: 'Write your first article →',
     previous: '← Previous',
     next: 'Next →',

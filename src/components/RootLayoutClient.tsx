@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { BookOpen, Home, LogOut, NotebookPen, Quote, Settings, User as UserIcon, type LucideIcon } from 'lucide-react'
+import { BookOpen, Home, LogOut, NotebookPen, Quote, Settings, WalletCards, User as UserIcon, type LucideIcon } from 'lucide-react'
 import { Toaster } from 'sonner'
 import { useEffect, useRef, useState } from 'react'
 import { getSupabaseBrowserClient } from '@/lib/supabase-browser'
@@ -147,6 +147,7 @@ export function RootLayoutClient({ children }: { children: React.ReactNode }) {
 
   const navItems = [
     { href: '/notes', label: t('header.navNotes'), icon: NotebookPen },
+    { href: '/finance', label: t('header.navFinance'), icon: WalletCards },
     { href: '/blog', label: t('header.navBlog'), icon: BookOpen },
     { href: '/quotes', label: t('header.navQuotes'), icon: Quote },
   ]
@@ -172,7 +173,7 @@ export function RootLayoutClient({ children }: { children: React.ReactNode }) {
                   <span className="hidden sm:inline">nvhug</span>
                 </Link>
 
-                <div className="grid min-w-0 flex-1 grid-cols-3 gap-1.5 sm:hidden">
+                <div className="grid min-w-0 flex-1 grid-cols-4 gap-1.5 sm:hidden">
                   {navItems.map((item) => {
                     const isActive = pathname.startsWith(item.href)
                     return (
