@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Resend } from 'resend'
 import { sendTeamsCard, getServiceSupabaseClient } from '@/lib/notify'
+import { createSupabaseServerClient } from '@/lib/supabase-server'
 
 const RESEND_API_KEY    = process.env.RESEND_API_KEY
 const TO_EMAIL          = process.env.BUG_REPORT_TO_EMAIL
@@ -51,11 +52,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'not configured' }, { status: 500 })
   }
 
-  const { userName = '', userEmail = '', ts = '', userId = '' } = await request.json().catch(() => ({})) as {
+  const supabaseAuth = await createSupabaseServerClient()
+  const { data: { user } } = await supabaseAuth.auth.getUser()
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const { userName = '', userEmail = '', ts = '' } = await request.json().catch(() => ({})) as {
     userName?: string
     userEmail?: string
     ts?: string
-    userId?: string
   }
 
   const resend = new Resend(RESEND_API_KEY)
@@ -83,9 +89,9 @@ export async function POST(request: NextRequest) {
     }],
   })
 
-  if (userId) {
+  if (user.id) {
     const supabase = getServiceSupabaseClient()
-    await supabase.from('user_profiles').update({ role: 'paid' }).eq('id', userId)
+    await supabase.from('user_profiles').update({ role: 'paid' }).eq('id', user.id)
   }
 
   return NextResponse.json({ success: true })
