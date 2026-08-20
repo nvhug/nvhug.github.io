@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
+import { checkAITrialQuota, incrementAITrialUsage, trialExhaustedBody } from '@/lib/ai-trial'
 
 const suggestedTickerSchema = z.object({
   ticker: z.string().min(1),
@@ -143,16 +144,42 @@ export async function GET() {
 export async function POST(request: Request) {
   const authHeader = request.headers.get('Authorization')
   const secret = process.env.ALERT_SECRET
-  let isAuthorized = !!(secret && authHeader === `Bearer ${secret}`)
+  const isCronCall = !!(secret && authHeader === `Bearer ${secret}`)
+
+  let isAuthorized = isCronCall
+  let callerUserId: string | null = null
+  let callerRole: string = 'user'
 
   if (!isAuthorized && authHeader?.startsWith('Bearer ')) {
     const token = authHeader.slice(7)
     const { data: { user } } = await adminClient().auth.getUser(token)
-    isAuthorized = !!user
+    if (user) {
+      isAuthorized = true
+      callerUserId = user.id
+      const supabase = adminClient()
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('role')
+        .eq('id', user.id)
+        .maybeSingle()
+      callerRole = profile?.role ?? 'user'
+    }
   }
 
   if (!isAuthorized) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  // Cron calls are exempt from trial quota; user-triggered calls are not
+  if (!isCronCall && callerUserId) {
+    const supabase = adminClient()
+    const quota = await checkAITrialQuota(supabase, callerUserId, 'stock_suggestions', callerRole)
+    if (!quota.allowed) {
+      return NextResponse.json(
+        trialExhaustedBody('stock_suggestions', quota.used, quota.limit),
+        { status: 402 },
+      )
+    }
   }
 
   let requestedTickers: unknown
@@ -296,6 +323,11 @@ Trả về CHỈ JSON hợp lệ (không markdown, không giải thích):
 
   if (insertError) {
     return NextResponse.json({ error: insertError.message }, { status: 500 })
+  }
+
+  // Increment trial usage for user-triggered calls (cron is exempt)
+  if (!isCronCall && callerUserId && callerRole !== 'admin' && callerRole !== 'paid') {
+    await incrementAITrialUsage(adminClient(), callerUserId, 'stock_suggestions')
   }
 
   // Keep only the latest 10 rows

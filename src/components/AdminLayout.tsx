@@ -5,6 +5,7 @@ import {
   BarChart3,
   ArrowUpRight,
   ChevronDown,
+  CreditCard,
   FileText,
   LayoutTemplate,
   LogOut,
@@ -68,6 +69,7 @@ export function AdminSidebar() {
     { title: t('admin.settings.usersTab'), href: '/admin/settings', icon: Users },
     { title: t('admin.settings.pagesTab'), href: '/admin/settings/pages', icon: Shield },
     { title: t('admin.settings.nutritionTab'), href: '/admin/settings/nutrition-qa', icon: BarChart3 },
+    { title: 'Nâng cấp', href: '/admin/settings/upgrades', icon: CreditCard },
   ]
   const isSettingsActive = pathname.startsWith('/admin/settings')
 

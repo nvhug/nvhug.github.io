@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AlertCircle, RefreshCw, Sparkles } from 'lucide-react'
 import { filterByRange, formatDateTime, pctChangeForRange } from './stockChartUtils'
 import { type DailyPricePoint } from './stockTypes'
+import { AITrialExhaustedModal, type AITrialExhaustedInfo } from '@/components/ui/ai-trial-exhausted-modal'
 
 type StockAnalysisStats = {
   currentPrice: number
@@ -110,6 +111,7 @@ export function RankingTab({ ticker, company, allPoints, historyMax, historyMin,
   active: boolean
   onSelectTicker: (ticker: string) => void
 }) {
+  const [trialExhausted, setTrialExhausted] = useState<AITrialExhaustedInfo | null>(null)
   const [analysis, setAnalysis] = useState<StockAnalysis | null>(null)
   const [analyzing, setAnalyzing] = useState(false)
   const [loadingSaved, setLoadingSaved] = useState(false)
@@ -180,6 +182,10 @@ export function RankingTab({ ticker, company, allPoints, historyMax, historyMin,
       })
       const data = await res.json()
       if (!res.ok) {
+        if (res.status === 402 && data?.trialExhausted) {
+          setTrialExhausted({ feature: data.feature, used: data.used, limit: data.limit })
+          return
+        }
         if (data?.analysis) setAnalysis(data.analysis as StockAnalysis)
         if (data?.nextAnalyzeAt) setNextAnalyzeAt(data.nextAnalyzeAt as string)
         if (typeof data?.canAnalyze === 'boolean') setCanAnalyze(data.canAnalyze)
@@ -235,28 +241,30 @@ export function RankingTab({ ticker, company, allPoints, historyMax, historyMin,
   ] as const
 
   return (
+    <>
+    <AITrialExhaustedModal
+      open={!!trialExhausted}
+      info={trialExhausted}
+      onClose={() => setTrialExhausted(null)}
+    />
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-zinc-200 bg-zinc-50/60 px-4 py-3">
         <div>
           <p className="font-poppins text-sm font-semibold text-zinc-700">Xếp hạng cơ bản {ticker}</p>
           <p className="mt-0.5 text-[11px] text-zinc-400">Chỉ hiển thị các tiêu chí có dữ liệu quan sát được; các chỉ số tài chính/giao dịch không có nguồn chứng thực sẽ là N/A.</p>
         </div>
-        <button type="button" onClick={runAnalysis} disabled={analyzing || loadingSaved || !stats || !canAnalyze}
-          title={!canAnalyze && nextAnalyzeAt ? `Có thể phân tích lại từ ${formatDateTime(nextAnalyzeAt)}` : undefined}
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50">
-          {analyzing ? <RefreshCw className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />}
-          {analyzing
-            ? 'Đang phân tích...'
-            : !canAnalyze && nextAnalyzeAt
-              ? `Mở lại ${new Intl.DateTimeFormat('vi-VN').format(new Date(nextAnalyzeAt))}`
-              : analysis ? 'Phân tích lại' : 'Phân tích bằng AI'}
-        </button>
+        {(canAnalyze || analyzing) && (
+          <button type="button" onClick={runAnalysis} disabled={analyzing || loadingSaved || !stats}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50">
+            {analyzing ? <RefreshCw className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />}
+            {analyzing ? 'Đang phân tích...' : analysis ? 'Phân tích lại' : 'Phân tích bằng AI'}
+          </button>
+        )}
       </div>
 
-      {(analyzedAt || nextAnalyzeAt) && (
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-zinc-50 px-3 py-2 text-[11px] text-zinc-500">
-          <span>{analyzedAt ? `Đã phân tích: ${formatDateTime(analyzedAt)}` : ''}</span>
-          <span>{canAnalyze ? 'Có thể cập nhật báo cáo' : `Có thể phân tích lại từ ${formatDateTime(nextAnalyzeAt!)}`}</span>
+      {analyzedAt && (
+        <div className="flex flex-wrap items-center gap-2 rounded-lg bg-zinc-50 px-3 py-2 text-[11px] text-zinc-500">
+          <span>Đã phân tích: {formatDateTime(analyzedAt)}</span>
         </div>
       )}
 
@@ -276,10 +284,12 @@ export function RankingTab({ ticker, company, allPoints, historyMax, historyMin,
         <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-zinc-200 py-16 text-center">
           <Sparkles className="size-8 text-zinc-300" />
           <p className="text-sm text-zinc-400">Chưa có báo cáo đã lưu cho {ticker}.</p>
-          <button type="button" onClick={runAnalysis} disabled={!stats || !canAnalyze}
-            className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">
-            Phân tích bằng AI
-          </button>
+          {canAnalyze && (
+            <button type="button" onClick={runAnalysis} disabled={!stats}
+              className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">
+              Phân tích bằng AI
+            </button>
+          )}
         </div>
       )}
 
@@ -544,7 +554,7 @@ export function RankingTab({ ticker, company, allPoints, historyMax, historyMin,
                 <p className="text-[10px] text-zinc-400">AI ước tính tham khảo — không phải dữ liệu thị trường thời gian thực</p>
               </div>
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[640px] text-xs">
+                <table className="w-full min-w-160 text-xs">
                   <thead>
                     <tr className="border-b border-zinc-100">
                       <th className="px-2 py-2 text-left font-semibold text-zinc-400">STT</th>
@@ -600,5 +610,6 @@ export function RankingTab({ ticker, company, allPoints, historyMax, historyMin,
         </>
       )}
     </div>
+    </>
   )
 }

@@ -7,6 +7,8 @@ import { supabase } from '@/lib/supabase'
 import { getUpsidePct, type SuggestedTicker } from './stockSuggestions'
 import { fmt } from './stockChartUtils'
 import { type PriceData, type WatchRow } from './stockTypes'
+import { AITrialExhaustedModal, type AITrialExhaustedInfo } from '@/components/ui/ai-trial-exhausted-modal'
+import { useUserRole } from '@/lib/useUserRole'
 
 // localStorage key kept as migration fallback only
 const WATCH_KEY = 'stock-watchlist-v1'
@@ -309,6 +311,9 @@ export function SuggestionsSection({ onAdd, onSelect }: {
   onAdd: (ticker: string) => void
   onSelect: (ticker: string) => void
 }) {
+  const { role } = useUserRole()
+  const isAdmin = role === 'admin'
+  const [trialExhausted, setTrialExhausted] = useState<AITrialExhaustedInfo | null>(null)
   const [suggestions, setSuggestions] = useState<SuggestedTicker[]>([])
   const [generatedAt, setGeneratedAt] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -361,8 +366,15 @@ export function SuggestionsSection({ onAdd, onSelect }: {
         },
         body: JSON.stringify({ tickers: screenerTickers }),
       })
-      const data = await res.json() as { suggestions?: SuggestedTicker[]; error?: string }
-      if (!res.ok) { toast.error(data.error ?? 'Không tạo được gợi ý'); return }
+      const data = await res.json() as { suggestions?: SuggestedTicker[]; error?: string; trialExhausted?: boolean; feature?: string; used?: number; limit?: number }
+      if (!res.ok) {
+        if (res.status === 402 && data.trialExhausted) {
+          setTrialExhausted({ feature: data.feature ?? 'stock_suggestions', used: data.used ?? 0, limit: data.limit ?? 0 })
+        } else {
+          toast.error(data.error ?? 'Không tạo được gợi ý')
+        }
+        return
+      }
       setSuggestions(data.suggestions ?? [])
       setGeneratedAt(new Date().toISOString())
       setTickerCount(screenerTickers.length)
@@ -404,6 +416,12 @@ export function SuggestionsSection({ onAdd, onSelect }: {
   }
 
   return (
+    <>
+    <AITrialExhaustedModal
+      open={!!trialExhausted}
+      info={trialExhausted}
+      onClose={() => setTrialExhausted(null)}
+    />
     <div className="rounded-2xl border border-amber-100 bg-white p-4 shadow-[0_8px_24px_-8px_rgba(251,191,36,0.2)]">
       <div className="mb-3 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
@@ -421,41 +439,45 @@ export function SuggestionsSection({ onAdd, onSelect }: {
               {new Date(generatedAt).toLocaleDateString('vi-VN')}
             </span>
           )}
-          <button type="button" onClick={handleGenerate} disabled={generating || refreshing}
-            className="inline-flex items-center gap-1 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-semibold text-amber-700 transition-colors hover:bg-amber-100 disabled:opacity-50">
-            {generating ? <RefreshCw className="size-3 animate-spin" /> : <Sparkles className="size-3" />}
-            {generating ? 'Đang phân tích...' : 'Tạo AI mới'}
-          </button>
+          {isAdmin && (
+            <button type="button" onClick={handleGenerate} disabled={generating || refreshing}
+              className="inline-flex items-center gap-1 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-semibold text-amber-700 transition-colors hover:bg-amber-100 disabled:opacity-50">
+              {generating ? <RefreshCw className="size-3 animate-spin" /> : <Sparkles className="size-3" />}
+              {generating ? 'Đang phân tích...' : 'Tạo AI mới'}
+            </button>
+          )}
         </div>
       </div>
 
-      <div className="mb-3 rounded-xl border border-zinc-100 bg-zinc-50/70 p-3">
-        <button type="button" onClick={() => setShowTickerSettings((open) => !open)}
-          className="flex w-full items-center justify-between text-left text-xs font-semibold text-zinc-600">
-          <span>Danh sách mã phân tích ({screenerTickers.length}/50) · lần gần nhất: {tickerCount} mã</span>
-          <span className="text-emerald-700">{showTickerSettings ? 'Thu gọn' : 'Xem và chỉnh sửa'}</span>
-        </button>
-        {showTickerSettings && (
-          <div className="mt-3 space-y-2">
-            <textarea value={tickerDraft} onChange={(event) => setTickerDraft(event.target.value)} rows={3}
-              className="w-full resize-y rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs uppercase text-zinc-700 outline-none ring-emerald-200 focus:ring-2"
-              aria-label="Danh sách mã cổ phiếu phân tích" />
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-[10px] text-zinc-400">Nhập mã cách nhau bằng dấu phẩy hoặc khoảng trắng. Tối đa 50 mã.</p>
-              <button type="button" onClick={saveScreenerTickers}
-                className="shrink-0 rounded-lg bg-emerald-600 px-3 py-1.5 text-[10px] font-semibold text-white hover:bg-emerald-700">
-                Lưu danh sách
-              </button>
+      {isAdmin && (
+        <div className="mb-3 rounded-xl border border-zinc-100 bg-zinc-50/70 p-3">
+          <button type="button" onClick={() => setShowTickerSettings((open) => !open)}
+            className="flex w-full items-center justify-between text-left text-xs font-semibold text-zinc-600">
+            <span>Danh sách mã phân tích ({screenerTickers.length}/50) · lần gần nhất: {tickerCount} mã</span>
+            <span className="text-emerald-700">{showTickerSettings ? 'Thu gọn' : 'Xem và chỉnh sửa'}</span>
+          </button>
+          {showTickerSettings && (
+            <div className="mt-3 space-y-2">
+              <textarea value={tickerDraft} onChange={(event) => setTickerDraft(event.target.value)} rows={3}
+                className="w-full resize-y rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs uppercase text-zinc-700 outline-none ring-emerald-200 focus:ring-2"
+                aria-label="Danh sách mã cổ phiếu phân tích" />
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-[10px] text-zinc-400">Nhập mã cách nhau bằng dấu phẩy hoặc khoảng trắng. Tối đa 50 mã.</p>
+                <button type="button" onClick={saveScreenerTickers}
+                  className="shrink-0 rounded-lg bg-emerald-600 px-3 py-1.5 text-[10px] font-semibold text-white hover:bg-emerald-700">
+                  Lưu danh sách
+                </button>
+              </div>
             </div>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      )}
 
       {suggestions.length === 0 ? (
         <div className="flex flex-col items-center gap-2 py-8 text-center">
           <Sparkles className="size-8 text-amber-200" />
           <p className="text-sm text-zinc-500">Chưa có gợi ý nào.</p>
-          <p className="text-xs text-zinc-400">Nhấn <strong>Tạo AI mới</strong> để phân tích danh sách mã bên trên.</p>
+          {isAdmin && <p className="text-xs text-zinc-400">Nhấn <strong>Tạo AI mới</strong> để phân tích danh sách mã bên trên.</p>}
         </div>
       ) : (
         <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-5">
@@ -470,5 +492,6 @@ export function SuggestionsSection({ onAdd, onSelect }: {
         </div>
       )}
     </div>
+    </>
   )
 }

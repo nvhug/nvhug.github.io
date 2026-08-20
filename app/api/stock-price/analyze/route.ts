@@ -7,6 +7,7 @@ import { fetchGovernanceDisclosures, type GovernanceDisclosures } from './govern
 import { gradeFromOverallScore, overallScoreFromScores } from './scoring'
 import { stockAnalysisSchema } from './schema'
 import { cooldownMetadata } from './cooldown'
+import { checkAITrialQuota, incrementAITrialUsage, trialExhaustedBody } from '@/lib/ai-trial'
 
 export const runtime = 'nodejs'
 
@@ -159,7 +160,16 @@ export async function POST(request: Request) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { data: profile } = await supabase.from('user_profiles').select('role').eq('id', user.id).maybeSingle()
-  const isAdmin = profile?.role === 'admin'
+  const role = profile?.role ?? 'user'
+  const isAdmin = role === 'admin'
+
+  const quota = await checkAITrialQuota(supabase, user.id, 'stock_analyze', role)
+  if (!quota.allowed) {
+    return NextResponse.json(
+      trialExhaustedBody('stock_analyze', quota.used, quota.limit),
+      { status: 402 },
+    )
+  }
 
   let body: AnalyzeRequest
   try {
@@ -367,6 +377,10 @@ export async function POST(request: Request) {
   if (saveError) {
     console.error('[stock-analysis] save failed:', saveError)
     return NextResponse.json({ error: 'Phân tích xong nhưng không lưu được kết quả.' }, { status: 500 })
+  }
+
+  if (!quota.unlimited) {
+    await incrementAITrialUsage(supabase, user.id, 'stock_analyze')
   }
 
   return NextResponse.json({ analysis: finalResult, ...cooldownMetadata(analyzedAt, Date.now(), isAdmin) }, {

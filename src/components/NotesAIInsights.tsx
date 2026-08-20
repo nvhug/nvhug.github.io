@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import {
   Sparkles, RefreshCw, ChevronRight,
-  AlertCircle, Lightbulb, History, ChevronDown, ChevronUp,
+  AlertCircle, Info, Lightbulb, History, ChevronDown, ChevronUp,
   Scale, Utensils, BookOpen, Crown, X, Dumbbell, CalendarDays, Activity, Target,
 } from 'lucide-react'
 import { Note } from '@/types'
@@ -13,6 +13,7 @@ import type { Lang } from '@/lib/i18n/language-context'
 import { useFeatureAccess } from '@/lib/useFeatureAccess'
 import { getSupabaseBrowserClient } from '@/lib/supabase-browser'
 import { useUserRole } from '@/lib/useUserRole'
+import { AITrialExhaustedModal, type AITrialExhaustedInfo } from '@/components/ui/ai-trial-exhausted-modal'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -238,6 +239,8 @@ export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note
   const [loading,          setLoading]          = useState(false)
   const [fetching,         setFetching]         = useState(true)
   const [error,            setError]            = useState<string | null>(null)
+  const [cooldownInfo,     setCooldownInfo]     = useState<string | null>(null)
+  const [trialExhausted,   setTrialExhausted]   = useState<AITrialExhaustedInfo | null>(null)
   const [showDonateModal,  setShowDonateModal]  = useState(false)
   const [donating,         setDonating]         = useState(false)
   const [donated,          setDonated]          = useState(false)
@@ -305,12 +308,13 @@ export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note
 
   async function analyze() {
     if (role !== 'admin' && cooldown.isBlocked) {
-      setError(t('notesAIInsights.cooldownError', { cooldown: cooldownLabel }))
+      setCooldownInfo(t('notesAIInsights.cooldownHint', { cooldown: cooldownLabel }))
       return
     }
 
     setLoading(true)
     setError(null)
+    setCooldownInfo(null)
     try {
       const res = await fetch('/api/notes/analyze', {
         method: 'POST',
@@ -323,7 +327,13 @@ export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note
         }),
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error ?? t('notesAIInsights.analyzeFailed'))
+      if (!res.ok) {
+        if (res.status === 402 && data?.trialExhausted) {
+          setTrialExhausted({ feature: data.feature, used: data.used, limit: data.limit })
+          return
+        }
+        throw new Error(data.error ?? t('notesAIInsights.analyzeFailed'))
+      }
 
       const result: AIInsights = data
       setHistory(prev => [result, ...prev].slice(0, 10))
@@ -340,6 +350,12 @@ export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note
   const quarters = useMemo(() => periodOptions.filter(o => o.group === 'quarter'), [periodOptions])
 
   return (
+    <>
+    <AITrialExhaustedModal
+      open={!!trialExhausted}
+      info={trialExhausted}
+      onClose={() => setTrialExhausted(null)}
+    />
     <div className="space-y-3 p-3">
       {/* Controls row */}
       <div className="rounded-xl border border-zinc-100 bg-white p-2.5">
@@ -372,10 +388,9 @@ export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note
           <span className="text-zinc-400">(+ cân, gym, lịch)</span>
         </span>
 
-        {/* Analyze button — visible to everyone; users without permission get a donate modal on click */}
         <button
           onClick={handleAnalyzeClick}
-          disabled={loading || fetching || totalItems < MIN_NOTES_REQUIRED || (canUseAI && role !== 'admin' && cooldown.isBlocked)}
+          disabled={loading || fetching || totalItems < MIN_NOTES_REQUIRED}
           className="ml-auto flex items-center gap-1.5 rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-violet-700 disabled:opacity-60"
         >
           {loading
@@ -385,15 +400,6 @@ export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note
           {!canUseAI && <Crown className="h-3.5 w-3.5 text-amber-300" />}
         </button>
         </div>
-
-        {cooldown.isBlocked && (
-          <p className="mt-2 text-[11px] text-zinc-500">
-            {t('notesAIInsights.lastAnalyzed', {
-              time: latestAnalysis?.analyzedAt ? formatDateTime(latestAnalysis.analyzedAt, lang) : '--',
-              cooldown: cooldownLabel,
-            })}
-          </p>
-        )}
       </div>
 
       {/* Empty / insufficient notes warning */}
@@ -406,6 +412,14 @@ export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note
         <p className="text-center text-sm text-amber-500">
           {t('notesAIInsights.minNotesHint', { min: MIN_NOTES_REQUIRED, n: totalItems })}
         </p>
+      )}
+
+      {/* Cooldown info — gentle, not an error */}
+      {cooldownInfo && (
+        <div className="flex items-start gap-2 rounded-lg border border-blue-100 bg-blue-50 p-3 text-sm text-blue-700">
+          <Info className="mt-0.5 h-4 w-4 shrink-0" />
+          {cooldownInfo}
+        </div>
       )}
 
       {/* Error */}
@@ -822,5 +836,6 @@ export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note
         </div>
       )}
     </div>
+    </>
   )
 }

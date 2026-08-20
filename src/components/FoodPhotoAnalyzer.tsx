@@ -8,6 +8,7 @@ import { uploadFoodThumb } from '@/lib/storage'
 import { TimePicker } from '@/components/ui/time-picker'
 import { useLanguage } from '@/lib/i18n/language-context'
 import type { NormalizedSource, NormalizedTableKey, NormalizationWarning } from '@/types/nutrition-normalization'
+import { AITrialExhaustedModal, type AITrialExhaustedInfo } from '@/components/ui/ai-trial-exhausted-modal'
 
 const MAX_EDGE_PX = 1024
 const JPEG_QUALITY = 0.82
@@ -165,6 +166,7 @@ export function FoodPhotoAnalyzer({ date, onAdded, inputMode = 'photo' }: FoodPh
   const cameraRef = useRef<HTMLInputElement>(null)
   const galleryRef = useRef<HTMLInputElement>(null)
 
+  const [trialExhausted, setTrialExhausted] = useState<AITrialExhaustedInfo | null>(null)
   const [image, setImage] = useState<PickedImage | null>(null)
   const [analyzing, setAnalyzing] = useState(false)
   const [result, setResult] = useState<AnalyzeResponse | null>(null)
@@ -285,8 +287,12 @@ export function FoodPhotoAnalyzer({ date, onAdded, inputMode = 'photo' }: FoodPh
       const payload = await res.json()
       if (!res.ok) {
         stopProgressTicker(0)
-        toast.error(payload?.error || t('foodPhoto.analyzeError'))
-        setDetailOpen(true)
+        if (res.status === 402 && payload?.trialExhausted) {
+          setTrialExhausted({ feature: payload.feature, used: payload.used, limit: payload.limit })
+        } else {
+          toast.error(payload?.error || t('foodPhoto.analyzeError'))
+          setDetailOpen(true)
+        }
         return
       }
 
@@ -421,6 +427,12 @@ export function FoodPhotoAnalyzer({ date, onAdded, inputMode = 'photo' }: FoodPh
   }
 
   return (
+    <>
+    <AITrialExhaustedModal
+      open={!!trialExhausted}
+      info={trialExhausted}
+      onClose={() => setTrialExhausted(null)}
+    />
     <div className="space-y-3">
       <input
         ref={cameraRef}
@@ -799,5 +811,6 @@ export function FoodPhotoAnalyzer({ date, onAdded, inputMode = 'photo' }: FoodPh
         </div>
       )}
     </div>
+    </>
   )
 }

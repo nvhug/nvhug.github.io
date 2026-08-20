@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { createSupabaseServerClient } from '@/lib/supabase-server'
 import { requestVisionJSON, requestTextJSON, resolveVisionConfig, visionProviderNames } from '@/lib/ai-vision'
 import { normalizeItemsWithInternalTable } from './nutrition-normalizer'
+import { checkAITrialQuota, incrementAITrialUsage, trialExhaustedBody } from '@/lib/ai-trial'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -229,6 +230,21 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: MSG.unauthorized[lang] }, { status: 401 })
   }
 
+  const { data: profile } = await supabase
+    .from('user_profiles')
+    .select('role')
+    .eq('id', user.id)
+    .maybeSingle()
+  const role = profile?.role ?? 'user'
+
+  const quota = await checkAITrialQuota(supabase, user.id, 'food_analyze', role)
+  if (!quota.allowed) {
+    return NextResponse.json(
+      trialExhaustedBody('food_analyze', quota.used, quota.limit, lang),
+      { status: 402 },
+    )
+  }
+
   if (mode === 'image') {
     if (!image) return NextResponse.json({ error: MSG.noImage[lang] }, { status: 400 })
     if (!ALLOWED_MIME.includes(image.mimeType.toLowerCase())) {
@@ -304,6 +320,11 @@ export async function POST(request: Request) {
       // Telemetry is best-effort only.
       console.warn('[analyze-food] telemetry insert skipped:', telemetryError.message)
     }
+  }
+
+  // Increment trial usage counter (no-op for admin/paid since quota check returned unlimited)
+  if (!quota.unlimited) {
+    await incrementAITrialUsage(supabase, user.id, 'food_analyze')
   }
 
   return NextResponse.json({

@@ -464,6 +464,7 @@ export const en: Dictionary = {
     daysRemaining: '{d}d',
     daysHoursRemaining: '{d}d {h}h',
     cooldownError: 'You can only run analysis once per week. Please try again after {cooldown}.',
+    cooldownHint: "Your data hasn't changed much this week — analyzing again will give similar results. Come back after {cooldown} for fresh insights.",
     analyzeFailed: 'Analysis failed',
     analyzeError: 'An error occurred during analysis. Please try again.',
     minNotesHint: 'Need at least {min} data items (notes + habits) to analyze — currently {n}',

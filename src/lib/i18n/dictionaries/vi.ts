@@ -462,6 +462,7 @@ export const vi = {
     daysRemaining: '{d} ngày',
     daysHoursRemaining: '{d} ngày {h} giờ',
     cooldownError: 'Bạn chỉ có thể phân tích 1 lần mỗi tuần. Vui lòng thử lại sau {cooldown}.',
+    cooldownHint: 'Dữ liệu của bạn chưa thay đổi nhiều trong tuần này — nhấn phân tích lại sẽ cho kết quả tương tự. Hãy quay lại sau {cooldown} để có góc nhìn mới nhé.',
     analyzeFailed: 'Phân tích thất bại',
     analyzeError: 'Có lỗi khi phân tích. Vui lòng thử lại.',
     minNotesHint: 'Cần ít nhất {min} mục dữ liệu (notes + thói quen) để phân tích — đang có {n}',

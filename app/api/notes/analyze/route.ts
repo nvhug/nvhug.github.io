@@ -3,6 +3,7 @@ import { Note } from '@/types'
 import { createSupabaseServerClient } from '@/lib/supabase-server'
 import { DEFAULT_MACRO_TARGETS, getMacroTargets, resolveTargetsByDate } from './macroUtils'
 import type { MacroTargets, MacroTargetRow } from './macroUtils'
+import { checkAITrialQuota, incrementAITrialUsage, trialExhaustedBody } from '@/lib/ai-trial'
 
 export const dynamic = 'force-dynamic'
 
@@ -516,18 +517,31 @@ export async function POST(request: Request) {
 
   const { data: profile } = await supabaseAuth.from('user_profiles').select('role').eq('id', user.id).single()
   const role = profile?.role ?? 'user'
-  const { data: permission } = await supabaseAuth
-    .from('page_permissions')
-    .select('allowed')
-    .eq('page_key', 'notes.ai_analysis')
-    .eq('role', role)
-    .maybeSingle()
-  if (!permission?.allowed) {
-    return NextResponse.json({
-      error: activeLang === 'en'
-        ? 'AI analysis is a paid feature, available to Pro accounts only. Please contact the admin to upgrade.'
-        : 'Phân tích AI là tính năng trả phí, chỉ dành cho tài khoản Pro. Vui lòng liên hệ admin để nâng cấp.',
-    }, { status: 403 })
+
+  if (role === 'user') {
+    // Trial users: check quota instead of page_permissions
+    const quota = await checkAITrialQuota(supabaseAuth, user.id, 'notes_analyze', role)
+    if (!quota.allowed) {
+      return NextResponse.json(
+        trialExhaustedBody('notes_analyze', quota.used, quota.limit, activeLang),
+        { status: 402 },
+      )
+    }
+  } else {
+    // paid / admin: use the admin-configurable permission gate
+    const { data: permission } = await supabaseAuth
+      .from('page_permissions')
+      .select('allowed')
+      .eq('page_key', 'notes.ai_analysis')
+      .eq('role', role)
+      .maybeSingle()
+    if (!permission?.allowed) {
+      return NextResponse.json({
+        error: activeLang === 'en'
+          ? 'AI analysis is not available for your account. Please contact the admin.'
+          : 'Phân tích AI không khả dụng với tài khoản của bạn. Vui lòng liên hệ admin.',
+      }, { status: 403 })
+    }
   }
 
   if (!period?.from || !period?.to || !period?.label) {
@@ -861,6 +875,11 @@ Trả về JSON hợp lệ với đúng cấu trúc sau (không thêm/bỏ field
     .single()
 
   if (saveErr) console.error('[analyze] DB save failed:', saveErr.message)
+
+  // Increment trial usage counter for non-admin/paid users
+  if (role === 'user') {
+    await incrementAITrialUsage(supabaseAuth, user.id, 'notes_analyze')
+  }
 
   return NextResponse.json({
     ...insights,

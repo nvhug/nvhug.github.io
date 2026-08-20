@@ -8,11 +8,20 @@ const {
   mockRequestTextJSON,
 } = vi.hoisted(() => {
   const mockInsert = vi.fn(async () => ({ error: null }))
-  const mockFrom = vi.fn(() => ({ insert: mockInsert }))
+  // Support both .insert() and .select().eq().eq().maybeSingle() chains
+  const mockQueryBuilder = {
+    insert: mockInsert,
+    select: () => mockQueryBuilder,
+    eq: () => mockQueryBuilder,
+    maybeSingle: async () => ({ data: { role: 'user' }, error: null }),
+    rpc: async () => ({ error: null }),
+  }
+  const mockFrom = vi.fn(() => mockQueryBuilder)
   const mockGetUser = vi.fn(async () => ({ data: { user: { id: 'user-1' } } }))
   const mockCreateSupabaseServerClient = vi.fn(async () => ({
     auth: { getUser: mockGetUser },
     from: mockFrom,
+    rpc: vi.fn(async () => ({ error: null })),
   }))
   const mockRequestTextJSON = vi.fn<(
     prompt: string
@@ -36,6 +45,19 @@ vi.mock('@/lib/ai-vision', () => ({
   requestTextJSON: mockRequestTextJSON,
   resolveVisionConfig: vi.fn(() => true),
   visionProviderNames: vi.fn(() => []),
+}))
+
+// Trial quota: default to unlimited (simulates admin/paid) so existing tests are unaffected
+vi.mock('@/lib/ai-trial', () => ({
+  checkAITrialQuota: vi.fn(async () => ({ allowed: true, unlimited: true })),
+  incrementAITrialUsage: vi.fn(async () => {}),
+  trialExhaustedBody: vi.fn((feature: string, used: number, limit: number) => ({
+    error: `Trial exhausted (${used}/${limit})`,
+    trialExhausted: true,
+    feature,
+    used,
+    limit,
+  })),
 }))
 
 import { POST } from './route'
