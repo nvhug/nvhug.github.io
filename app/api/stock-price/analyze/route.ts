@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase-server'
+import { getServiceSupabaseClient } from '@/lib/supabase-admin'
 import { formatCompanyContextForPrompt, type CompanyContext } from './companyContext'
 import { fetchFinancialSnapshot, type FinancialSnapshot } from './fundamentals'
 import { fetchGovernanceDisclosures, type GovernanceDisclosures } from './governanceDisclosures'
@@ -49,12 +50,11 @@ function applyEvidence(result: unknown, fundamentals: FinancialSnapshot | null, 
   }
 }
 
-async function getStoredAnalysis(userId: string, ticker: string): Promise<StoredAnalysis | null> {
-  const supabase = await createSupabaseServerClient()
+async function getStoredAnalysis(ticker: string): Promise<StoredAnalysis | null> {
+  const supabase = getServiceSupabaseClient()
   const { data, error } = await supabase
     .from('stock_analysis_history')
     .select('result, analyzed_at')
-    .eq('user_id', userId)
     .eq('ticker', ticker)
     .maybeSingle()
 
@@ -116,7 +116,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const stored = await getStoredAnalysis(user.id, ticker)
+    const stored = await getStoredAnalysis(ticker)
     if (!stored) return NextResponse.json({ analysis: null, canAnalyze: true })
     const [fundamentals, governanceDisclosures] = await Promise.all([fetchFinancialSnapshot(ticker), fetchGovernanceDisclosures(ticker)])
     return NextResponse.json({ analysis: applyEvidence(stored.result, fundamentals, governanceDisclosures), ...cooldownMetadata(stored.analyzed_at, Date.now(), isAdmin) })
@@ -176,7 +176,7 @@ export async function POST(request: Request) {
 
   let stored: StoredAnalysis | null
   try {
-    stored = await getStoredAnalysis(user.id, normalizedTicker)
+    stored = await getStoredAnalysis(normalizedTicker)
   } catch (error) {
     console.error('[stock-analysis] cooldown read failed:', error)
     return NextResponse.json({ error: 'Không kiểm tra được lịch sử phân tích.' }, { status: 500 })
@@ -354,7 +354,7 @@ export async function POST(request: Request) {
 
   const analyzedAt = new Date().toISOString()
   const finalResult = applyEvidence(result.data, fundamentals, governanceDisclosures)
-  const { error: saveError } = await supabase
+  const { error: saveError } = await getServiceSupabaseClient()
     .from('stock_analysis_history')
     .upsert({
       user_id: user.id,
@@ -362,7 +362,7 @@ export async function POST(request: Request) {
       company_name: companyName,
       result: finalResult,
       analyzed_at: analyzedAt,
-    }, { onConflict: 'user_id,ticker' })
+    }, { onConflict: 'ticker' })
 
   if (saveError) {
     console.error('[stock-analysis] save failed:', saveError)
