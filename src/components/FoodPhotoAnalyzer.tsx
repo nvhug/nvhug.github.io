@@ -189,9 +189,10 @@ export function FoodPhotoAnalyzer({ date, onAdded, inputMode = 'photo' }: FoodPh
   const [manualFat, setManualFat] = useState('')
   const [manualTime, setManualTime] = useState(currentTimeStr)
   const [manualSaving, setManualSaving] = useState(false)
-  const [isManualExpanded, setIsManualExpanded] = useState(() => {
-    try { return localStorage.getItem('foodphoto:manual:expanded') !== 'false' } catch { return true }
-  })
+  const [isManualExpanded, setIsManualExpanded] = useState(true)
+  useEffect(() => {
+    try { setIsManualExpanded(localStorage.getItem('foodphoto:manual:expanded') !== 'false') } catch { /* ignore */ }
+  }, [])
 
   function toggleManualExpanded() {
     const next = !isManualExpanded

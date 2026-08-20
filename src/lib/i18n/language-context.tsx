@@ -37,11 +37,12 @@ interface LanguageContextValue {
 const LanguageContext = createContext<LanguageContextValue | null>(null)
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
-  const [lang, setLangState] = useState<Lang>(() => {
-    if (typeof window === 'undefined') return 'vi'
+  const [lang, setLangState] = useState<Lang>('vi')
+
+  useEffect(() => {
     const stored = window.localStorage.getItem(STORAGE_KEY)
-    return stored === 'vi' || stored === 'en' ? stored : 'vi'
-  })
+    if (stored === 'vi' || stored === 'en') setLangState(stored)
+  }, [])
 
   useEffect(() => {
     document.documentElement.lang = lang
