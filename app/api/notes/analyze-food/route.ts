@@ -239,10 +239,22 @@ export async function POST(request: Request) {
 
   const quota = await checkAITrialQuota(supabase, user.id, 'food_analyze', role)
   if (!quota.allowed) {
-    return NextResponse.json(
-      trialExhaustedBody('food_analyze', quota.used, quota.limit, lang),
-      { status: 402 },
-    )
+    // Allow if user has a pending upgrade request with no prior rejection (benefit of the doubt)
+    const { data: requests } = await supabase
+      .from('upgrade_requests')
+      .select('status')
+      .eq('user_id', user.id)
+      .in('status', ['pending', 'rejected'])
+    const statuses = (requests ?? []).map((r: { status: string }) => r.status)
+    const hasPending = statuses.includes('pending')
+    const hasRejected = statuses.includes('rejected')
+    const bypassed = hasPending && !hasRejected
+    if (!bypassed) {
+      return NextResponse.json(
+        trialExhaustedBody('food_analyze', quota.used, quota.limit, lang),
+        { status: 402 },
+      )
+    }
   }
 
   if (mode === 'image') {

@@ -11,12 +11,20 @@ import { DatePicker } from '@/components/ui/date-picker'
 import { TimePicker } from '@/components/ui/time-picker'
 import { getTodayLocalISODate } from '@/lib/date'
 
-const DEFAULT_MEALS = [
+const DEFAULT_MEALS_VI = [
   { time: '07:00', name: 'Bữa sáng', target_calories: 520, foods: ['Cơm trắng: 150g', 'Trứng luộc: 2 quả', 'Sữa nóng: 150ml', 'Mật ong: 1.5 thìa'] },
   { time: '09:30', name: 'Sáng muộn', target_calories: 380, foods: ['Bánh mì trắng: 2 lát', 'Bơ: 1 thìa', 'Chuối: 1 quả', 'Sữa chua plain: 100g'] },
   { time: '12:00', name: 'Bữa trưa', target_calories: 680, foods: ['Cơm trắng: 250g', 'Gà nướng: 180g (không da)', 'Cháo gạo nhạt: 150ml', 'Dầu ô liu: 0.5 thìa'] },
   { time: '15:00', name: 'Chiều', target_calories: 360, foods: ['Bánh mì trắng nướng: 2 lát', 'Bơ: 1 thìa', 'Mật ong pha sữa ấm: 250ml', 'Chuối: 0.5 quả'] },
   { time: '17:00', name: 'Tối', target_calories: 460, foods: ['Sữa nóng: 300ml', 'Yến mạch: 40g', 'Trứng luộc: 1 quả', 'Mật ong: 1 thìa'] },
+]
+
+const DEFAULT_MEALS_EN = [
+  { time: '07:00', name: 'Breakfast', target_calories: 520, foods: ['White rice: 150g', 'Boiled eggs: 2', 'Hot milk: 150ml', 'Honey: 1.5 tsp'] },
+  { time: '09:30', name: 'Mid-morning', target_calories: 380, foods: ['White bread: 2 slices', 'Butter: 1 tbsp', 'Banana: 1', 'Plain yogurt: 100g'] },
+  { time: '12:00', name: 'Lunch', target_calories: 680, foods: ['White rice: 250g', 'Grilled chicken: 180g (skinless)', 'Plain rice porridge: 150ml', 'Olive oil: 0.5 tsp'] },
+  { time: '15:00', name: 'Afternoon', target_calories: 360, foods: ['Toasted white bread: 2 slices', 'Butter: 1 tbsp', 'Honey milk: 250ml', 'Banana: 0.5'] },
+  { time: '17:00', name: 'Dinner', target_calories: 460, foods: ['Hot milk: 300ml', 'Oats: 40g', 'Boiled egg: 1', 'Honey: 1 tsp'] },
 ]
 
 type EditForm = {
@@ -29,7 +37,8 @@ type EditForm = {
 const EMPTY_FORM: EditForm = { time: '', name: '', target_calories: '', foods: '' }
 
 export function MealScheduleTracker() {
-  const { t } = useLanguage()
+  const { t, lang } = useLanguage()
+  const DEFAULT_MEALS = lang === 'en' ? DEFAULT_MEALS_EN : DEFAULT_MEALS_VI
   const [meals, setMeals] = useState<Meal[]>([])
   const [selectedDate, setSelectedDate] = useState(() => getTodayLocalISODate())
   const [loading, setLoading] = useState(true)
@@ -70,7 +79,7 @@ export function MealScheduleTracker() {
       console.error('Error setting up meals:', error)
       setLoading(false)
     }
-  }, [selectedDate])
+  }, [selectedDate, lang])
 
   const fetchMeals = useCallback(async () => {
     try {

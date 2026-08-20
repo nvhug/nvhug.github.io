@@ -1,10 +1,11 @@
 'use client'
 
-import { useState } from 'react'
-import { Coffee, X } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { Clock, Coffee, X } from 'lucide-react'
 import { Button } from './button'
 import { UpgradeModal } from '@/components/UpgradeModal'
 import { useUser } from '@/hooks/useUser'
+import { getSupabaseBrowserClient } from '@/lib/supabase-browser'
 
 export interface AITrialExhaustedInfo {
   feature: string
@@ -27,7 +28,46 @@ const FEATURE_LABELS: Record<string, string> = {
 
 export function AITrialExhaustedModal({ open, info, onClose }: Props) {
   const [showUpgrade, setShowUpgrade] = useState(false)
+  // hasPending = pending request AND a prior rejection (first-time pending is bypassed and never reaches this modal)
+  const [hasPending, setHasPending] = useState(false)
   const { user } = useUser()
+  const notifiedRef = useRef(false)
+
+  useEffect(() => {
+    if (!open || !info) return
+    notifiedRef.current = false
+    setHasPending(false)
+
+    async function checkPending() {
+      const client = getSupabaseBrowserClient()
+      const { data: { user: authUser } } = await client.auth.getUser()
+      if (!authUser) return
+
+      const { data: requests } = await client
+        .from('upgrade_requests')
+        .select('status')
+        .eq('user_id', authUser.id)
+        .in('status', ['pending', 'rejected'])
+      const statuses = (requests ?? []).map((r: { status: string }) => r.status)
+      const hasPendingReq = statuses.includes('pending')
+      const hasRejected = statuses.includes('rejected')
+
+      // Show "waiting" state only when pending AND has a prior rejection
+      if (hasPendingReq && hasRejected) {
+        setHasPending(true)
+        if (!notifiedRef.current) {
+          notifiedRef.current = true
+          fetch('/api/upgrade/pending-notify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ feature: info?.feature }),
+          }).catch(() => {})
+        }
+      }
+    }
+
+    void checkPending()
+  }, [open, info])
 
   if (!open || !info) return null
 
@@ -44,10 +84,15 @@ export function AITrialExhaustedModal({ open, info, onClose }: Props) {
           {/* Header */}
           <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 px-5 py-4">
             <div className="flex items-center gap-2.5">
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/40">
-                <Coffee className="h-4 w-4 text-amber-600" />
+              <div className={`flex h-8 w-8 items-center justify-center rounded-full ${hasPending ? 'bg-violet-100 dark:bg-violet-900/40' : 'bg-amber-100 dark:bg-amber-900/40'}`}>
+                {hasPending
+                  ? <Clock className="h-4 w-4 text-violet-600" />
+                  : <Coffee className="h-4 w-4 text-amber-600" />
+                }
               </div>
-              <p className="font-poppins text-sm font-semibold text-zinc-900 dark:text-white">Đã dùng hết lượt thử</p>
+              <p className="font-poppins text-sm font-semibold text-zinc-900 dark:text-white">
+                {hasPending ? 'Yêu cầu đang chờ xét duyệt' : 'Đã dùng hết lượt thử'}
+              </p>
             </div>
             <button
               type="button"
@@ -70,40 +115,64 @@ export function AITrialExhaustedModal({ open, info, onClose }: Props) {
 
             {/* Progress bar */}
             <div className="h-1.5 w-full rounded-full bg-zinc-100 dark:bg-zinc-800">
-              <div className="h-1.5 rounded-full bg-amber-400 transition-all" style={{ width: '100%' }} />
+              <div
+                className={`h-1.5 rounded-full transition-all ${hasPending ? 'bg-violet-400' : 'bg-amber-400'}`}
+                style={{ width: '100%' }}
+              />
             </div>
 
-            <p className="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed pt-1">
-              Bạn đã dùng hết {info.limit} lượt thử miễn phí 🎉<br />
-              Mua cho mình <span className="font-medium text-amber-600">một ly cà phê</span> (~30k) để mình tiếp tục duy trì AI cho bạn nhé ☕
-            </p>
+            {hasPending ? (
+              <p className="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed pt-1">
+                Yêu cầu nâng cấp của bạn đang được xem xét ⏳<br />
+                Mình sẽ kích hoạt Pro cho bạn <span className="font-medium text-violet-600">trong vài giờ</span>. Cảm ơn bạn đã ủng hộ! 🙏
+              </p>
+            ) : (
+              <p className="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed pt-1">
+                Bạn đã dùng hết {info.limit} lượt thử miễn phí 🎉<br />
+                Mua cho mình <span className="font-medium text-amber-600">một ly cà phê</span> (~30k) để mình tiếp tục duy trì AI cho bạn nhé ☕
+              </p>
+            )}
           </div>
 
           {/* Footer */}
           <div className="flex gap-2 border-t border-zinc-100 dark:border-zinc-800 px-5 py-4">
-            <Button
-              variant="ghost"
-              className="flex-1 border border-zinc-200 dark:border-zinc-700 text-zinc-600 hover:bg-zinc-50 dark:hover:bg-zinc-800"
-              onClick={onClose}
-            >
-              Để sau
-            </Button>
-            <Button
-              className="flex-1 bg-amber-500 hover:bg-amber-600 text-white border-0"
-              onClick={() => setShowUpgrade(true)}
-            >
-              <Coffee className="h-4 w-4 mr-1.5" />
-              Ủng hộ ngay
-            </Button>
+            {hasPending ? (
+              <Button
+                className="flex-1 bg-violet-500 hover:bg-violet-600 text-white border-0"
+                onClick={onClose}
+              >
+                <Clock className="h-4 w-4 mr-1.5" />
+                Đã hiểu, chờ kích hoạt
+              </Button>
+            ) : (
+              <>
+                <Button
+                  variant="ghost"
+                  className="flex-1 border border-zinc-200 dark:border-zinc-700 text-zinc-600 hover:bg-zinc-50 dark:hover:bg-zinc-800"
+                  onClick={onClose}
+                >
+                  Để sau
+                </Button>
+                <Button
+                  className="flex-1 bg-amber-500 hover:bg-amber-600 text-white border-0"
+                  onClick={() => setShowUpgrade(true)}
+                >
+                  <Coffee className="h-4 w-4 mr-1.5" />
+                  Ủng hộ ngay
+                </Button>
+              </>
+            )}
           </div>
         </div>
       </div>
 
-      <UpgradeModal
-        open={showUpgrade}
-        onClose={() => { setShowUpgrade(false); onClose() }}
-        userEmail={user?.email ?? ''}
-      />
+      {!hasPending && (
+        <UpgradeModal
+          open={showUpgrade}
+          onClose={() => { setShowUpgrade(false); onClose() }}
+          userEmail={user?.email ?? ''}
+        />
+      )}
     </>
   )
 }

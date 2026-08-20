@@ -9,6 +9,8 @@ import { TimePicker } from '@/components/ui/time-picker'
 import { useLanguage } from '@/lib/i18n/language-context'
 import type { NormalizedSource, NormalizedTableKey, NormalizationWarning } from '@/types/nutrition-normalization'
 import { AITrialExhaustedModal, type AITrialExhaustedInfo } from '@/components/ui/ai-trial-exhausted-modal'
+import { checkAITrialQuota } from '@/lib/ai-trial'
+import { getSupabaseBrowserClient } from '@/lib/supabase-browser'
 
 const MAX_EDGE_PX = 1024
 const JPEG_QUALITY = 0.82
@@ -167,6 +169,7 @@ export function FoodPhotoAnalyzer({ date, onAdded, inputMode = 'photo' }: FoodPh
   const galleryRef = useRef<HTMLInputElement>(null)
 
   const [trialExhausted, setTrialExhausted] = useState<AITrialExhaustedInfo | null>(null)
+  const [photoQuotaExhausted, setPhotoQuotaExhausted] = useState<AITrialExhaustedInfo | null>(null)
   const [image, setImage] = useState<PickedImage | null>(null)
   const [analyzing, setAnalyzing] = useState(false)
   const [result, setResult] = useState<AnalyzeResponse | null>(null)
@@ -195,6 +198,31 @@ export function FoodPhotoAnalyzer({ date, onAdded, inputMode = 'photo' }: FoodPh
     setIsManualExpanded(next)
     try { localStorage.setItem('foodphoto:manual:expanded', String(next)) } catch { /* ignore */ }
   }
+
+  useEffect(() => {
+    async function preCheckQuota() {
+      const client = getSupabaseBrowserClient()
+      const { data: { user } } = await client.auth.getUser()
+      if (!user) return
+      const { data: profile } = await client.from('user_profiles').select('role').eq('id', user.id).single()
+      const role = (profile?.role as string) ?? 'user'
+      const result = await checkAITrialQuota(client, user.id, 'food_analyze', role)
+      if (!result.allowed) {
+        // Check upgrade requests: pending + no rejection = bypass (allowed)
+        const { data: requests } = await client
+          .from('upgrade_requests')
+          .select('status')
+          .eq('user_id', user.id)
+          .in('status', ['pending', 'rejected'])
+        const statuses = (requests ?? []).map((r: { status: string }) => r.status)
+        const hasPending = statuses.includes('pending')
+        const hasRejected = statuses.includes('rejected')
+        if (hasPending && !hasRejected) return // bypass: first-time pending, allow use
+        setPhotoQuotaExhausted({ feature: 'food_analyze', used: result.used, limit: result.limit })
+      }
+    }
+    void preCheckQuota()
+  }, [])
 
   useEffect(() => {
     return () => {
@@ -455,7 +483,10 @@ export function FoodPhotoAnalyzer({ date, onAdded, inputMode = 'photo' }: FoodPh
         <div className="grid grid-cols-2 gap-2">
           <button
             type="button"
-            onClick={() => cameraRef.current?.click()}
+            onClick={() => {
+              if (photoQuotaExhausted) { setTrialExhausted(photoQuotaExhausted); return }
+              cameraRef.current?.click()
+            }}
             className="flex flex-col items-center gap-1.5 rounded-lg border border-dashed border-emerald-300 bg-emerald-50/50 px-3 py-5 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-50"
           >
             <Camera className="h-5 w-5" />
@@ -463,7 +494,10 @@ export function FoodPhotoAnalyzer({ date, onAdded, inputMode = 'photo' }: FoodPh
           </button>
           <button
             type="button"
-            onClick={() => galleryRef.current?.click()}
+            onClick={() => {
+              if (photoQuotaExhausted) { setTrialExhausted(photoQuotaExhausted); return }
+              galleryRef.current?.click()
+            }}
             className="flex flex-col items-center gap-1.5 rounded-lg border border-dashed border-emerald-300 bg-emerald-50/50 px-3 py-5 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-50"
           >
             <ImagePlus className="h-5 w-5" />
