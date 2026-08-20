@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { BookOpen, Home, LogOut, NotebookPen, Quote, Settings, WalletCards, User as UserIcon, type LucideIcon } from 'lucide-react'
+import { BookOpen, CircleDollarSign, Home, LogOut, NotebookPen, Quote, Settings, User as UserIcon, type LucideIcon } from 'lucide-react'
 import { Toaster } from 'sonner'
 import { useEffect, useRef, useState } from 'react'
 import { getSupabaseBrowserClient } from '@/lib/supabase-browser'
@@ -147,7 +147,7 @@ export function RootLayoutClient({ children }: { children: React.ReactNode }) {
 
   const navItems = [
     { href: '/notes', label: t('header.navNotes'), icon: NotebookPen },
-    { href: '/finance', label: t('header.navFinance'), icon: WalletCards },
+    { href: '/finance', label: t('header.navFinance'), icon: CircleDollarSign },
     { href: '/blog', label: t('header.navBlog'), icon: BookOpen },
     { href: '/quotes', label: t('header.navQuotes'), icon: Quote },
   ]
@@ -169,29 +169,29 @@ export function RootLayoutClient({ children }: { children: React.ReactNode }) {
                   className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-zinc-700 transition-colors hover:bg-emerald-50 hover:text-emerald-700 sm:h-auto sm:w-auto sm:rounded-none sm:font-poppins sm:text-xl sm:font-semibold sm:tracking-tight sm:text-zinc-900"
                   aria-label="Home"
                 >
-                  <Home className="h-4 w-4 sm:hidden" />
+                  <Home className="h-5 w-5 sm:hidden" />
                   <span className="hidden sm:inline">nvhug</span>
                 </Link>
 
-                <div className="grid min-w-0 flex-1 grid-cols-4 gap-1.5 sm:hidden">
+                <div className="flex min-w-0 flex-1 items-center justify-around sm:hidden">
                   {navItems.map((item) => {
                     const isActive = pathname.startsWith(item.href)
                     return (
                       <Link
                         key={item.href}
                         href={item.href}
-                        className={`relative inline-flex h-10 w-full min-w-0 items-center justify-center gap-1 px-2.5 py-2 text-sm font-medium transition-colors touch-manipulation ${
+                        aria-label={item.label}
+                        className={`relative flex h-10 w-10 shrink-0 items-center justify-center rounded-lg touch-manipulation transition-colors ${
                           isActive
                             ? 'text-emerald-700'
-                            : 'text-zinc-600 hover:text-zinc-900'
+                            : 'text-zinc-500 hover:text-zinc-900'
                         }`}
                       >
-                        <item.icon className={`h-3.5 w-3.5 ${isActive ? 'text-emerald-600' : 'text-zinc-400'}`} />
-                        {item.label}
+                        <item.icon className={`h-5 w-5 ${isActive ? 'text-emerald-600' : 'text-zinc-400'}`} />
                         <span
                           aria-hidden
                           className={`absolute bottom-0 left-1/2 h-0.5 -translate-x-1/2 rounded-full bg-emerald-500 transition-all ${
-                            isActive ? 'w-8 opacity-100' : 'w-0 opacity-0'
+                            isActive ? 'w-5 opacity-100' : 'w-0 opacity-0'
                           }`}
                         />
                       </Link>
