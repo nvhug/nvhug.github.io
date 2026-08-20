@@ -497,7 +497,7 @@ export const vi = {
   notes: {
     header: {
       eyebrow: 'Nhật ký',
-      title: 'Notes cá nhân',
+      title: 'Sổ tay cá nhân',
       subtitle: 'Ghi lại thói quen tốt/xấu mỗi ngày và theo dõi tiến độ cải thiện.',
       totalStat: 'Tổng số',
       goodStat: 'Việc tốt',
