@@ -7,7 +7,7 @@ import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import type { Goal, GoalItem } from '@/types'
 import type { GoalDraft, GoalItemDraft, SetState, Translate } from '../_components/tabs/types'
-import { patchGoalItemCompletion, reorderGoalItemsLocal } from '../_lib/goalsUtils'
+import { isValidGoalDateRange, patchGoalItemCompletion, reorderGoalItemsLocal } from '../_lib/goalsUtils'
 
 type UseGoalsActionsParams = {
   deleteGoal: Goal | null
@@ -320,6 +320,11 @@ export function useGoalsActions(params: UseGoalsActionsParams) {
   const saveEditingGoal = useCallback(async (goal: Goal) => {
     if (!editingGoalDraft || !editingGoalDraft.title.trim()) {
       toast.error(t('notes.goals.nameEmptyError'))
+      return
+    }
+
+    if (!isValidGoalDateRange(editingGoalDraft.start_date, editingGoalDraft.target_date)) {
+      toast.error(t('notes.goals.dateRangeError'))
       return
     }
 

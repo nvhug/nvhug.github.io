@@ -651,6 +651,7 @@ export const vi = {
       hideDetails: 'Ẩn chi tiết',
       showDetails: 'Xem chi tiết',
       nameEmptyError: 'Tên mục tiêu không được để trống.',
+      dateRangeError: 'Ngày bắt đầu không được sau ngày mục tiêu.',
       updateSuccess: 'Cập nhật mục tiêu thành công.',
       updateError: 'Không thể cập nhật mục tiêu.',
       itemTypeOptions: {

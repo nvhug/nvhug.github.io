@@ -653,6 +653,7 @@ export const en: Dictionary = {
       hideDetails: 'Hide details',
       showDetails: 'Show details',
       nameEmptyError: 'Goal name cannot be empty.',
+      dateRangeError: 'Start date cannot be after target date.',
       updateSuccess: 'Goal updated successfully.',
       updateError: 'Could not update goal.',
       itemTypeOptions: {

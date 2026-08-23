@@ -12,3 +12,8 @@ export function reorderGoalItemsLocal(items: GoalItem[], fromIndex: number, toIn
 export function patchGoalItemCompletion(items: GoalItem[], itemId: string, isCompleted: boolean): GoalItem[] {
   return items.map((item) => (item.id === itemId ? { ...item, is_completed: isCompleted } : item))
 }
+
+export function isValidGoalDateRange(startDate?: string, targetDate?: string): boolean {
+  if (!startDate || !targetDate) return true
+  return startDate <= targetDate
+}
