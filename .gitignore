@@ -67,3 +67,11 @@ graphify-out/
 memory/
 kichban.md
 README.md
+# rocket-core
+.devcore/state.json
+.devcore/state.json.*
+.devcore/bin/__pycache__/
+.claude/settings.local.json
+.claude/settings.json.bak.*
+# gstack (rocket-core's vendored dependency, ~32MB) - not committed, run install.ps1 to restore locally
+.claude/skills/gstack/
