@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { CalendarIcon, ChevronLeft, ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { getTodayLocalISODate } from '@/lib/date'
+import { getTodayLocalISODate, getYearOptions } from '@/lib/date'
 import { Popover, PopoverContent, PopoverTrigger } from './popover'
 
 const MONTHS = ['Tháng 1','Tháng 2','Tháng 3','Tháng 4','Tháng 5','Tháng 6','Tháng 7','Tháng 8','Tháng 9','Tháng 10','Tháng 11','Tháng 12']
@@ -31,6 +31,7 @@ export function DatePicker({ value, onChange, align = 'start', className }: Date
   const { year: initY, month: initMo } = parseISO(value)
   const [viewYear, setViewYear] = useState(initY)
   const [viewMonth, setViewMonth] = useState(initMo)
+  const yearOptions = getYearOptions(new Date().getFullYear(), viewYear)
 
   const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate()
   const firstDow = new Date(viewYear, viewMonth, 1).getDay()
@@ -60,14 +61,32 @@ export function DatePicker({ value, onChange, align = 'start', className }: Date
         {label}
       </PopoverTrigger>
       <PopoverContent className="w-auto p-3" align={align} sideOffset={6}>
-        {/* Month navigation */}
+        {/* Month/year navigation — direct-jump selects so a far-past date (e.g.
+            a birth year) doesn't require clicking prevMonth hundreds of times */}
         <div className="mb-3 flex items-center justify-between gap-2">
           <button type="button" onClick={prevMonth} className="rounded-md p-1 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900">
             <ChevronLeft className="h-4 w-4" />
           </button>
-          <span className="text-sm font-semibold text-zinc-900">
-            {MONTHS[viewMonth]} {viewYear}
-          </span>
+          <div className="flex items-center gap-1">
+            <select
+              value={viewMonth}
+              onChange={(e) => setViewMonth(Number(e.target.value))}
+              className="cursor-pointer rounded-md border-none bg-transparent text-sm font-semibold text-zinc-900 outline-none hover:bg-zinc-100"
+            >
+              {MONTHS.map((m, i) => (
+                <option key={m} value={i}>{m}</option>
+              ))}
+            </select>
+            <select
+              value={viewYear}
+              onChange={(e) => setViewYear(Number(e.target.value))}
+              className="cursor-pointer rounded-md border-none bg-transparent text-sm font-semibold text-zinc-900 outline-none hover:bg-zinc-100"
+            >
+              {yearOptions.map((y) => (
+                <option key={y} value={y}>{y}</option>
+              ))}
+            </select>
+          </div>
           <button type="button" onClick={nextMonth} className="rounded-md p-1 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900">
             <ChevronRight className="h-4 w-4" />
           </button>

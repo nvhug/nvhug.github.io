@@ -8,3 +8,16 @@ export function toLocalISODate(date: Date): string {
 export function getTodayLocalISODate(): string {
   return toLocalISODate(new Date())
 }
+
+// Year choices for a date picker's quick-jump dropdown: a generous window
+// around `currentYear` (100 back for a birth date, 10 forward for a future
+// plan date), always widened to include `includeYear` so a value outside the
+// default window (e.g. an already-saved date decades in the past) still has
+// a matching <option> instead of silently mismatching the select's display.
+export function getYearOptions(currentYear: number, includeYear: number): number[] {
+  const min = Math.min(currentYear - 100, includeYear)
+  const max = Math.max(currentYear + 10, includeYear)
+  const options: number[] = []
+  for (let year = max; year >= min; year--) options.push(year)
+  return options
+}
