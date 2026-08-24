@@ -70,3 +70,11 @@ kichban.md
 # rocket-core (DevCore) - local dev tooling only, not part of the pushed repo
 .claude/
 .devcore/
+
+# rocket-core
+.devcore/state.json
+.devcore/state.json.*
+.devcore/bin/__pycache__/
+.claude/settings.local.json
+.claude/settings.json.bak.*
+.claude/skills/gstack/
