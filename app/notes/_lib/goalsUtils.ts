@@ -2,6 +2,7 @@ import type { GoalItem } from '@/types'
 
 export function reorderGoalItemsLocal(items: GoalItem[], fromIndex: number, toIndex: number): GoalItem[] {
   if (fromIndex === toIndex) return [...items]
+  if (fromIndex < 0 || fromIndex >= items.length || toIndex < 0 || toIndex >= items.length) return [...items]
   const next = [...items]
   const [movedItem] = next.splice(fromIndex, 1)
   if (!movedItem) return [...items]

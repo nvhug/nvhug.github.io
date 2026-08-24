@@ -202,6 +202,13 @@ export function useGoalsActions(params: UseGoalsActionsParams) {
     if (!items || fromIndex === toIndex) return
 
     const newItems = reorderGoalItemsLocal(items, fromIndex, toIndex)
+    // reorderGoalItemsLocal rejects an out-of-range index by returning the
+    // items unchanged (same order, new array) — detect that here instead of
+    // re-validating the indices, so a rejected reorder is a true no-op and
+    // never falls through to the order-diff below (which compares against
+    // `order`, nullable for items never yet dragged, and would otherwise
+    // still push a "corrective" write to Supabase for those items).
+    if (newItems.every((item, idx) => item.id === items[idx]?.id)) return
 
     setGoalItems((prev) => ({ ...prev, [goalId]: newItems }))
 

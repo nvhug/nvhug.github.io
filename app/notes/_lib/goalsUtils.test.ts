@@ -24,6 +24,34 @@ describe('goals utils', () => {
     expect(source.map((x) => x.id)).toEqual(['a', 'b', 'c'])
   })
 
+  it('rejects a reorder with a negative fromIndex', () => {
+    const source = [item('a', 1), item('b', 2), item('c', 3)]
+    const reordered = reorderGoalItemsLocal(source, -1, 1)
+
+    expect(reordered.map((x) => x.id)).toEqual(['a', 'b', 'c'])
+  })
+
+  it('rejects a reorder with a negative toIndex', () => {
+    const source = [item('a', 1), item('b', 2), item('c', 3)]
+    const reordered = reorderGoalItemsLocal(source, 1, -1)
+
+    expect(reordered.map((x) => x.id)).toEqual(['a', 'b', 'c'])
+  })
+
+  it('rejects a reorder with fromIndex out of range', () => {
+    const source = [item('a', 1), item('b', 2), item('c', 3)]
+    const reordered = reorderGoalItemsLocal(source, 3, 1)
+
+    expect(reordered.map((x) => x.id)).toEqual(['a', 'b', 'c'])
+  })
+
+  it('rejects a reorder with toIndex out of range', () => {
+    const source = [item('a', 1), item('b', 2), item('c', 3)]
+    const reordered = reorderGoalItemsLocal(source, 1, 3)
+
+    expect(reordered.map((x) => x.id)).toEqual(['a', 'b', 'c'])
+  })
+
   it('patches completion for a single goal item', () => {
     const source = [item('a', 1), item('b', 2)]
     const patched = patchGoalItemCompletion(source, 'b', true)
