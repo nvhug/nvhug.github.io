@@ -61,12 +61,12 @@ temp/
 /docs/
 CLAUDE.md
 AGENTS.md
+README.md
 baiviet/
 sql/
 graphify-out/
 memory/
 kichban.md
-README.md
 # rocket-core
 .devcore/state.json
 .devcore/state.json.*
