@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest'
 
 import type { GoalItem } from '@/types'
-import { isValidGoalDateRange, patchGoalItemCompletion, reorderGoalItemsLocal } from './goalsUtils'
+import {
+  computeGoalDisplayStatus,
+  computeGoalProgress,
+  isValidGoalDateRange,
+  patchGoalItemCompletion,
+  reorderGoalItemsLocal,
+} from './goalsUtils'
 
 function item(id: string, order: number): GoalItem {
   return {
@@ -76,5 +82,50 @@ describe('goals utils', () => {
     expect(isValidGoalDateRange('', '2026-05-01')).toBe(true)
     expect(isValidGoalDateRange('2026-05-01', '')).toBe(true)
     expect(isValidGoalDateRange('', '')).toBe(true)
+  })
+
+  it('computes elapsed/total/remaining days when both dates are present', () => {
+    // No 'Z'/offset -- parsed as LOCAL midnight, matching how computeGoalProgress
+    // parses startDate/targetDate. Mixing a UTC `now` with locally-parsed dates
+    // would reintroduce the exact timezone bug this function fixes.
+    const now = new Date('2026-05-11T00:00:00')
+    const progress = computeGoalProgress('2026-05-01', '2026-05-21', now)
+
+    expect(progress).toEqual({ elapsedDays: 10, totalDays: 20, remainingDays: 10 })
+  })
+
+  it('returns a negative elapsedDays for a goal that has not started yet', () => {
+    const now = new Date('2026-04-25T00:00:00')
+    const progress = computeGoalProgress('2026-05-01', '2026-05-21', now)
+
+    expect(progress).not.toBeNull()
+    expect(progress?.elapsedDays).toBeLessThan(0)
+  })
+
+  it('returns null progress when either date is missing', () => {
+    expect(computeGoalProgress(undefined, '2026-05-21')).toBeNull()
+    expect(computeGoalProgress('2026-05-01', undefined)).toBeNull()
+    expect(computeGoalProgress(undefined, undefined)).toBeNull()
+  })
+
+  it('marks an active goal overdue once the target date has passed', () => {
+    expect(computeGoalDisplayStatus('active', '2026-05-01', '2026-05-02')).toBe('overdue')
+  })
+
+  it('does not mark an active goal overdue before the target date', () => {
+    expect(computeGoalDisplayStatus('active', '2026-05-21', '2026-05-02')).toBe('active')
+  })
+
+  it('does not mark an active goal overdue on the target date itself', () => {
+    expect(computeGoalDisplayStatus('active', '2026-05-02', '2026-05-02')).toBe('active')
+  })
+
+  it('never marks a completed or archived goal overdue', () => {
+    expect(computeGoalDisplayStatus('completed', '2026-05-01', '2026-05-02')).toBe('completed')
+    expect(computeGoalDisplayStatus('archived', '2026-05-01', '2026-05-02')).toBe('archived')
+  })
+
+  it('shows the plain status when there is no target date', () => {
+    expect(computeGoalDisplayStatus('active', undefined, '2026-05-02')).toBe('active')
   })
 })

@@ -1,5 +1,7 @@
 'use client'
 
+import { useState } from 'react'
+
 import { Check, CheckCircle2, ChevronDown, ChevronUp, Circle, Pencil, Plus, Trash2, X } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
@@ -8,6 +10,8 @@ import { Input } from '@/components/ui/input'
 import { getIntlLocale } from '@/lib/i18n/locale'
 import type { Lang } from '@/lib/i18n/language-context'
 import type { Goal, GoalItem } from '@/types'
+import { computeGoalProgress } from '../../_lib/goalsUtils'
+import { GoalDetailPreviewModal } from './GoalDetailPreviewModal'
 import type { GoalDraft, GoalItemDraft, GroupedTabProps, SetState, TextareaRef, Translate } from './types'
 
 type GoalFilter = 'active' | 'completed' | 'all'
@@ -127,6 +131,8 @@ export function GoalsTab({ actions, refs, state, ui }: GoalsTabProps) {
   } = actions
   const { editingGoalDescriptionRef, goalDescriptionRef } = refs
   const { autoTextareaClass, t } = ui
+  const [previewGoal, setPreviewGoal] = useState<Goal | null>(null)
+  const now = new Date()
   const activeGoalsCount = goals.filter((goal) => goal.status === 'active').length
   const completedGoalsCount = goals.filter((goal) => goal.status === 'completed').length
   const filteredGoals = goals.filter((goal) => goalFilter === 'all' || goal.status === goalFilter)
@@ -327,7 +333,12 @@ export function GoalsTab({ actions, refs, state, ui }: GoalsTabProps) {
                     ) : (
                       <div className="space-y-3">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <h3 className="font-medium text-base text-zinc-900">{goal.title}</h3>
+                          <h3
+                            className="cursor-pointer font-medium text-base text-zinc-900 hover:text-emerald-700"
+                            onClick={() => setPreviewGoal(goal)}
+                          >
+                            {goal.title}
+                          </h3>
                           <span className="text-sm px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700 font-medium">{getGoalTypeLabel(goal.type, t)}</span>
                           <button
                             type="button"
@@ -356,14 +367,10 @@ export function GoalsTab({ actions, refs, state, ui }: GoalsTabProps) {
                                   {goal.start_date && <span>📅 <span className="text-zinc-700 font-medium">{new Date(goal.start_date).toLocaleDateString(getIntlLocale(lang))}</span></span>}
                                   {goal.target_date && <span>🎯 <span className="text-zinc-700 font-medium">{new Date(goal.target_date).toLocaleDateString(getIntlLocale(lang))}</span></span>}
                                 </div>
-                                {goal.start_date && goal.target_date && (() => {
-                                  const start = new Date(goal.start_date)
-                                  const end = new Date(goal.target_date)
-                                  const now = new Date()
-                                  const totalDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
-                                  const elapsedDays = Math.ceil((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
-                                  const remainingDays = Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
-                                  return <div className="text-sm text-zinc-600">⏱️ <span className="font-medium text-zinc-700">{Math.max(0, elapsedDays)}/{totalDays}</span> {t('notes.goals.daysRemainingPrefix')} <span className="font-medium text-zinc-700">{Math.max(0, remainingDays)}</span></div>
+                                {(() => {
+                                  const progress = computeGoalProgress(goal.start_date, goal.target_date, now)
+                                  if (!progress) return null
+                                  return <div className="text-sm text-zinc-600">⏱️ <span className="font-medium text-zinc-700">{Math.max(0, progress.elapsedDays)}/{progress.totalDays}</span> {t('notes.goals.daysRemainingPrefix')} <span className="font-medium text-zinc-700">{Math.max(0, progress.remainingDays)}</span></div>
                                 })()}
                               </div>
                             )}
@@ -612,6 +619,20 @@ export function GoalsTab({ actions, refs, state, ui }: GoalsTabProps) {
           )}
         </div>
       </div>
+
+      {previewGoal && (
+        <GoalDetailPreviewModal
+          goal={previewGoal}
+          items={goalItems[previewGoal.id] || []}
+          lang={lang}
+          onClose={() => setPreviewGoal(null)}
+          onEdit={(goal) => {
+            setPreviewGoal(null)
+            startEditingGoal(goal)
+          }}
+          t={t}
+        />
+      )}
     </section>
   )
 }

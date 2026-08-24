@@ -674,6 +674,12 @@ export const vi = {
       itemsEmpty: 'Chưa có chi tiết nào.',
       reorderError: 'Không thể sắp xếp lại.',
       empty: 'Chưa có mục tiêu nào.',
+      statusOverdue: 'Quá hạn',
+      previewClose: 'Đóng',
+      previewEdit: 'Sửa',
+      previewNoDescription: 'Chưa có mô tả',
+      previewNoItems: 'Chưa có mục nào',
+      previewDaysLabel: 'Đã qua {elapsed}/{total} ngày',
     },
     toasts: {
       updateSuccess: 'Cập nhật thành công.',

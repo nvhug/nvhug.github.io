@@ -676,6 +676,12 @@ export const en: Dictionary = {
       itemsEmpty: 'No details yet.',
       reorderError: 'Could not reorder items.',
       empty: 'No goals yet.',
+      statusOverdue: 'Overdue',
+      previewClose: 'Close',
+      previewEdit: 'Edit',
+      previewNoDescription: 'No description',
+      previewNoItems: 'No items yet',
+      previewDaysLabel: '{elapsed}/{total} days elapsed',
     },
     toasts: {
       updateSuccess: 'Updated successfully.',
