@@ -96,15 +96,15 @@ if (-not (Test-Path $paths.FEATURE_DIR -PathType Container)) {
 }
 
 if (-not (Test-Path $paths.IMPL_PLAN -PathType Leaf)) {
-    [Console]::Error.WriteLine("ERROR: plan.md not found in $($paths.FEATURE_DIR)")
+    [Console]::Error.WriteLine("ERROR: 2-plan.md not found in $($paths.FEATURE_DIR)")
     $planCommand = '/speckit-plan'
     [Console]::Error.WriteLine("Run $planCommand first to create the implementation plan.")
     exit 1
 }
 
-# Check for tasks.md if required
+# Check for 3-tasks.md if required
 if ($RequireTasks -and -not (Test-Path $paths.TASKS -PathType Leaf)) {
-    [Console]::Error.WriteLine("ERROR: tasks.md not found in $($paths.FEATURE_DIR)")
+    [Console]::Error.WriteLine("ERROR: 3-tasks.md not found in $($paths.FEATURE_DIR)")
     $tasksCommand = '/speckit-tasks'
     [Console]::Error.WriteLine("Run $tasksCommand first to create the task list.")
     exit 1
@@ -124,9 +124,9 @@ if ((Test-Path $paths.CONTRACTS_DIR) -and (Get-ChildItem -Path $paths.CONTRACTS_
 
 if (Test-Path $paths.QUICKSTART) { $docs += 'quickstart.md' }
 
-# Include tasks.md if requested and it exists
+# Include 3-tasks.md if requested and it exists
 if ($IncludeTasks -and (Test-Path $paths.TASKS)) {
-    $docs += 'tasks.md'
+    $docs += '3-tasks.md'
 }
 
 # Output results

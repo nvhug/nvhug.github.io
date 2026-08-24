@@ -2,7 +2,7 @@
 
 **Branch**: `[###-feature-name]` | **Date**: [DATE] | **Spec**: [link]
 
-**Input**: Feature specification from `/specs/[###-feature-name]/spec.md`
+**Input**: Feature specification from `/specs/[###-feature-name]/1-spec.md`
 
 **Note**: This template is filled in by the `/speckit-plan` command; its definition describes the execution workflow.
 
@@ -42,18 +42,40 @@
 
 [Gates determined based on constitution file]
 
+## Research *(Phase 0)*
+
+<!--
+  ACTION REQUIRED: For each NEEDS CLARIFICATION in Technical Context, each
+  dependency, and each integration, record a decision here instead of a
+  separate research.md file.
+-->
+
+- **Decision**: [what was chosen]
+- **Rationale**: [why chosen]
+- **Alternatives considered**: [what else was evaluated]
+
+## Data Model *(Phase 1 — include if the feature involves data)*
+
+<!--
+  ACTION REQUIRED: Entity name, fields, relationships, validation rules
+  (from Requirements), state transitions if applicable. Replaces the
+  separate data-model.md file.
+-->
+
+- **[Entity]**: [fields, validation rules, relationships]
+
 ## Project Structure
 
 ### Documentation (this feature)
 
 ```text
 specs/[###-feature]/
-├── plan.md              # This file (/speckit-plan command output)
-├── research.md          # Phase 0 output (/speckit-plan command)
-├── data-model.md        # Phase 1 output (/speckit-plan command)
-├── quickstart.md        # Phase 1 output (/speckit-plan command)
-├── contracts/           # Phase 1 output (/speckit-plan command)
-└── tasks.md             # Phase 2 output (/speckit-tasks command - NOT created by /speckit-plan)
+├── 1-spec.md            # /speckit-specify command output
+├── 2-plan.md            # This file — includes Research, Data Model, and
+│                         # Quickstart/Validation as sections below (Phase 0/1
+│                         # output — /speckit-plan command)
+├── contracts/           # Phase 1 output (/speckit-plan command), if applicable
+└── 3-tasks.md           # Phase 2 output (/speckit-tasks command - NOT created by /speckit-plan)
 ```
 
 ### Source Code (repository root)
@@ -102,6 +124,14 @@ ios/ or android/
 
 **Structure Decision**: [Document the selected structure and reference the real
 directories captured above]
+
+## Quickstart / Validation *(Phase 1)*
+
+<!--
+  ACTION REQUIRED: Runnable validation scenarios that prove the feature works
+  end-to-end — prerequisites, setup/run commands, expected outcomes. Replaces
+  the separate quickstart.md file. No full implementation code here.
+-->
 
 ## Complexity Tracking
 

@@ -218,6 +218,28 @@ export const vi = {
     },
   },
 
+  tuVi: {
+    disclaimer:
+      'Nội dung tử vi chỉ mang tính tham khảo, giải trí — không phải lời khuyên chuyên môn về tài chính, sức khỏe hay pháp lý.',
+    onboardTitle: 'Xem tử vi — nhập thông tin của bạn',
+    editTitle: 'Chỉnh sửa thông tin tử vi',
+    birthDateLabel: 'Ngày sinh (dương lịch)',
+    genderLabel: 'Giới tính',
+    genderNam: 'Nam',
+    genderNu: 'Nữ',
+    genderKhac: 'Khác',
+    birthTimeLabel: 'Giờ sinh',
+    birthTimeUnknown: 'Không rõ giờ sinh',
+    submit: 'Lưu thông tin',
+    submitSaving: 'Đang lưu...',
+    errorDate: 'Ngày sinh không hợp lệ hoặc ở tương lai',
+    errorGender: 'Vui lòng chọn giới tính',
+    saveSuccess: 'Đã lưu thông tin tử vi',
+    saveError: 'Không lưu được, vui lòng thử lại',
+    overviewTitle: 'Vận trình của bạn',
+    overviewBody: 'Tính năng xem vận trình hằng ngày đang được xây dựng. Thông tin ngày sinh của bạn đã được lưu.',
+  },
+
   weightTracker: {
     invalidWeight: 'Cân nặng không hợp lệ',
     saveFailed: 'Lưu thất bại',

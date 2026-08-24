@@ -220,6 +220,28 @@ export const en: Dictionary = {
     },
   },
 
+  tuVi: {
+    disclaimer:
+      'Horoscope content is for reference/entertainment only — not professional financial, health, or legal advice.',
+    onboardTitle: 'Horoscope — tell us about yourself',
+    editTitle: 'Edit your horoscope info',
+    birthDateLabel: 'Birth date (solar calendar)',
+    genderLabel: 'Gender',
+    genderNam: 'Male',
+    genderNu: 'Female',
+    genderKhac: 'Other',
+    birthTimeLabel: 'Birth time',
+    birthTimeUnknown: "I don't know my birth time",
+    submit: 'Save',
+    submitSaving: 'Saving...',
+    errorDate: 'Birth date is invalid or in the future',
+    errorGender: 'Please select a gender',
+    saveSuccess: 'Horoscope info saved',
+    saveError: 'Could not save, please try again',
+    overviewTitle: 'Your fortune',
+    overviewBody: 'Daily fortune readings are still being built. Your birth info has been saved.',
+  },
+
   weightTracker: {
     invalidWeight: 'Invalid weight',
     saveFailed: 'Save failed',

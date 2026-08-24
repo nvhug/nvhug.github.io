@@ -7,7 +7,7 @@ description: "Task list template for feature implementation"
 
 **Input**: Design documents from `/specs/[###-feature-name]/`
 
-**Prerequisites**: plan.md (required), spec.md (required for user stories), research.md, data-model.md, contracts/
+**Prerequisites**: 2-plan.md (required — Research/Data Model/Quickstart are now sections inside it), 1-spec.md (required for user stories), contracts/
 
 **Tests**: The examples below include test tasks. Tests are OPTIONAL - only include them if explicitly requested in the feature specification.
 
@@ -24,16 +24,15 @@ description: "Task list template for feature implementation"
 - **Single project**: `src/`, `tests/` at repository root
 - **Web app**: `backend/src/`, `frontend/src/`
 - **Mobile**: `api/src/`, `ios/src/` or `android/src/`
-- Paths shown below assume single project - adjust based on plan.md structure
+- Paths shown below assume single project - adjust based on 2-plan.md structure
 
 <!--
   ============================================================================
   IMPORTANT: The tasks below are SAMPLE TASKS for illustration purposes only.
 
   The /speckit-tasks command MUST replace these with actual tasks based on:
-  - User stories from spec.md (with their priorities P1, P2, P3...)
-  - Feature requirements from plan.md
-  - Entities from data-model.md
+  - User stories from 1-spec.md (with their priorities P1, P2, P3...)
+  - Feature requirements and Data Model section from 2-plan.md
   - Endpoints from contracts/
 
   Tasks MUST be organized by user story so each story can be:
@@ -41,7 +40,7 @@ description: "Task list template for feature implementation"
   - Tested independently
   - Delivered as an MVP increment
 
-  DO NOT keep these sample tasks in the generated tasks.md file.
+  DO NOT keep these sample tasks in the generated 3-tasks.md file.
   ============================================================================
 -->
 
@@ -156,7 +155,7 @@ Examples of foundational tasks (adjust based on your project):
 - [ ] TXXX Performance optimization across all stories
 - [ ] TXXX [P] Additional unit tests (if requested) in tests/unit/
 - [ ] TXXX Security hardening
-- [ ] TXXX Run quickstart.md validation
+- [ ] TXXX Run the Quickstart/Validation section of 2-plan.md
 
 ---
 

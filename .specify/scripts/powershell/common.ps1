@@ -227,9 +227,13 @@ function Get-FeaturePathsEnv {
         REPO_ROOT     = $repoRoot
         CURRENT_BRANCH = $currentBranch
         FEATURE_DIR   = $featureDir
-        FEATURE_SPEC  = Join-Path $featureDir 'spec.md'
-        IMPL_PLAN     = Join-Path $featureDir 'plan.md'
-        TASKS         = Join-Path $featureDir 'tasks.md'
+        FEATURE_SPEC  = Join-Path $featureDir '1-spec.md'
+        IMPL_PLAN     = Join-Path $featureDir '2-plan.md'
+        TASKS         = Join-Path $featureDir '3-tasks.md'
+        # research.md/data-model.md/quickstart.md no longer exist as separate files —
+        # their content is now written as sections inside 2-plan.md (see speckit-plan
+        # SKILL.md). These three paths are kept only so the presence-check callers
+        # below degrade gracefully (Test-Path is always false, so nothing breaks).
         RESEARCH      = Join-Path $featureDir 'research.md'
         DATA_MODEL    = Join-Path $featureDir 'data-model.md'
         QUICKSTART    = Join-Path $featureDir 'quickstart.md'

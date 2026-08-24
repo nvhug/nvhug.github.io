@@ -250,7 +250,7 @@ if ($branchName -ne $originalBranchName) {
 }
 
 $featureDir = Join-Path $specsDir $branchName
-$specFile = Join-Path $featureDir 'spec.md'
+$specFile = Join-Path $featureDir '1-spec.md'
 
 if (-not $DryRun) {
     if ((Test-Path -LiteralPath $featureDir -PathType Container) -and -not $AllowExistingBranch) {

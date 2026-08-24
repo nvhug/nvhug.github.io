@@ -12,9 +12,10 @@ interface TimePickerProps {
   value: string // "HH:MM"
   onChange: (v: string) => void
   className?: string
+  disabled?: boolean
 }
 
-export function TimePicker({ value, onChange, className }: TimePickerProps) {
+export function TimePicker({ value, onChange, className, disabled }: TimePickerProps) {
   const [h = '00', m = '00'] = (value || '00:00').split(':')
   const hourRef = useRef<HTMLDivElement>(null)
   const minRef = useRef<HTMLDivElement>(null)
@@ -31,8 +32,9 @@ export function TimePicker({ value, onChange, className }: TimePickerProps) {
   return (
     <Popover onOpenChange={onOpen}>
       <PopoverTrigger
+        disabled={disabled}
         className={cn(
-          'inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-emerald-200 bg-white px-2.5 py-1.5 text-sm font-medium text-zinc-900 tabular-nums transition-colors hover:border-emerald-300 hover:bg-emerald-50/50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-emerald-400',
+          'inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-emerald-200 bg-white px-2.5 py-1.5 text-sm font-medium text-zinc-900 tabular-nums transition-colors hover:border-emerald-300 hover:bg-emerald-50/50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-emerald-400 disabled:cursor-not-allowed disabled:opacity-50',
           className
         )}
       >
