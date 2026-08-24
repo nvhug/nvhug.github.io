@@ -21,7 +21,7 @@ vi.mock('sonner', () => ({
   },
 }))
 
-function item(id: string, order: number | undefined): GoalItem {
+function item(id: string, order: number | undefined, overrides: Partial<GoalItem> = {}): GoalItem {
   return {
     id,
     goal_id: 'goal-1',
@@ -30,10 +30,11 @@ function item(id: string, order: number | undefined): GoalItem {
     is_completed: false,
     order,
     created_at: '2026-08-03T00:00:00.000Z',
+    ...overrides,
   }
 }
 
-function setup(items: GoalItem[]) {
+function setup(items: GoalItem[], overrides: Partial<Parameters<typeof useGoalsActions>[0]> = {}) {
   const setGoalItems = vi.fn()
   const { result } = renderHook(() =>
     useGoalsActions({
@@ -63,6 +64,7 @@ function setup(items: GoalItem[]) {
       setSavingGoal: vi.fn(),
       setSavingGoalItem: vi.fn(),
       t: (key: string) => key,
+      ...overrides,
     })
   )
   return { result, setGoalItems }
@@ -108,5 +110,112 @@ describe('useGoalsActions reorderGoalItems', () => {
     expect(setGoalItems).toHaveBeenCalled()
     expect(mockSupabaseFrom).toHaveBeenCalledWith('goal_items')
     expect(update).toHaveBeenCalled()
+  })
+})
+
+describe('useGoalsActions toggleGoalItem', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('sets completed_at when completing a not-yet-completed item', async () => {
+    const target = item('a', 1, { is_completed: false, completed_at: null })
+    const update = vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) })
+    mockSupabaseFrom.mockReturnValue({ update })
+    const { result, setGoalItems } = setup([target])
+
+    await act(async () => {
+      await result.current.toggleGoalItem(target)
+    })
+
+    expect(update).toHaveBeenCalledWith(expect.objectContaining({ is_completed: true, completed_at: expect.any(String) }))
+    const patcher = setGoalItems.mock.calls[0][0]
+    const patched = patcher({ 'goal-1': [target] })['goal-1'][0]
+    expect(patched.completed_at).toEqual(expect.any(String))
+  })
+
+  it('clears completed_at when un-completing a completed item', async () => {
+    const target = item('a', 1, { is_completed: true, completed_at: '2026-08-01T00:00:00.000Z' })
+    const update = vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) })
+    mockSupabaseFrom.mockReturnValue({ update })
+    const { result, setGoalItems } = setup([target])
+
+    await act(async () => {
+      await result.current.toggleGoalItem(target)
+    })
+
+    expect(update).toHaveBeenCalledWith(expect.objectContaining({ is_completed: false, completed_at: null }))
+    const patcher = setGoalItems.mock.calls[0][0]
+    const patched = patcher({ 'goal-1': [target] })['goal-1'][0]
+    expect(patched.completed_at).toBeNull()
+  })
+
+  it('rolls back completed_at (not just is_completed) on a failed write', async () => {
+    const target = item('a', 1, { is_completed: false, completed_at: null })
+    const update = vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: new Error('boom') }) })
+    mockSupabaseFrom.mockReturnValue({ update })
+    const { result, setGoalItems } = setup([target])
+
+    await act(async () => {
+      await result.current.toggleGoalItem(target)
+    })
+
+    // Second call is the rollback (first is the optimistic update).
+    const rollback = setGoalItems.mock.calls[1][0]
+    const rolledBack = rollback({ 'goal-1': [target] })['goal-1'][0]
+    expect(rolledBack.is_completed).toBe(false)
+    expect(rolledBack.completed_at).toBeNull()
+  })
+})
+
+describe('useGoalsActions saveEditingGoalItem', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('sets completed_at when the edit form transitions the item to completed', async () => {
+    const target = item('a', 1, { is_completed: false, completed_at: null })
+    const update = vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) })
+    mockSupabaseFrom.mockReturnValue({ update })
+    const { result } = setup([target], {
+      editingGoalItemDraft: { content: 'a', item_type: 'routine', is_completed: true, order: 1 },
+    })
+
+    await act(async () => {
+      await result.current.saveEditingGoalItem(target)
+    })
+
+    expect(update).toHaveBeenCalledWith(expect.objectContaining({ is_completed: true, completed_at: expect.any(String) }))
+  })
+
+  it('clears completed_at when the edit form transitions the item to not-completed', async () => {
+    const target = item('a', 1, { is_completed: true, completed_at: '2026-08-01T00:00:00.000Z' })
+    const update = vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) })
+    mockSupabaseFrom.mockReturnValue({ update })
+    const { result } = setup([target], {
+      editingGoalItemDraft: { content: 'a', item_type: 'routine', is_completed: false, order: 1 },
+    })
+
+    await act(async () => {
+      await result.current.saveEditingGoalItem(target)
+    })
+
+    expect(update).toHaveBeenCalledWith(expect.objectContaining({ is_completed: false, completed_at: null }))
+  })
+
+  it('leaves completed_at untouched when re-saving with completed state unchanged', async () => {
+    const target = item('a', 1, { is_completed: true, completed_at: '2026-08-01T00:00:00.000Z' })
+    const update = vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) })
+    mockSupabaseFrom.mockReturnValue({ update })
+    const { result } = setup([target], {
+      // Only content changed; is_completed stays true -- must not re-stamp completed_at.
+      editingGoalItemDraft: { content: 'edited', item_type: 'routine', is_completed: true, order: 1 },
+    })
+
+    await act(async () => {
+      await result.current.saveEditingGoalItem(target)
+    })
+
+    expect(update).toHaveBeenCalledWith(expect.objectContaining({ completed_at: '2026-08-01T00:00:00.000Z' }))
   })
 })

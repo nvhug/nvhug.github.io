@@ -5,6 +5,7 @@ import {
   computeGoalDisplayStatus,
   computeGoalProgress,
   isValidGoalDateRange,
+  nextCompletedAt,
   patchGoalItemCompletion,
   reorderGoalItemsLocal,
 } from './goalsUtils'
@@ -58,12 +59,22 @@ describe('goals utils', () => {
     expect(reordered.map((x) => x.id)).toEqual(['a', 'b', 'c'])
   })
 
-  it('patches completion for a single goal item', () => {
+  it('patches completion and completed_at for a single goal item', () => {
     const source = [item('a', 1), item('b', 2)]
-    const patched = patchGoalItemCompletion(source, 'b', true)
+    const patched = patchGoalItemCompletion(source, 'b', true, '2026-08-24T00:00:00.000Z')
 
     expect(patched[0].is_completed).toBe(false)
+    expect(patched[0].completed_at).toBeUndefined()
     expect(patched[1].is_completed).toBe(true)
+    expect(patched[1].completed_at).toBe('2026-08-24T00:00:00.000Z')
+  })
+
+  it('patches completed_at back to null when un-completing', () => {
+    const source = [item('a', 1)]
+    const patched = patchGoalItemCompletion(source, 'a', false, null)
+
+    expect(patched[0].is_completed).toBe(false)
+    expect(patched[0].completed_at).toBeNull()
   })
 
   it('rejects a start date after the target date', () => {
@@ -127,5 +138,21 @@ describe('goals utils', () => {
 
   it('shows the plain status when there is no target date', () => {
     expect(computeGoalDisplayStatus('active', undefined, '2026-05-02')).toBe('active')
+  })
+
+  it('nextCompletedAt sets the timestamp when transitioning to completed', () => {
+    const now = new Date('2026-08-24T10:00:00.000Z')
+    expect(nextCompletedAt(false, true, undefined, now)).toBe('2026-08-24T10:00:00.000Z')
+  })
+
+  it('nextCompletedAt clears the timestamp when transitioning to not-completed', () => {
+    const now = new Date('2026-08-24T10:00:00.000Z')
+    expect(nextCompletedAt(true, false, '2026-08-01T00:00:00.000Z', now)).toBeNull()
+  })
+
+  it('nextCompletedAt leaves an existing timestamp untouched when completed state does not change', () => {
+    const now = new Date('2026-08-24T10:00:00.000Z')
+    expect(nextCompletedAt(true, true, '2026-08-01T00:00:00.000Z', now)).toBe('2026-08-01T00:00:00.000Z')
+    expect(nextCompletedAt(false, false, null, now)).toBeNull()
   })
 })

@@ -7,7 +7,7 @@ import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import type { Goal, GoalItem } from '@/types'
 import type { GoalDraft, GoalItemDraft, SetState, Translate } from '../_components/tabs/types'
-import { isValidGoalDateRange, patchGoalItemCompletion, reorderGoalItemsLocal } from '../_lib/goalsUtils'
+import { isValidGoalDateRange, nextCompletedAt, patchGoalItemCompletion, reorderGoalItemsLocal } from '../_lib/goalsUtils'
 
 type UseGoalsActionsParams = {
   deleteGoal: Goal | null
@@ -178,20 +178,24 @@ export function useGoalsActions(params: UseGoalsActionsParams) {
 
   const toggleGoalItem = useCallback(async (item: GoalItem) => {
     const previousIsCompleted = !!item.is_completed
+    const previousCompletedAt = item.completed_at ?? null
     const nextIsCompleted = !previousIsCompleted
+    const nextCompletedAtValue = nextCompletedAt(previousIsCompleted, nextIsCompleted, previousCompletedAt)
 
     setGoalItems((prev) => ({
       ...prev,
-      [item.goal_id]: patchGoalItemCompletion(prev[item.goal_id] || [], item.id, nextIsCompleted),
+      [item.goal_id]: patchGoalItemCompletion(prev[item.goal_id] || [], item.id, nextIsCompleted, nextCompletedAtValue),
     }))
 
     try {
-      const { error } = await supabase.from('goal_items').update({ is_completed: nextIsCompleted }).eq('id', item.id)
+      const { error } = await supabase.from('goal_items')
+        .update({ is_completed: nextIsCompleted, completed_at: nextCompletedAtValue })
+        .eq('id', item.id)
       if (error) throw error
     } catch {
       setGoalItems((prev) => ({
         ...prev,
-        [item.goal_id]: patchGoalItemCompletion(prev[item.goal_id] || [], item.id, previousIsCompleted),
+        [item.goal_id]: patchGoalItemCompletion(prev[item.goal_id] || [], item.id, previousIsCompleted, previousCompletedAt),
       }))
       toast.error(t('notes.toasts.updateError'))
     }
@@ -268,6 +272,10 @@ export function useGoalsActions(params: UseGoalsActionsParams) {
       return
     }
 
+    const wasCompleted = !!item.is_completed
+    const isCompleted = editingGoalItemDraft.is_completed || false
+    const completedAt = nextCompletedAt(wasCompleted, isCompleted, item.completed_at)
+
     setSavingGoalItem(true)
     try {
       const { error } = await supabase.from('goal_items').update({
@@ -275,7 +283,8 @@ export function useGoalsActions(params: UseGoalsActionsParams) {
         item_type: editingGoalItemDraft.item_type,
         result: editingGoalItemDraft.result || null,
         metadata: editingGoalItemDraft.metadata || {},
-        is_completed: editingGoalItemDraft.is_completed || false,
+        is_completed: isCompleted,
+        completed_at: completedAt,
       }).eq('id', item.id)
       if (error) throw error
 
@@ -289,7 +298,8 @@ export function useGoalsActions(params: UseGoalsActionsParams) {
                 item_type: editingGoalItemDraft.item_type,
                 result: editingGoalItemDraft.result,
                 metadata: editingGoalItemDraft.metadata,
-                is_completed: editingGoalItemDraft.is_completed,
+                is_completed: isCompleted,
+                completed_at: completedAt,
               }
             : i
         ) || [],

@@ -138,6 +138,7 @@ export interface GoalItem {
   metadata?: Record<string, unknown> // JSON: { calories, duration, reps, etc. }
   result?: string // Kết quả sau khi hoàn thành
   is_completed?: boolean
+  completed_at?: string | null // Set when is_completed transitions to true, cleared when it transitions to false
   order?: number // For drag-drop sorting
   created_at: string
   updated_at?: string

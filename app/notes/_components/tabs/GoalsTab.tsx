@@ -459,7 +459,11 @@ export function GoalsTab({ actions, refs, state, ui }: GoalsTabProps) {
                           }}
                           className={`flex flex-col sm:flex-row sm:items-start gap-2 rounded-lg border p-2 transition-all cursor-move group ${draggedItemId === item.id ? 'opacity-50 border-emerald-400 bg-emerald-100' : 'border-emerald-50 bg-emerald-50/50'} ${dragOverItemId === item.id && draggedItemId !== item.id ? 'border-emerald-400 bg-emerald-100/50' : ''} hover:bg-emerald-100/30`}
                         >
-                          <button onClick={() => void toggleGoalItem(item)} className="shrink-0 mt-0.5 text-emerald-600 hover:text-emerald-700 transition-colors">
+                          <button
+                            onClick={() => void toggleGoalItem(item)}
+                            disabled={editingGoalItemId === item.id}
+                            className="shrink-0 mt-0.5 text-emerald-600 hover:text-emerald-700 transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+                          >
                             {item.is_completed ? <CheckCircle2 className="h-4 w-4" /> : <Circle className="h-4 w-4" />}
                           </button>
                           <div className="flex-1 w-full">

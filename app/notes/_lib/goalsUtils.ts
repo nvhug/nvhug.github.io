@@ -10,8 +10,29 @@ export function reorderGoalItemsLocal(items: GoalItem[], fromIndex: number, toIn
   return next
 }
 
-export function patchGoalItemCompletion(items: GoalItem[], itemId: string, isCompleted: boolean): GoalItem[] {
-  return items.map((item) => (item.id === itemId ? { ...item, is_completed: isCompleted } : item))
+export function patchGoalItemCompletion(
+  items: GoalItem[],
+  itemId: string,
+  isCompleted: boolean,
+  completedAt: string | null
+): GoalItem[] {
+  return items.map((item) => (item.id === itemId ? { ...item, is_completed: isCompleted, completed_at: completedAt } : item))
+}
+
+// Shared by every code path that can change a goal item's completed state
+// (the dedicated toggle, and the "Done" checkbox in the item edit form) so
+// both agree: set on a false->true transition, clear on true->false, leave
+// untouched otherwise (an unrelated edit re-saving the same completed state
+// must not disturb when it was actually completed).
+export function nextCompletedAt(
+  wasCompleted: boolean,
+  isCompleted: boolean,
+  previousCompletedAt: string | null | undefined,
+  now: Date = new Date()
+): string | null {
+  if (isCompleted && !wasCompleted) return now.toISOString()
+  if (!isCompleted && wasCompleted) return null
+  return previousCompletedAt ?? null
 }
 
 export function isValidGoalDateRange(startDate?: string, targetDate?: string): boolean {
