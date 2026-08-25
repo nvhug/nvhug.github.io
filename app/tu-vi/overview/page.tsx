@@ -11,6 +11,7 @@ import { fetchHoroscopeProfile } from '@/lib/horoscope-profile-client'
 import type { HoroscopeProfile } from '@/lib/horoscope-profile'
 import { buildReading } from '@/lib/tuvi/reading'
 import { vietnamTodaySolar } from '@/lib/horoscope-interpretation'
+import { westernZodiacSign } from '@/lib/western-zodiac'
 import { LaSoFull, LaSoMini } from '@/components/tu-vi/LaSoGrid'
 import { ChartOverlay } from '@/components/tu-vi/ChartOverlay'
 import { ReadingSections } from '@/components/tu-vi/ReadingSections'
@@ -72,6 +73,12 @@ export default function TuViOverviewPage() {
     return buildReading(profile, { day, month, year })
   }, [profile, todayKey])
 
+  const westernSign = useMemo(() => {
+    if (!profile) return null
+    const [, month, day] = profile.birthDateSolar.split('-').map(Number)
+    return westernZodiacSign({ month, day })
+  }, [profile])
+
   if (authLoading || checkingProfile) {
     return (
       <main className="min-h-svh bg-[#f7fef9] pt-24">
@@ -114,9 +121,11 @@ export default function TuViOverviewPage() {
             <h1 className="mt-1 font-tuvi-serif text-lg leading-tight text-[#18181b] md:text-2xl">
               {reading.yearName}
             </h1>
-            {/* One middle dot on this line, which is the ration (taste-skill 9.F). */}
+            {/* One middle dot on this line, which is the ration (taste-skill 9.F);
+                the Western sign is parenthetical rather than a second dot. */}
             <p className="font-tuvi-sans text-sm text-[#52525b]">
               {reading.napAm.name} · {t('tuVi.zodiacPrefix')} {reading.zodiac}
+              {westernSign && ` (${westernSign})`}
             </p>
             <Link
               href="/tu-vi/edit"
