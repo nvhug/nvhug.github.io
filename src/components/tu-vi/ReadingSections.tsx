@@ -247,16 +247,10 @@ export function ReadingSections({
   if (scores) {
     const weakest = findWeakestArea(reading.chart.palaces)
     let weakestPalace: Palace | null | undefined
-    let weakestLabel = ''
     if (weakest) {
-      if (weakest.key === 'menh') {
-        weakestPalace = reading.menh
-        weakestLabel = t('tuVi.sectionMenh')
-      } else {
-        const areaKey = weakest.key
-        weakestPalace = reading.chart.palaces.find((p) => p.name === AREA_PALACE[areaKey])
-        weakestLabel = t(AREAS.find(([key]) => key === areaKey)![1])
-      }
+      const areaKey = weakest.key
+      weakestPalace =
+        areaKey === 'menh' ? reading.menh : reading.chart.palaces.find((p) => p.name === AREA_PALACE[areaKey])
     }
 
     rows = [
@@ -297,7 +291,7 @@ export function ReadingSections({
             {
               key: 'diemYeu' as const,
               icon: '⚠️',
-              label: `${t('tuVi.sectionWeakness')} (${weakestLabel})`,
+              label: t('tuVi.sectionWeakness'),
               value: weakest.breakdown.percent,
               interpretKey: 'diemYeu',
               detail: <PalaceScoreDetail palace={weakestPalace} />,

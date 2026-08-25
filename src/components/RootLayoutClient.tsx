@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { BookOpen, CircleDollarSign, Home, LogOut, NotebookPen, Quote, Settings, User as UserIcon, type LucideIcon } from 'lucide-react'
+import { BookOpen, CircleDollarSign, Home, LogOut, NotebookPen, Quote, Settings, Sparkles, User as UserIcon, type LucideIcon } from 'lucide-react'
 import { Toaster } from 'sonner'
 import { useEffect, useRef, useState } from 'react'
 import { getSupabaseBrowserClient } from '@/lib/supabase-browser'
@@ -148,6 +148,7 @@ export function RootLayoutClient({ children }: { children: React.ReactNode }) {
   const navItems = [
     { href: '/notes', label: t('header.navNotes'), icon: NotebookPen },
     { href: '/finance', label: t('header.navFinance'), icon: CircleDollarSign },
+    { href: '/tu-vi', label: t('header.navTuVi'), icon: Sparkles },
     { href: '/blog', label: t('header.navBlog'), icon: BookOpen },
     { href: '/quotes', label: t('header.navQuotes'), icon: Quote },
   ]
