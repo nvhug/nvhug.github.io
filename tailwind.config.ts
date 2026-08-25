@@ -30,6 +30,10 @@ const config = {
         poppins: ['var(--font-poppins)', 'system-ui', 'sans-serif'],
         inter: ['var(--font-inter)', 'system-ui', 'sans-serif'],
         playfair: ['var(--font-playfair)', 'Georgia', 'serif'],
+        // Scoped to /tu-vi — see docs/DESIGN.md "Sổ Tử Vi" direction.
+        'tuvi-serif': ['var(--font-tuvi-serif)', 'Georgia', 'serif'],
+        'tuvi-sans': ['var(--font-tuvi-sans)', 'system-ui', 'sans-serif'],
+        'tuvi-mono': ['var(--font-tuvi-mono)', 'monospace'],
       },
       fontSize: {
         '4.5xl': '48px',

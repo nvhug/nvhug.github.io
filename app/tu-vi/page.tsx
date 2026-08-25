@@ -12,26 +12,59 @@ export default function TuViOnboardingPage() {
   const { t } = useLanguage()
   const { user, loading: authLoading } = useRequireAuth()
   const [checkingProfile, setCheckingProfile] = useState(true)
+  const [loadFailed, setLoadFailed] = useState(false)
+  const [reloadKey, setReloadKey] = useState(0)
 
   useEffect(() => {
     if (!user) return
     const userId = user.id
+    let cancelled = false
+
     async function checkExistingProfile() {
-      const { profile } = await fetchHoroscopeProfile(userId)
-      // On a fetch error, `profile` is null the same as "not onboarded yet" —
-      // showing the onboarding form again is the safe default (annoying at
-      // worst), unlike the overview page where the same ambiguity must not
-      // bounce an already-onboarded user back into onboarding.
+      const { profile, error } = await fetchHoroscopeProfile(userId)
+      if (cancelled) return
+      // A fetch error must NOT open a blank form: it would pre-fill today's date
+      // and saving would overwrite the real birth date with it (spec FR-004).
+      if (error) {
+        setLoadFailed(true)
+        setCheckingProfile(false)
+        return
+      }
       if (profile) { router.replace('/tu-vi/overview'); return }
+      setLoadFailed(false)
       setCheckingProfile(false)
     }
+
     void checkExistingProfile()
-  }, [user, router])
+    return () => {
+      cancelled = true
+    }
+  }, [user, router, reloadKey])
 
   if (authLoading || checkingProfile || !user) {
     return (
       <main className="min-h-svh bg-[#f7fef9] pt-24">
         <p className="text-center text-sm text-zinc-500">{t('common.loading')}</p>
+      </main>
+    )
+  }
+
+  if (loadFailed) {
+    return (
+      <main className="min-h-svh bg-[#f7fef9] px-4 pb-16 pt-24 sm:px-6">
+        <div className="mx-auto w-full max-w-md rounded-2xl border border-emerald-200/70 bg-white/85 p-6 text-center">
+          <p className="text-sm text-zinc-500">{t('tuVi.loadError')}</p>
+          <button
+            type="button"
+            onClick={() => {
+              setCheckingProfile(true)
+              setReloadKey((key) => key + 1)
+            }}
+            className="mt-3 rounded-lg border border-emerald-300 px-3 py-1.5 text-sm font-medium text-emerald-700 transition-colors hover:bg-emerald-50"
+          >
+            {t('tuVi.loadRetry')}
+          </button>
+        </div>
       </main>
     )
   }

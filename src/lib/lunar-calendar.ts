@@ -138,3 +138,70 @@ export function solarToLunar(date: SolarDate): LunarDate {
 
   return { day: lunarDay, month: lunarMonth, year: lunarYear, isLeapMonth }
 }
+
+// Julian Day Number for a solar date. Exposed because the tu vi day pillar
+// (can chi of the day) runs on an unbroken 60-day cycle defined on the JDN,
+// independent of lunar months. See src/lib/tuvi/can-chi.ts.
+export function julianDayNumber(date: SolarDate): number {
+  return jdFromDate(date)
+}
+
+/** Inverse of jdFromDate: a Julian Day Number back to a Gregorian date. */
+function jdToDate(jd: number): SolarDate {
+  let a: number
+  let b: number
+  let c: number
+  if (jd > 2299160) {
+    a = jd + 32044
+    b = Math.floor((4 * a + 3) / 146097)
+    c = a - Math.floor((b * 146097) / 4)
+  } else {
+    b = 0
+    c = jd + 32082
+  }
+  const d = Math.floor((4 * c + 3) / 1461)
+  const e = c - Math.floor((1461 * d) / 4)
+  const m = Math.floor((5 * e + 2) / 153)
+  const day = e - Math.floor((153 * m + 2) / 5) + 1
+  const month = m + 3 - 12 * Math.floor(m / 10)
+  const year = b * 100 + d - 4800 + Math.floor(m / 10)
+  return { day, month, year }
+}
+
+/**
+ * Inverse of solarToLunar. Returns { day: 0, month: 0, year: 0 } when the
+ * input claims a leap month that lunarYear does not actually have — the
+ * caller (isValidLunarBirthDate) treats that sentinel as invalid input
+ * rather than a real date.
+ */
+export function lunarToSolar(lunar: LunarDate): SolarDate {
+  const { day, month, year, isLeapMonth } = lunar
+
+  let a11: number
+  let b11: number
+  if (month < 11) {
+    a11 = getLunarMonth11(year - 1)
+    b11 = getLunarMonth11(year)
+  } else {
+    a11 = getLunarMonth11(year)
+    b11 = getLunarMonth11(year + 1)
+  }
+
+  const k = Math.floor(0.5 + (a11 - 2415021.076998695) / 29.530588853)
+  let off = month - 11
+  if (off < 0) off += 12
+
+  if (b11 - a11 > 365) {
+    const leapOff = getLeapMonthOffset(a11)
+    let leapMonth = leapOff - 2
+    if (leapMonth < 0) leapMonth += 12
+    if (isLeapMonth && month !== leapMonth) {
+      return { day: 0, month: 0, year: 0 }
+    } else if (isLeapMonth || off >= leapOff) {
+      off += 1
+    }
+  }
+
+  const monthStart = getNewMoonDay(k + off)
+  return jdToDate(monthStart + day - 1)
+}

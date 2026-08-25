@@ -1,0 +1,67 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`full chart layout for a fixed profile > places every star where the rule tables put it 1`] = `
+{
+  "Dần": [
+    "Tham Lang",
+  ],
+  "Dậu": [
+    "Hồng Loan",
+    "Kình Dương",
+    "Linh Tinh",
+  ],
+  "Hợi": [
+    "Thiên Đồng",
+  ],
+  "Mão": [
+    "Cự Môn",
+    "Thiên Cơ",
+    "Thiên Hỷ",
+    "Đào Hoa",
+  ],
+  "Mùi": [
+    "Hỏa Tinh",
+    "Thiên Việt",
+    "Đà La",
+  ],
+  "Ngọ": [
+    "Hữu Bật",
+    "Thất Sát",
+  ],
+  "Sửu": [
+    "Thiên Khôi",
+    "Thái Dương",
+    "Thái Âm",
+  ],
+  "Thân": [
+    "Cô Thần",
+    "Liêm Trinh",
+    "Lộc Tồn",
+    "Thiên Mã",
+    "Tả Phù",
+  ],
+  "Thìn": [
+    "Phượng Các",
+    "Quả Tú",
+    "Thiên Tướng",
+    "Tử Vi",
+    "Văn Xương",
+  ],
+  "Tuất": [
+    "Long Trì",
+    "Phá Quân",
+    "Văn Khúc",
+  ],
+  "Tý": [
+    "Thiên Hư",
+    "Thiên Khốc",
+    "Thiên Phủ",
+    "Vũ Khúc",
+  ],
+  "Tỵ": [
+    "Thiên Lương",
+    "Địa Không",
+    "Địa Kiếp",
+  ],
+}
+`;
