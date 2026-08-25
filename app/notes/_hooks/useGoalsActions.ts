@@ -9,6 +9,14 @@ import type { Goal, GoalItem } from '@/types'
 import type { GoalDraft, GoalItemDraft, SetState, Translate } from '../_components/tabs/types'
 import { isValidGoalDateRange, nextCompletedAt, patchGoalItemCompletion, reorderGoalItemsLocal } from '../_lib/goalsUtils'
 
+function sanitizeGoalDraft(draft: GoalDraft) {
+  return {
+    ...draft,
+    target_date: draft.target_date ? draft.target_date : null,
+    start_date: draft.start_date ? draft.start_date : null,
+  }
+}
+
 type UseGoalsActionsParams = {
   deleteGoal: Goal | null
   deleteGoalItem: GoalItem | null
@@ -87,7 +95,7 @@ export function useGoalsActions(params: UseGoalsActionsParams) {
     if (!goalDraft || !goalDraft.title.trim()) return
     setSavingGoal(true)
     try {
-      const { error } = await supabase.from('goals').insert([goalDraft])
+      const { error } = await supabase.from('goals').insert([sanitizeGoalDraft(goalDraft)])
       if (error) throw error
       setGoalDraft(null)
       const { data, error: fetchError } = await supabase.from('goals').select('*').order('created_at', { ascending: false })
@@ -347,13 +355,14 @@ export function useGoalsActions(params: UseGoalsActionsParams) {
 
     setSavingGoal(true)
     try {
+      const sanitized = sanitizeGoalDraft(editingGoalDraft)
       const { error } = await supabase.from('goals').update({
-        title: editingGoalDraft.title,
-        type: editingGoalDraft.type,
-        description: editingGoalDraft.description,
-        start_date: editingGoalDraft.start_date,
-        target_date: editingGoalDraft.target_date,
-        completion_percentage: editingGoalDraft.completion_percentage,
+        title: sanitized.title,
+        type: sanitized.type,
+        description: sanitized.description,
+        start_date: sanitized.start_date,
+        target_date: sanitized.target_date,
+        completion_percentage: sanitized.completion_percentage,
       }).eq('id', goal.id)
       if (error) throw error
 
