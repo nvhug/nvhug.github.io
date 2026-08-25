@@ -10,7 +10,10 @@ export type InterpretationSections = Record<string, InterpretationSection>
 
 export type InterpretationState =
   | { status: 'loading' }
-  | { status: 'ready'; sections: InterpretationSections }
+  /** `remaining` is present only right after a generation actually spent a
+      slot — a cache hit spends nothing and an exempt role counts nothing, and
+      neither has a number worth showing. */
+  | { status: 'ready'; sections: InterpretationSections; remaining?: number }
   | { status: 'failed' }
   | { status: 'limited' }
 
@@ -18,6 +21,35 @@ export type InterpretationState =
  * Loads on its own, after and independently of the computed reading, so a
  * slow or failed AI call degrades only the sections it feeds (spec FR-011).
  */
+/**
+ * In-flight requests, shared per (language, attempt).
+ *
+ * Two things make an un-deduplicated fetch here expensive rather than merely
+ * wasteful: React Strict Mode mounts every effect twice in development, and the
+ * route behind this claims a generation slot and bills a completion BEFORE it
+ * can know the caller went away. Sharing the promise means the second mount
+ * subscribes to the first request instead of paying for a second one.
+ *
+ * Entries are dropped as soon as they settle, so a later remount refetches
+ * rather than replaying an old result — including an old failure.
+ */
+const inFlight = new Map<string, Promise<Response>>()
+
+function fetchInterpretation(lang: string, attempt: number): Promise<Response> {
+  const key = `${lang}:${attempt}`
+  const existing = inFlight.get(key)
+  if (existing) return existing
+
+  const request = fetch('/api/tu-vi/interpret', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ lang }),
+  }).finally(() => inFlight.delete(key))
+
+  inFlight.set(key, request)
+  return request
+}
+
 export function useInterpretation(lang: string) {
   const [state, setState] = useState<InterpretationState>({ status: 'loading' })
   const [attempt, setAttempt] = useState(0)
@@ -32,16 +64,13 @@ export function useInterpretation(lang: string) {
 
   useEffect(() => {
     let cancelled = false
-    const controller = new AbortController()
 
     async function load() {
       try {
-        const res = await fetch('/api/tu-vi/interpret', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ lang }),
-          signal: controller.signal,
-        })
+        // Not aborted on cleanup: the response is a paid, server-cached
+        // generation, so letting it finish and land in the cache is strictly
+        // better than throwing it away and asking for another one.
+        const res = (await fetchInterpretation(lang, attempt)).clone()
         if (res.status === 429) {
           if (!cancelled) setState({ status: 'limited' })
           return
@@ -52,7 +81,15 @@ export function useInterpretation(lang: string) {
         // record behind it, and rendering a malformed one would blank the page.
         const sections = parseInterpretationSections(data.sections)
         if (cancelled) return
-        setState(sections ? { status: 'ready', sections } : { status: 'failed' })
+        setState(
+          sections
+            ? {
+                status: 'ready',
+                sections,
+                remaining: typeof data.remaining === 'number' ? data.remaining : undefined,
+              }
+            : { status: 'failed' },
+        )
       } catch {
         if (!cancelled) setState({ status: 'failed' })
       }
@@ -61,7 +98,6 @@ export function useInterpretation(lang: string) {
     void load()
     return () => {
       cancelled = true
-      controller.abort()
     }
   }, [attempt, lang])
 

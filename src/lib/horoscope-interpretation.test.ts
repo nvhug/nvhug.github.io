@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import type { HoroscopeProfile } from './horoscope-profile'
 import {
@@ -5,7 +6,12 @@ import {
   lunarDayKey,
   parseInterpretationSections,
   profileFingerprint,
+  INTERPRETATION_VERSION,
+  isUnlimitedTuviRole,
   readCachedInterpretation,
+  SECTIONS_MAX_TOKENS,
+  SECTIONS_TIMEOUT_MS,
+  TUVI_DAILY_LIMIT,
   vietnamTodaySolar,
 } from './horoscope-interpretation'
 import { buildReading } from './tuvi/reading'
@@ -219,10 +225,28 @@ describe('vietnamTodaySolar', () => {
 describe('readCachedInterpretation', () => {
   const fingerprint = 'fp'
   const lunarDay = '2026-7-13'
-  const valid = { sections: fullSections, profileFingerprint: fingerprint, lunarDay }
+  const valid = {
+    sections: fullSections,
+    profileFingerprint: fingerprint,
+    lunarDay,
+    version: INTERPRETATION_VERSION,
+  }
 
   it('returns the stored sections when the fingerprint and lunar day both match', () => {
-    expect(readCachedInterpretation(valid, fingerprint, lunarDay)).toEqual(fullSections)
+    expect(readCachedInterpretation(valid, fingerprint, lunarDay)).toEqual({
+      sections: fullSections,
+      current: true,
+    })
+  })
+
+  it('marks a reading from an older prompt as not current', () => {
+    // Returned rather than dropped: the route regenerates it, but falls back to
+    // this text if the reader has no generation left today.
+    const older = { ...valid, version: INTERPRETATION_VERSION - 1 }
+    expect(readCachedInterpretation(older, fingerprint, lunarDay)?.current).toBe(false)
+    // A record predating the version field at all counts the same way.
+    const { version: _version, ...unversioned } = valid
+    expect(readCachedInterpretation(unversioned, fingerprint, lunarDay)?.current).toBe(false)
   })
 
   it('misses when the birth data changed', () => {
@@ -271,5 +295,48 @@ describe('buildInterpretationPrompt language', () => {
 
   it('feeds the same computed values in either language', () => {
     expect(buildInterpretationPrompt(reading, profile, 'en')).toContain('Canh Ngọ')
+  })
+})
+
+describe('sections generation budget', () => {
+  // Slowest sustained output rate seen across five real completions on four
+  // different charts (2331-3026 output tokens, 18.7-24.8s each).
+  const MEASURED_TOKENS_PER_SECOND = 120
+  // The longest of those five completions.
+  const MEASURED_CEILING_TOKENS = 3026
+
+  it('allows more tokens than the longest completion actually measured', () => {
+    // 2800 sat below this, so the longer half of the natural sampling spread
+    // came back as truncated JSON and lost the whole reading after billing.
+    expect(SECTIONS_MAX_TOKENS).toBeGreaterThan(MEASURED_CEILING_TOKENS)
+  })
+
+  it('waits longer than the completion it allows takes to produce', () => {
+    // Raising the token ceiling without raising this only turns a truncated
+    // reading into a timed-out one.
+    const worstCaseMs = (SECTIONS_MAX_TOKENS / MEASURED_TOKENS_PER_SECOND) * 1000
+    expect(SECTIONS_TIMEOUT_MS).toBeGreaterThan(worstCaseMs)
+  })
+})
+
+describe('daily generation cap', () => {
+  it('matches the limit the SQL function actually enforces', () => {
+    // The TS copy only feeds the "N left today" line; the SQL one is what holds
+    // the cap. Drift between them would show the reader a number that is not the
+    // one they are being held to.
+    const sql = readFileSync('sql/tuvi_daily_usage.sql', 'utf8')
+    const limit = /v_limit\s+CONSTANT\s+INT\s*:=\s*(\d+)/.exec(sql)?.[1]
+    expect(Number(limit)).toBe(TUVI_DAILY_LIMIT)
+  })
+
+  it('exempts the roles the brake is not aimed at', () => {
+    expect(isUnlimitedTuviRole('admin')).toBe(true)
+    expect(isUnlimitedTuviRole('paid')).toBe(true)
+  })
+
+  it('still holds an ordinary reader, including one with no role row', () => {
+    expect(isUnlimitedTuviRole('user')).toBe(false)
+    expect(isUnlimitedTuviRole(null)).toBe(false)
+    expect(isUnlimitedTuviRole(undefined)).toBe(false)
   })
 })

@@ -4,6 +4,12 @@
   --font-sans: var(--font-sans);
   --font-playfair: var(--font-playfair);
   --font-poppins: var(--font-poppins);
+  /* Scoped to /tu-vi. tailwind.config.ts declares these too, but Tailwind v4
+     never loads that file (there is no @config directive), so every
+     font-tuvi-* utility emitted no CSS until they were registered here. */
+  --font-tuvi-serif: var(--font-tuvi-serif), Georgia, serif;
+  --font-tuvi-sans: var(--font-tuvi-sans), system-ui, sans-serif;
+  --font-tuvi-mono: var(--font-tuvi-mono), monospace;
 }
 
 /* Slightly larger text on mobile for main pages */

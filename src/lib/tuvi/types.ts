@@ -74,6 +74,9 @@ export type Reading = {
   yearName: string
   napAm: NapAm
   zodiac: string
+  /** Traditional Vietnamese age (starts at one in the birth year), reckoned from
+      the resolved birth lunar year so a late-Tý birth counts from the right one. */
+  age: number
   chart: Chart
   cycles: Cycle[]
   menh: Palace | null

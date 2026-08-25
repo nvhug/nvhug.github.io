@@ -3,27 +3,38 @@ import { createSupabaseServerClient } from '@/lib/supabase-server'
 import { getServiceSupabaseClient } from '@/lib/supabase-admin'
 import {
   buildInterpretationPrompt,
+  INTERPRETATION_VERSION,
+  isUnlimitedTuviRole,
   lunarDayKey,
   type InterpretationLang,
   type ParsedSection,
+  missingRequiredSections,
   parseInterpretationSections,
   profileFingerprint,
   readCachedInterpretation,
+  SECTIONS_MAX_TOKENS,
+  SECTIONS_TIMEOUT_MS,
+  TUVI_DAILY_LIMIT,
   vietnamTodaySolar,
 } from '@/lib/horoscope-interpretation'
 import { buildReading } from '@/lib/tuvi/reading'
 import { parseHoroscopeProfile } from '@/lib/horoscope-profile'
 
 export const dynamic = 'force-dynamic'
+// The completion itself runs ~20-33s, so the platform default would cut the
+// request off before the reading is written. Longer than SECTIONS_TIMEOUT_MS,
+// which is what should end a slow generation.
+export const maxDuration = 60
 
 type StoredInterpretation = {
   sections: Record<string, ParsedSection>
+  /** Which prompt wrote this. A record from an older one is regenerated rather
+      than served, so a prompt fix is not silently held back by the cache. */
+  version: number
   lunarDay: string
   profileFingerprint: string
   generatedAt: string
 }
-
-const DEEPSEEK_TIMEOUT_MS = 30_000
 
 /**
  * Readings are stored one per language under `profile_data.horoscopeReading`.
@@ -50,7 +61,9 @@ export async function POST(request: Request) {
   // 404 for this route, not a backend failure.
   const { data: row, error: profileError } = await supabase
     .from('user_profiles')
-    .select('profile_data')
+    // `role` rides along on the row already being read — the cap exemption below
+    // costs no extra query.
+    .select('profile_data, role')
     .eq('id', userId)
     .maybeSingle()
   if (profileError) {
@@ -83,8 +96,8 @@ export async function POST(request: Request) {
     fingerprint,
     lunarDay,
   )
-  if (cached) {
-    return NextResponse.json({ sections: cached, cached: true })
+  if (cached?.current) {
+    return NextResponse.json({ ...cached, cached: true })
   }
 
   const apiKey = process.env.DEEPSEEK_API_KEY
@@ -96,19 +109,46 @@ export async function POST(request: Request) {
   // the browser cannot write. The reading cache is keyed on the birth-data
   // fingerprint, so without this an edit-then-regenerate loop bills without
   // limit; claiming first also means a failed generation still consumes its
-  // slot, so the retry button cannot become a spend loop. Free for every role
-  // either way (spec FR-018) — an abuse cap, not a gate.
-  const { data: claimed, error: claimError } = await supabase.rpc('claim_tuvi_generation', {
-    p_lunar_day: lunarDay,
-  })
-  if (claimError) {
-    // The counter is unavailable (sql/tuvi_daily_usage.sql not applied yet).
-    // Fail open rather than taking the feature down, but say so loudly.
-    console.error('[tu-vi] generation counter unavailable:', claimError.message)
-  } else if (claimed === false) {
-    return NextResponse.json({ error: 'daily_limit_reached' }, { status: 429 })
+  // slot, so the retry button cannot become a spend loop. The reading itself
+  // stays free for every role (spec FR-018) — this is an abuse cap, not a gate,
+  // and admins and paying readers are not the account it is aimed at, so they
+  // never claim a slot and never spend one.
+  const unlimited = isUnlimitedTuviRole(row?.role as string | null | undefined)
+
+  let claimError: { message: string } | null = null
+  let claimed: unknown = null
+  if (!unlimited) {
+    const result = await supabase.rpc('claim_tuvi_generation', { p_lunar_day: lunarDay })
+    claimError = result.error
+    claimed = result.data
+    if (claimError) {
+      // The counter is unavailable (sql/tuvi_daily_usage.sql not applied yet).
+      // Fail open rather than taking the feature down, but say so loudly.
+      console.error('[tu-vi] generation counter unavailable:', claimError.message)
+    } else if (claimed === false) {
+      if (cached) {
+        return NextResponse.json({ ...cached, cached: true, stale: true })
+      }
+      return NextResponse.json({ error: 'daily_limit_reached' }, { status: 429 })
+    }
   }
-  const slotClaimed = !claimError && claimed === true
+  const slotClaimed = !unlimited && !claimError && claimed === true
+
+  // How many are left after this one, for the line that warns before the cap is
+  // reached rather than at it. Read only when a slot was actually spent: on a
+  // cache hit nothing changed, and an unlimited role has nothing to count.
+  let remaining: number | null = null
+  if (slotClaimed) {
+    const { data: usage } = await supabase
+      .from('tuvi_daily_usage')
+      .select('used_count')
+      .eq('user_id', userId)
+      .eq('lunar_day', lunarDay)
+      .maybeSingle()
+    if (typeof usage?.used_count === 'number') {
+      remaining = Math.max(0, TUVI_DAILY_LIMIT - usage.used_count)
+    }
+  }
 
   // Refund only when no completion was produced at all — a network timeout or a
   // non-2xx response. A 200 whose body fails validation WAS billed, so refunding
@@ -144,9 +184,9 @@ export async function POST(request: Request) {
     fingerprint,
     lunarDay,
   )
-  if (justCached) {
+  if (justCached?.current) {
     await refundSlot()
-    return NextResponse.json({ sections: justCached, cached: true })
+    return NextResponse.json({ ...justCached, cached: true })
   }
 
   const prompt = buildInterpretationPrompt(buildReading(profile, today), profile, lang)
@@ -164,15 +204,13 @@ export async function POST(request: Request) {
         messages: [{ role: 'user', content: prompt }],
         response_format: { type: 'json_object' },
         temperature: 0.6,
-        // Bounded so a runaway generation cannot be truncated mid-JSON, which
-        // would fail validation after already being billed. Raised from 1600
-        // for the 11-section reading (was 7) with longer, deeper prose per
-        // section.
-        max_tokens: 2800,
+        // Sized from measured completions — see SECTIONS_MAX_TOKENS. Covers the
+        // 11-section reading only; the twelve-palace block has its own route.
+        max_tokens: SECTIONS_MAX_TOKENS,
       }),
       // Without this the route can hang for as long as the upstream keeps the
       // socket open, holding the request and the user's loading state with it.
-      signal: AbortSignal.timeout(DEEPSEEK_TIMEOUT_MS),
+      signal: AbortSignal.timeout(SECTIONS_TIMEOUT_MS),
     })
   } catch {
     await refundSlot()
@@ -188,22 +226,46 @@ export async function POST(request: Request) {
   // upstream failure, not throw out of the handler as an opaque 500.
   let sections: Record<string, ParsedSection> | null
   let truncated = false
+  // Enough to name the cause of a rejected completion without logging the whole
+  // reading: which required keys were absent, how long the body was, and why the
+  // model stopped.
+  let diagnosis = 'no body read'
+  let aborted = false
   try {
     const data = await res.json()
     truncated = data.choices?.[0]?.finish_reason === 'length'
-    sections = parseInterpretationSections(JSON.parse(data.choices?.[0]?.message?.content))
-  } catch {
+    const content: string = data.choices?.[0]?.message?.content ?? ''
+    diagnosis = `finish_reason=${data.choices?.[0]?.finish_reason} chars=${content.length}`
+    const body = JSON.parse(content)
+    sections = parseInterpretationSections(body)
+    if (!sections) {
+      diagnosis += ` missing=[${missingRequiredSections(body).join(',')}] topLevel=[${Object.keys(
+        body as Record<string, unknown>,
+      ).join(',')}]`
+    }
+  } catch (error) {
     sections = null
+    aborted = error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError')
+    diagnosis += ` threw=${error instanceof Error ? `${error.name}: ${error.message}` : String(error)}`
   }
   if (!sections) {
     // A completion cut short by max_tokens is a limit we set, not abuse, so the
     // slot goes back — otherwise a few retries would lock the user out of a
     // reading they never received. A malformed body for any other reason was
     // delivered and billed, so it keeps its slot.
-    if (truncated) {
-      console.error('[tu-vi] completion truncated by max_tokens')
+    // A completion cut short by max_tokens is a limit we set, and one cut short
+    // by the timeout produced nothing at all — neither is abuse, so the slot goes
+    // back. A complete body that simply failed validation WAS delivered and
+    // billed, so it keeps its slot: otherwise the retry button is a spend loop.
+    if (truncated || aborted) {
+      console.error('[tu-vi] completion incomplete:', diagnosis)
       await refundSlot()
+      return NextResponse.json(
+        { error: 'interpretation_unavailable' },
+        { status: aborted ? 504 : 502 },
+      )
     }
+    console.error('[tu-vi] completion rejected by validation:', diagnosis)
     return NextResponse.json({ error: 'interpretation_unavailable' }, { status: 502 })
   }
 
@@ -220,7 +282,7 @@ export async function POST(request: Request) {
   // snapshot back would revert whatever was saved during the call. Return the
   // interpretation without caching it instead.
   if (freshError || !fresh) {
-    return NextResponse.json({ sections, cached: false })
+    return NextResponse.json({ sections, cached: false, remaining })
   }
 
   const freshData = (fresh.profile_data ?? {}) as Record<string, unknown>
@@ -228,7 +290,7 @@ export async function POST(request: Request) {
 
   // Birth data changed while this reading was being written about the old data.
   if (!freshProfile || profileFingerprint(freshProfile) !== fingerprint) {
-    return NextResponse.json({ sections, cached: false })
+    return NextResponse.json({ sections, cached: false, remaining })
   }
 
   // A concurrent request already cached a reading for the same day and birth
@@ -236,12 +298,13 @@ export async function POST(request: Request) {
   // overwriting it with a second, differently-worded reading.
   const existingReadings = readingsByLang(freshData.horoscopeReading)
   const raced = readCachedInterpretation(existingReadings[lang], fingerprint, lunarDay)
-  if (raced) {
-    return NextResponse.json({ sections: raced, cached: true })
+  if (raced?.current) {
+    return NextResponse.json({ ...raced, cached: true })
   }
 
   const stored: StoredInterpretation = {
     sections,
+    version: INTERPRETATION_VERSION,
     lunarDay,
     profileFingerprint: fingerprint,
     generatedAt: new Date().toISOString(),
@@ -260,5 +323,5 @@ export async function POST(request: Request) {
 
   // The reading is valid either way, but a failed write means every later view
   // this lunar day pays for another completion — report it rather than hide it.
-  return NextResponse.json({ sections, cached: false, stored: !writeError })
+  return NextResponse.json({ sections, cached: false, stored: !writeError, remaining })
 }

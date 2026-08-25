@@ -10,7 +10,7 @@ import { getTodayLocalISODate } from '@/lib/date'
 import { buildTransactionDeleteAdjustments, buildTransactionDeltaMap } from '@/lib/fund-transaction-deltas'
 import { StocksPortfolio } from './StocksPortfolio'
 import { useLanguage } from '@/lib/i18n/language-context'
-import { formatDigitInput, getAssetBreakdownEmptyText } from '@/lib/fund-ui'
+import { formatDigitInput, getAssetBreakdownEmptyText, getFundActorLabel, getFundContributorOptions } from '@/lib/fund-ui'
 import { supabase } from '@/lib/supabase'
 
 type AssetType = 'gold' | 'cash' | 'bank' | 'other'
@@ -49,10 +49,6 @@ type FundTransaction = {
   date: string
   asset_id: string | null
   dest_asset_id: string | null
-}
-
-function getFundActorLabel(value: string) {
-  return value.trim().toLowerCase() === 'nvhug001@gmail.com' ? 'Văn Hưng' : value
 }
 
 type FundDebt = {
@@ -377,6 +373,7 @@ export default function FundFutureClient() {
   const [transactionDate, setTransactionDate] = useState(getTodayLocalISODate)
   const [transactionConvertFromId, setTransactionConvertFromId] = useState('')
   const [transactionConvertToName, setTransactionConvertToName] = useState('')
+  const [transactionWho, setTransactionWho] = useState('')
   const [transactionFilter, setTransactionFilter] = useState<'all' | 'in' | 'out' | 'convert'>('all')
   const [transactionActorFilter, setTransactionActorFilter] = useState('all')
 
@@ -649,7 +646,7 @@ export default function FundFutureClient() {
   }
 
   function resetTransaction() {
-    setTransactionId(null); setTransactionType('in'); setTransactionAmount(''); setTransactionReason(''); setTransactionDate(getTodayLocalISODate()); setTransactionConvertFromId(''); setTransactionConvertToName(''); setTransactionFormOpen(false)
+    setTransactionId(null); setTransactionType('in'); setTransactionAmount(''); setTransactionReason(''); setTransactionDate(getTodayLocalISODate()); setTransactionConvertFromId(''); setTransactionConvertToName(''); setTransactionWho(''); setTransactionFormOpen(false)
   }
 
   async function applyAssetDelta(assetId: string, delta: number, options?: { floorAtZero?: boolean }) {
@@ -726,7 +723,7 @@ export default function FundFutureClient() {
     })
 
     const actor = userAccountLabel || userId || (vi ? 'Tài khoản hiện tại' : 'Current account')
-    const row = { user_id: effectiveOwnerId!, type: transactionType, amount, who: actor, reason: transactionReason.trim(), note: null, date: transactionDate, asset_id: srcId || null, dest_asset_id: dstId || null }
+    const row = { user_id: effectiveOwnerId!, type: transactionType, amount, who: transactionWho.trim() || actor, reason: transactionReason.trim(), note: null, date: transactionDate, asset_id: srcId || null, dest_asset_id: dstId || null }
     const { error } = transactionId
       ? await supabase.from('fund_transactions').update(row).eq('id', transactionId)
       : await supabase.from('fund_transactions').insert(row)
@@ -844,6 +841,8 @@ export default function FundFutureClient() {
   const totalIn = transactions.filter((item) => item.type === 'in').reduce((sum, item) => sum + Number(item.amount), 0)
   const totalOut = transactions.filter((item) => item.type === 'out').reduce((sum, item) => sum + Number(item.amount), 0)
   const totalConvert = transactions.filter((item) => item.type === 'convert').reduce((sum, item) => sum + Number(item.amount), 0)
+  const contributorOptions = getFundContributorOptions({ shares, userId: userId ?? null, selfLabel: userAccountLabel })
+  const transactionWhoOptions = transactionWho && !contributorOptions.includes(transactionWho) ? [transactionWho, ...contributorOptions] : contributorOptions
   const transactionActors = [...new Set(transactions.map((item) => getFundActorLabel(item.who)).filter(Boolean))]
   const filteredTransactions = transactions.filter((item) => (
     (transactionFilter === 'all' || item.type === transactionFilter) &&
@@ -1127,9 +1126,9 @@ export default function FundFutureClient() {
           vi={vi}
         >
           {transactionFormOpen && (
-            <CrudForm title={transactionId ? (vi ? 'Sửa giao dịch' : 'Edit transaction') : (vi ? 'Thêm giao dịch' : 'Add transaction')} onSubmit={saveTransaction} saving={saving} onCancel={resetTransaction} vi={vi} inline="transaction">
+            <CrudForm title={transactionId ? (vi ? 'Sửa giao dịch' : 'Edit transaction') : (vi ? 'Thêm giao dịch' : 'Add transaction')} onSubmit={saveTransaction} saving={saving} onCancel={resetTransaction} vi={vi} inline={contributorOptions.length > 1 ? 'transaction-wide' : 'transaction'}>
               {transactionType === 'convert' ? (
-                <div className="flex flex-wrap items-end gap-2 sm:col-span-2 lg:col-span-4">
+                <div className={`flex flex-wrap items-end gap-2 sm:col-span-2 ${contributorOptions.length > 1 ? 'lg:col-span-5' : 'lg:col-span-4'}`}>
                   <div className="w-28">
                     <label className="mb-1 block text-xs font-medium text-zinc-500">{vi ? 'Loại' : 'Type'}</label>
                     <select className={inputClass} value={transactionType} onChange={(event) => { const t = event.target.value as 'in' | 'out' | 'convert'; setTransactionType(t); if (t === 'convert') setTransactionConvertFromId(assets.find((a) => a.type === 'bank')?.id ?? '') }}>
@@ -1167,6 +1166,12 @@ export default function FundFutureClient() {
                       onSelect={(suggestion) => setTransactionConvertToName(suggestion.name)}
                     />
                   </div>
+                  {contributorOptions.length > 1 && (
+                    <div className="w-36">
+                      <label className="mb-1 block text-xs font-medium text-zinc-500">{vi ? 'Người nộp' : 'Submitted by'}</label>
+                      <select className={inputClass} value={transactionWho || contributorOptions[0] || ''} onChange={(event) => setTransactionWho(event.target.value)}>{transactionWhoOptions.map((option) => <option key={option} value={option}>{getFundActorLabel(option)}</option>)}</select>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <>
@@ -1174,6 +1179,9 @@ export default function FundFutureClient() {
                   <Field label={vi ? 'Số tiền' : 'Amount'}><MoneyInput value={transactionAmount} onChange={setTransactionAmount} min="1" required /></Field>
                   <Field label={vi ? 'Nội dung' : 'Description'}><input className={inputClass} value={transactionReason} onChange={(event) => setTransactionReason(event.target.value)} required placeholder={vi ? 'VD: Mua vàng 1 chỉ, mua cổ phiếu...' : 'e.g. Buy gold, buy stocks...'} /></Field>
                   <Field label={vi ? 'Ngày' : 'Date'}><DatePicker value={transactionDate} onChange={setTransactionDate} /></Field>
+                  {contributorOptions.length > 1 && (
+                    <Field label={vi ? 'Người nộp' : 'Submitted by'}><select className={inputClass} value={transactionWho || contributorOptions[0] || ''} onChange={(event) => setTransactionWho(event.target.value)}>{transactionWhoOptions.map((option) => <option key={option} value={option}>{getFundActorLabel(option)}</option>)}</select></Field>
+                  )}
                 </>
               )}
             </CrudForm>
@@ -1216,7 +1224,7 @@ export default function FundFutureClient() {
                 const amountCls = isConvert ? 'text-amber-600' : item.type === 'in' ? 'text-emerald-600' : 'text-red-500'
                 return (
                   <Row key={item.id} title={item.reason} subtitle={`${assetLabel ? assetLabel + ' · ' : ''}${item.date} · ${vi ? 'Người nộp' : 'Submitted by'}: ${getFundActorLabel(item.who)}`} amount={amountStr} amountClass={amountCls}
-                    actions={<ActionButtons onEdit={() => { setTransactionId(item.id); setTransactionType(item.type); setTransactionAmount(String(item.amount)); setTransactionReason(item.reason); setTransactionDate(item.date); setTransactionConvertFromId(isConvert ? (item.asset_id ?? '') : ''); setTransactionConvertToName(isConvert ? (toAsset?.name ?? '') : ''); setTransactionFormOpen(true) }} onDelete={() => setDeleteTarget({ table: 'fund_transactions', id: item.id })} />} />
+                    actions={<ActionButtons onEdit={() => { setTransactionId(item.id); setTransactionType(item.type); setTransactionAmount(String(item.amount)); setTransactionReason(item.reason); setTransactionDate(item.date); setTransactionConvertFromId(isConvert ? (item.asset_id ?? '') : ''); setTransactionConvertToName(isConvert ? (toAsset?.name ?? '') : ''); setTransactionWho(item.who); setTransactionFormOpen(true) }} onDelete={() => setDeleteTarget({ table: 'fund_transactions', id: item.id })} />} />
                 )
               })}
             </div>
@@ -1402,8 +1410,10 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   return <label className="flex min-w-0 flex-col gap-1.5 text-xs font-medium text-zinc-500">{label}{children}</label>
 }
 
-function CrudForm({ title, children, onSubmit, saving, onCancel, vi, inline = false }: { title: string; children: React.ReactNode; onSubmit: (event: React.FormEvent) => void; saving: boolean; onCancel: () => void; vi: boolean; inline?: boolean | 'transaction' }) {
-  const inlineGridClass = inline === 'transaction'
+function CrudForm({ title, children, onSubmit, saving, onCancel, vi, inline = false }: { title: string; children: React.ReactNode; onSubmit: (event: React.FormEvent) => void; saving: boolean; onCancel: () => void; vi: boolean; inline?: boolean | 'transaction' | 'transaction-wide' }) {
+  const inlineGridClass = inline === 'transaction-wide'
+    ? 'lg:grid-cols-[0.85fr_0.95fr_1fr_1.15fr_0.9fr_auto] lg:items-end'
+    : inline === 'transaction'
     ? 'lg:grid-cols-[0.85fr_0.95fr_1fr_1.25fr_auto] lg:items-end'
     : inline
       ? 'lg:grid-cols-[1.55fr_1fr_1.35fr_auto] lg:items-end'

@@ -21,6 +21,20 @@ describe('buildReading', () => {
     expect(reading.zodiac).toBe('Ngựa')
   })
 
+  it('reckons the traditional age, counting from one in the birth year', () => {
+    // Birth lunar year 1990, viewed in lunar year 2026: 2026 - 1990 + 1.
+    expect(buildReading(profile, today).age).toBe(37)
+  })
+
+  it('advances the age with the viewing year, not the calendar day', () => {
+    const early = buildReading(profile, { day: 3, month: 3, year: 2026 }).age
+    const late = buildReading(profile, { day: 20, month: 12, year: 2026 }).age
+    expect(early).toBe(37)
+    // Late December 2026 is still lunar year 2026, so the age has not turned yet.
+    expect(late).toBe(37)
+    expect(buildReading(profile, { day: 25, month: 8, year: 2027 }).age).toBe(38)
+  })
+
   it('reports all four pillars, with the hour pillar filled in', () => {
     const reading = buildReading(profile, today)
     expect(reading.pillars.hour).not.toBeNull()

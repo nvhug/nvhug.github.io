@@ -1,7 +1,7 @@
 // The whole computed layer of a tu vi reading: a pure function of the saved
 // profile and the date it is being viewed on. Holds no state and performs no
 // I/O, so the same inputs always give the same reading (spec FR-006, SC-002).
-import type { SolarDate } from '../lunar-calendar'
+import { solarToLunar, type SolarDate } from '../lunar-calendar'
 import type { HoroscopeProfile } from '../horoscope-profile'
 import {
   dayPillar,
@@ -14,7 +14,7 @@ import {
 } from './can-chi'
 import { birthMoment } from './birth-moment'
 import { buildChart, runsForward } from './build-chart'
-import { buildCycles, daiVanPalaceAtAge } from './cycles'
+import { buildCycles, daiVanPalaceAtAge, lunarAge } from './cycles'
 import { scoreChart } from './scoring'
 import type { Reading } from './types'
 
@@ -56,6 +56,7 @@ export function buildReading(profile: HoroscopeProfile, todaySolar: SolarDate): 
     yearName: pillarName(yearP),
     napAm: napAm(yearP.stem, yearP.branch),
     zodiac: zodiacAnimal(yearP.branch),
+    age: lunarAge(lunar.year, solarToLunar(todaySolar).year),
     chart: { ...chart, palaces },
     cycles,
     menh: palaces.find((p) => p.isMenh) ?? null,
