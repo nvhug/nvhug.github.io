@@ -56,14 +56,14 @@ export function palaceTone(palace: Palace): PalaceTone {
  * over, and the mark said nothing.
  */
 const TONE_FILL: Record<PalaceTone, string> = {
-  menh: 'bg-emerald-100',
+  menh: 'bg-emerald-200',
   than: 'bg-emerald-50',
   daiVan: 'bg-amber-50',
   plain: 'bg-white',
 }
 
 const TONE_HOVER: Record<PalaceTone, string> = {
-  menh: 'hover:bg-emerald-200/60',
+  menh: 'hover:bg-emerald-300/60',
   than: 'hover:bg-emerald-100',
   daiVan: 'hover:bg-amber-100/70',
   plain: 'hover:bg-emerald-50',
