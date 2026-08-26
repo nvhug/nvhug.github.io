@@ -155,7 +155,7 @@ export async function POST(request: Request) {
           Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-          model: 'deepseek-chat',
+          model: 'deepseek-v4-flash',
           messages: [{ role: 'user', content: buildPalacePrompt(reading, lang, indexes) }],
           response_format: { type: 'json_object' },
           temperature: 0.6,

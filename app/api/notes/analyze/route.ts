@@ -831,7 +831,7 @@ Trả về JSON hợp lệ với đúng cấu trúc sau (không thêm/bỏ field
       Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model: 'deepseek-chat',
+      model: 'deepseek-v4-flash',
       messages: [{ role: 'user', content: prompt }],
       response_format: { type: 'json_object' },
       temperature: 0.3,

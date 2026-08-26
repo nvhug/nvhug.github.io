@@ -142,7 +142,7 @@ export async function requestTextJSON(prompt: string): Promise<string> {
       'https://api.deepseek.com/v1',
       'DeepSeek',
       deepseekKey,
-      process.env.DEEPSEEK_MODEL?.trim() || 'deepseek-chat',
+      process.env.DEEPSEEK_MODEL?.trim() || 'deepseek-v4-flash',
       prompt
     )
   }
