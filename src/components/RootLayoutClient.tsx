@@ -45,7 +45,7 @@ export function AccountMenu({
   }, [open])
 
   return (
-    <div ref={containerRef} className="relative ml-2">
+    <div ref={containerRef} className="relative ml-1 sm:ml-2">
       {/* Avatar trigger */}
       <button
         type="button"
@@ -163,8 +163,8 @@ export function RootLayoutClient({ children }: { children: React.ReactNode }) {
       {!hideSiteChrome && (
         <header className="site-header fixed inset-x-0 top-0 z-50 border-b border-emerald-100/80 bg-white/88 backdrop-blur-md">
           <div className="mx-auto w-full max-w-6xl px-4 py-3 sm:px-6">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex min-w-0 flex-1 items-center gap-2">
+            <div className="flex items-center justify-between gap-2 sm:gap-3">
+              <div className="flex min-w-0 flex-1 items-center gap-1 sm:gap-2">
                 <Link
                   href="/"
                   className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-zinc-700 transition-colors hover:bg-emerald-50 hover:text-emerald-700 sm:h-auto sm:w-auto sm:rounded-none sm:font-poppins sm:text-xl sm:font-semibold sm:tracking-tight sm:text-zinc-900"
@@ -174,7 +174,7 @@ export function RootLayoutClient({ children }: { children: React.ReactNode }) {
                   <span className="hidden sm:inline">Notez</span>
                 </Link>
 
-                <div className="flex min-w-0 flex-1 items-center justify-around sm:hidden">
+                <div className="flex min-w-0 flex-1 items-stretch sm:hidden">
                   {navItems.map((item) => {
                     const isActive = pathname.startsWith(item.href)
                     return (
@@ -182,13 +182,13 @@ export function RootLayoutClient({ children }: { children: React.ReactNode }) {
                         key={item.href}
                         href={item.href}
                         aria-label={item.label}
-                        className={`relative flex h-10 w-10 shrink-0 items-center justify-center rounded-lg touch-manipulation transition-colors ${
+                        className={`relative flex h-11 min-w-0 flex-1 touch-manipulation items-center justify-center rounded-lg transition-colors active:bg-emerald-50 ${
                           isActive
                             ? 'text-emerald-700'
                             : 'text-zinc-500 hover:text-zinc-900'
                         }`}
                       >
-                        <item.icon className={`h-5 w-5 ${isActive ? 'text-emerald-600' : 'text-zinc-400'}`} />
+                        <item.icon className={`h-5 w-5 shrink-0 ${isActive ? 'text-emerald-600' : 'text-zinc-400'}`} />
                         <span
                           aria-hidden
                           className={`absolute bottom-0 left-1/2 h-0.5 -translate-x-1/2 rounded-full bg-emerald-500 transition-all ${
@@ -227,10 +227,8 @@ export function RootLayoutClient({ children }: { children: React.ReactNode }) {
                   })}
                 </div>
 
-                <div className="ml-1">
-                  <div className="hidden sm:block">
-                    <LanguageSwitch />
-                  </div>
+                <div className="ml-1 hidden sm:block">
+                  <LanguageSwitch />
                 </div>
 
                 {user ? (
