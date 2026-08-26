@@ -1,0 +1,30 @@
+.git
+.github
+node_modules
+.next
+npm-debug.log
+Dockerfile
+.dockerignore
+docker-compose.yml
+# Secrets never enter the image — NEXT_PUBLIC_* come in as build args instead.
+.env
+.env.*
+# Local tooling / docs that the build does not need
+.claude
+.devcore
+.gstack
+.husky
+.specify
+.vscode
+docs
+specs
+graphify-out
+sql
+baiviet
+kichban.md
+AGENTS.md
+CLAUDE.md
+README.md
+dev-server.log
+tsconfig.tsbuildinfo
+Caddyfile

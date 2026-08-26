@@ -1,0 +1,32 @@
+services:
+  web:
+    build:
+      context: .
+      args:
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+        NEXT_PUBLIC_PAYMENT_BANK_ID: ${NEXT_PUBLIC_PAYMENT_BANK_ID}
+        NEXT_PUBLIC_PAYMENT_ACCOUNT_NO: ${NEXT_PUBLIC_PAYMENT_ACCOUNT_NO}
+        NEXT_PUBLIC_PAYMENT_ACCOUNT_NAME: ${NEXT_PUBLIC_PAYMENT_ACCOUNT_NAME}
+    image: notez-web:latest
+    restart: unless-stopped
+    env_file: .env
+    expose:
+      - "3000"
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - web
+
+volumes:
+  caddy_data:
+  caddy_config:
