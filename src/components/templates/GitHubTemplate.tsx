@@ -19,7 +19,7 @@ export function GitHubTemplate({
         <section className="min-w-0 flex-1">
           {/* Repo-style breadcrumb */}
           <div className="mb-4 flex items-center gap-1.5 text-sm">
-            <Link href="/" className="font-semibold text-[#0969da] hover:underline">nvhug</Link>
+            <Link href="/" className="font-semibold text-[#0969da] hover:underline">Notez</Link>
             <span className="text-[#59636e]">/</span>
             <Link href={backHref} className="font-semibold text-[#0969da] hover:underline">blog</Link>
             <span className="text-[#59636e]">/</span>

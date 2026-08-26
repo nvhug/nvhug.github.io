@@ -171,7 +171,7 @@ export function RootLayoutClient({ children }: { children: React.ReactNode }) {
                   aria-label="Home"
                 >
                   <Home className="h-5 w-5 sm:hidden" />
-                  <span className="hidden sm:inline">nvhug</span>
+                  <span className="hidden sm:inline">Notez</span>
                 </Link>
 
                 <div className="flex min-w-0 flex-1 items-center justify-around sm:hidden">
@@ -258,7 +258,7 @@ export function RootLayoutClient({ children }: { children: React.ReactNode }) {
           <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-10 sm:px-6">
             <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
               <Link href="/" className="font-poppins text-xl font-semibold text-zinc-900">
-                nvhug
+                Notez
               </Link>
               <div className="flex flex-wrap gap-2">
                 {navItems.map((item) => (

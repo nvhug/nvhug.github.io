@@ -23,8 +23,8 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   title: {
-    default: "nvhug - Personal Blog",
-    template: "%s | nvhug",
+    default: "Notez - Personal Blog",
+    template: "%s | Notez",
   },
   description: "Personal blog about code, learning notes, and daily progress.",
   keywords: "design, development, nextjs, react, typescript, ui/ux",

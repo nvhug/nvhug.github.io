@@ -33,7 +33,7 @@ export const en: Dictionary = {
   },
 
   footer: {
-    copyright: '© 2026 nvhug. Everything Worth Noting.',
+    copyright: '© 2026 Notez. Everything Worth Noting.',
   },
 
   home: {
