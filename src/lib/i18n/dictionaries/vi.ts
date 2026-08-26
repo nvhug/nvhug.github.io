@@ -240,6 +240,8 @@ export const vi = {
     genderKhac: 'Khác',
     birthTimeLabel: 'Giờ sinh',
     birthTimeUnknown: 'Không rõ giờ sinh',
+    birthTimeUnknownValue: 'Không rõ giờ sinh',
+    birthHourOf: 'giờ {branch}',
     submit: 'Lưu thông tin',
     submitSaving: 'Đang lưu...',
     errorDate: 'Ngày sinh không hợp lệ hoặc ở tương lai',

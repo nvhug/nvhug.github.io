@@ -27,6 +27,48 @@ const CELL_POSITION: Record<number, string> = {
 // Can Chi line and the star-count row.
 const ROW_AT_WIDTH = ['', '', 'hidden @min-[8.5rem]:block', 'hidden @min-[9.5rem]:block']
 
+export type PalaceTone = 'menh' | 'than' | 'daiVan' | 'plain'
+
+/**
+ * Which of the three marks decides a palace's fill — at most one.
+ *
+ * Priority is deliberate. Mệnh and Thân are what a palace *is* and never move;
+ * Đại vận is only where the reader stands right now. On an overlap the identity
+ * fill stays and the decade reports itself with its own chip instead, because
+ * letting Đại vận win would visually erase the Mệnh palace for the ten years it
+ * happens to be current — the one palace a reader looks for first.
+ */
+export function palaceTone(palace: Palace): PalaceTone {
+  if (palace.isMenh) return 'menh'
+  if (palace.isThan) return 'than'
+  if (palace.isDaiVan) return 'daiVan'
+  return 'plain'
+}
+
+/**
+ * Fill per tone, and the hover that goes with it.
+ *
+ * Split from the hover on purpose: the legend below the chart paints the same
+ * swatches, and a legend that drifts from the grid it explains is worse than no
+ * legend. Each tone also carries its OWN hover — a single shared
+ * `hover:bg-emerald-50` used to collide exactly with the Đại vận fill, so the
+ * current decade looked identical to whatever cell the pointer happened to be
+ * over, and the mark said nothing.
+ */
+const TONE_FILL: Record<PalaceTone, string> = {
+  menh: 'bg-emerald-100',
+  than: 'bg-emerald-50',
+  daiVan: 'bg-amber-50',
+  plain: 'bg-white',
+}
+
+const TONE_HOVER: Record<PalaceTone, string> = {
+  menh: 'hover:bg-emerald-200/60',
+  than: 'hover:bg-emerald-100',
+  daiVan: 'hover:bg-amber-100/70',
+  plain: 'hover:bg-emerald-50',
+}
+
 function StarNames({ stars, gated }: { stars: Palace['stars']; gated?: boolean }) {
   return stars.map((star, index) => (
     <span
@@ -64,14 +106,22 @@ function FullCell({
   const marks = [palace.tuan ? 'Tuần' : '', palace.triet ? 'Triệt' : ''].filter(Boolean).join(', ')
   const badge = palace.isMenh ? t('tuVi.sectionMenh') : palace.isThan ? t('tuVi.sectionThan') : null
 
+  // Mệnh and Thân are there from the first paint; only the decade fades in, so
+  // the eye is drawn to where the reader currently stands after the chart has
+  // settled rather than during it.
+  const tone = palaceTone(palace)
+  const shown: PalaceTone = tone === 'daiVan' && !inked ? 'plain' : tone
+
   return (
     <button
       type="button"
       onClick={() => onSelect(palace)}
       aria-pressed={selected}
-      className={`@container relative flex flex-col items-stretch overflow-hidden p-2 text-left transition-colors duration-500 hover:bg-emerald-50 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[#047857] active:bg-emerald-100 motion-reduce:transition-none ${
-        inked ? 'bg-emerald-50' : 'bg-white'
-      } ${selected ? 'z-10 ring-2 ring-emerald-500 ring-inset' : ''} ${CELL_POSITION[palace.index]}`}
+      className={`@container relative flex flex-col items-stretch overflow-hidden p-2 text-left transition-colors duration-500 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[#047857] motion-reduce:transition-none ${
+        TONE_FILL[shown]
+      } ${TONE_HOVER[shown]} ${
+        selected ? 'z-10 ring-2 ring-emerald-500 ring-inset' : ''
+      } ${CELL_POSITION[palace.index]}`}
     >
       {/* Mệnh and Thân are the two palaces a reader looks for first, and the
           chart marked neither before. Out of the text flow entirely, so it can
@@ -119,6 +169,14 @@ function FullCell({
             {marks}
           </span>
         )}
+        {/* Down here rather than beside the Mệnh/Thân badge: this row already
+            carries several chips, and it is what lets a palace that is both an
+            identity and the current decade show both without either winning. */}
+        {palace.isDaiVan && (
+          <span className="rounded bg-amber-100 px-1.5 font-tuvi-sans text-[10px] leading-[1.6] text-[#b45309]">
+            {t('tuVi.cycleDaiVan')}
+          </span>
+        )}
       </span>
     </button>
   )
@@ -152,7 +210,7 @@ export function LaSoFull({
         <FullCell
           key={palace.index}
           palace={palace}
-          inked={inked && palace.isDaiVan}
+          inked={inked}
           selected={palace.index === selectedIndex}
           onSelect={onSelectPalace}
         />
@@ -172,5 +230,36 @@ export function LaSoFull({
         <div className="relative flex flex-col items-center gap-1">{identity}</div>
       </div>
     </div>
+  )
+}
+
+const LEGEND: ReadonlyArray<{ tone: PalaceTone; label: string }> = [
+  { tone: 'menh', label: 'tuVi.sectionMenh' },
+  { tone: 'than', label: 'tuVi.sectionThan' },
+  { tone: 'daiVan', label: 'tuVi.cycleDaiVan' },
+]
+
+/**
+ * What the three fills mean.
+ *
+ * Colour without a key is a puzzle: the grid can tint the Mệnh, Thân and Đại vận
+ * palaces perfectly and still tell the reader nothing until something on screen
+ * says which is which. Swatches carry a ring because the two lighter fills are
+ * nearly invisible against the white card on their own.
+ */
+export function LaSoLegend() {
+  const { t } = useLanguage()
+  return (
+    <ul className="mt-2.5 flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 font-tuvi-sans text-xs text-[#52525b]">
+      {LEGEND.map(({ tone, label }) => (
+        <li key={tone} className="flex items-center gap-1.5">
+          <span
+            aria-hidden="true"
+            className={`size-3 shrink-0 rounded-sm ring-1 ring-emerald-200 ${TONE_FILL[tone]}`}
+          />
+          {t(label)}
+        </li>
+      ))}
+    </ul>
   )
 }

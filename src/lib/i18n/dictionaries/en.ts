@@ -242,6 +242,8 @@ export const en: Dictionary = {
     genderKhac: 'Other',
     birthTimeLabel: 'Birth time',
     birthTimeUnknown: "I don't know my birth time",
+    birthTimeUnknownValue: 'Not known',
+    birthHourOf: '{branch} hour',
     submit: 'Save',
     submitSaving: 'Saving...',
     errorDate: 'Birth date is invalid or in the future',

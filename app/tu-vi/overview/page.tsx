@@ -12,9 +12,10 @@ import { fetchHoroscopeProfile } from '@/lib/horoscope-profile-client'
 import type { HoroscopeProfile } from '@/lib/horoscope-profile'
 import type { Palace } from '@/lib/tuvi/types'
 import { buildReading } from '@/lib/tuvi/reading'
+import { birthFacts } from '@/lib/tuvi/birth-facts'
 import { vietnamTodaySolar } from '@/lib/horoscope-interpretation'
 import { westernZodiacSign } from '@/lib/western-zodiac'
-import { LaSoFull } from '@/components/tu-vi/LaSoGrid'
+import { LaSoFull, LaSoLegend } from '@/components/tu-vi/LaSoGrid'
 import { PalaceDetail } from '@/components/tu-vi/PalaceDetail'
 import { ReadingSections } from '@/components/tu-vi/ReadingSections'
 
@@ -39,6 +40,44 @@ function Skeleton({ className }: { className: string }) {
     <span className={`inline-block overflow-hidden rounded-lg bg-emerald-50 ${className}`}>
       <span className="relative block h-full w-1/3 animate-shimmer-sweep bg-white/70 motion-reduce:hidden" />
     </span>
+  )
+}
+
+/**
+ * The birth data the chart was built from, under the chart it explains.
+ *
+ * The lunar date is derived rather than read back from storage, so what is on
+ * screen is always the date the reading used. A missing hour is called out in
+ * amber rather than left blank: without it a good half of the stars are omitted
+ * (FR-016), and a reader who cannot see that has no way to know why their chart
+ * looks sparse.
+ */
+function BirthFacts({ facts }: { facts: NonNullable<ReturnType<typeof birthFacts>> }) {
+  const { t } = useLanguage()
+  return (
+    <dl className="mt-3 space-y-1 rounded-xl border border-emerald-100 bg-emerald-50/30 px-3 py-2.5 font-tuvi-sans text-xs">
+      <div className="flex items-baseline justify-between gap-3">
+        <dt className="text-[#52525b]">{t('tuVi.birthDateLabel')}</dt>
+        <dd className="font-medium tabular-nums text-[#18181b]">{facts.solar}</dd>
+      </div>
+      <div className="flex items-baseline justify-between gap-3">
+        <dt className="text-[#52525b]">{t('tuVi.birthDateLunarLabel')}</dt>
+        <dd className="font-medium tabular-nums text-[#18181b]">{facts.lunar}</dd>
+      </div>
+      <div className="flex items-baseline justify-between gap-3">
+        <dt className="text-[#52525b]">{t('tuVi.birthTimeLabel')}</dt>
+        {facts.hour ? (
+          <dd className="font-medium text-[#18181b]">
+            <span className="tabular-nums">{facts.hour.clock}</span>{' '}
+            <span className="text-[#52525b]">
+              ({t('tuVi.birthHourOf', { branch: facts.hour.branch })})
+            </span>
+          </dd>
+        ) : (
+          <dd className="font-medium text-[#b45309]">{t('tuVi.birthTimeUnknownValue')}</dd>
+        )}
+      </div>
+    </dl>
   )
 }
 
@@ -103,6 +142,11 @@ export default function TuViOverviewPage() {
   }, [profile, todayKey])
 
   const displayName = (user?.user_metadata?.full_name as string | undefined)?.trim()
+
+  // What the reader actually entered. Nothing else on this screen shows it, so
+  // a mistyped birth hour — which silently changes every palace — was until now
+  // only discoverable by opening the edit form.
+  const facts = useMemo(() => (profile ? birthFacts(profile) : null), [profile])
 
   const westernSign = useMemo(() => {
     if (!profile) return null
@@ -182,7 +226,11 @@ export default function TuViOverviewPage() {
             {/* One middle dot on this line, which is the ration (taste-skill 9.F);
                 the Western sign is parenthetical rather than a second dot. */}
             <p className="mt-1 font-tuvi-sans text-sm text-[#52525b]">
-              {reading.napAm.name} · {t('tuVi.zodiacPrefix')} {reading.zodiac}
+              {/* Nạp âm is not repeated here: it sits in the thiên bàn at the
+                  centre of the chart, which is where a lá số traditionally
+                  carries it, and printing it twice on one screen said nothing
+                  the second time. */}
+              {t('tuVi.zodiacPrefix')} {reading.zodiac}
               {westernSign && ` (${westernSign})`}
             </p>
             <Link
@@ -251,6 +299,8 @@ export default function TuViOverviewPage() {
             <p className="mt-2.5 text-center font-tuvi-sans text-xs text-[#52525b]">
               {t('tuVi.chartHint')}
             </p>
+            <LaSoLegend />
+            {facts && <BirthFacts facts={facts} />}
             {openPalace && (
               <PalaceDetail
                 palace={openPalace}
