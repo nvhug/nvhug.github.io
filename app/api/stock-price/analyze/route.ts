@@ -8,6 +8,7 @@ import { gradeFromOverallScore, overallScoreFromScores } from './scoring'
 import { stockAnalysisSchema } from './schema'
 import { cooldownMetadata } from './cooldown'
 import { checkAITrialQuota, incrementAITrialUsage, trialExhaustedBody } from '@/lib/ai-trial'
+import { logAiUsage, normalizeUsage, servedModel } from '@/lib/ai-usage'
 
 export const runtime = 'nodejs'
 
@@ -346,6 +347,16 @@ export async function POST(request: Request) {
   }
 
   const data = await res.json()
+
+  await logAiUsage({
+    surface: 'stock_analyze',
+    provider: 'deepseek',
+    model: servedModel(data, 'deepseek-v4-flash'),
+    usage: normalizeUsage(data.usage, 'deepseek'),
+    outcome: 'success',
+    userId: user.id,
+    actor: 'user',
+  })
   const content = data.choices?.[0]?.message?.content
   if (!content) return NextResponse.json({ error: 'Empty response from DeepSeek' }, { status: 502 })
 

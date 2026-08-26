@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 import { checkAITrialQuota, incrementAITrialUsage, trialExhaustedBody } from '@/lib/ai-trial'
+import { logAiUsage, normalizeUsage, servedModel } from '@/lib/ai-usage'
 
 const suggestedTickerSchema = z.object({
   ticker: z.string().min(1),
@@ -293,6 +294,18 @@ Trả về CHỈ JSON hợp lệ (không markdown, không giải thích):
   }
 
   const aiData = await aiRes.json() as { choices?: { message?: { content?: string } }[] }
+
+  // The cron path has no signed-in initiator, so it is attributed to the system rather
+  // than to whichever account happened to be handy (FR-007).
+  await logAiUsage({
+    surface: 'stock_suggestions',
+    provider: 'deepseek',
+    model: servedModel(aiData, 'deepseek-v4-flash'),
+    usage: normalizeUsage((aiData as { usage?: unknown }).usage, 'deepseek'),
+    outcome: 'success',
+    userId: isCronCall ? null : callerUserId,
+    actor: isCronCall ? 'system' : 'user',
+  })
   const content = aiData.choices?.[0]?.message?.content
   if (!content) return NextResponse.json({ error: 'Empty AI response' }, { status: 502 })
 

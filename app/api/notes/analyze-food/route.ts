@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createSupabaseServerClient } from '@/lib/supabase-server'
 import { requestVisionJSON, requestTextJSON, resolveVisionConfig, visionProviderNames } from '@/lib/ai-vision'
+import type { ProviderResult } from '@/lib/ai-vision'
+import { logAiUsage, normalizeUsage, servedModel } from '@/lib/ai-usage'
 import { normalizeItemsWithInternalTable } from './nutrition-normalizer'
 import { checkAITrialQuota, incrementAITrialUsage, trialExhaustedBody } from '@/lib/ai-trial'
 
@@ -276,22 +278,47 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: MSG.noDescription[lang] }, { status: 400 })
   }
 
+  // One usage entry per PROVIDER call, not per user action: the image path calls a vision
+  // provider and then a text provider, so it records two rows against the same surface and
+  // user. Collapsing them would under-report call volume and make per-model cost wrong.
+  async function record(result: ProviderResult, outcome: 'success' | 'error') {
+    await logAiUsage({
+      surface: 'food_analyze',
+      provider: result.provider,
+      model: servedModel({ model: result.model }, result.model ?? 'unknown'),
+      usage: normalizeUsage(result.usage, result.provider),
+      outcome,
+      userId: user!.id,
+      actor: 'user',
+    })
+  }
+
   let raw: string
   let focusBox: [number, number, number, number] | null = null
   try {
     if (mode === 'image' && image) {
       // Stage 1: vision model describes the plate. Stage 2: DeepSeek does the nutrition maths.
-      const observation = await requestVisionJSON(buildVisionPrompt(lang, description), image)
+      const vision = await requestVisionJSON(buildVisionPrompt(lang, description), image)
+      await record(vision, 'success')
       try {
-        focusBox = observationSchema.parse(extractJSON(observation)).focus_box
+        focusBox = observationSchema.parse(extractJSON(vision.text)).focus_box
       } catch {
         focusBox = null
       }
-      raw = await requestTextJSON(buildNutritionPrompt(lang, { observation, description }))
+      const nutrition = await requestTextJSON(
+        buildNutritionPrompt(lang, { observation: vision.text, description })
+      )
+      await record(nutrition, 'success')
+      raw = nutrition.text
     } else {
-      raw = await requestTextJSON(buildNutritionPrompt(lang, { description }))
+      const nutrition = await requestTextJSON(buildNutritionPrompt(lang, { description }))
+      await record(nutrition, 'success')
+      raw = nutrition.text
     }
   } catch (err) {
+    // A provider that never returned reported no tokens, so there is nothing to cost.
+    // Stages that DID return were already recorded above, with their real cost — a later
+    // stage failing does not make an earlier billed call free.
     console.error('[analyze-food] provider call failed:', err)
     return NextResponse.json({ error: MSG.aiFailed[lang] }, { status: 502 })
   }

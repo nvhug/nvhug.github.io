@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase-server'
+import { logAiUsage, normalizeUsage, servedModel } from '@/lib/ai-usage'
 import { getServiceSupabaseClient } from '@/lib/supabase-admin'
 import {
   buildPalacePrompt,
@@ -177,6 +178,19 @@ export async function POST(request: Request) {
 
     try {
       const data = await res.json()
+
+      // Inside generateBatch on purpose: the two batches are two provider calls and are
+      // billed as two, so they are recorded as two (FR-001a). The insert is bounded at
+      // 1s, which is negligible against the 50s provider ceiling this route already sets.
+      await logAiUsage({
+        surface: 'tuvi_palaces',
+        provider: 'deepseek',
+        model: servedModel(data, 'deepseek-v4-flash'),
+        usage: normalizeUsage(data.usage, 'deepseek'),
+        outcome: 'success',
+        userId,
+        actor: 'user',
+      })
       const content: string = data.choices?.[0]?.message?.content ?? ''
       const truncated = data.choices?.[0]?.finish_reason === 'length'
       const palaces = parsePalaceReadings(JSON.parse(content))

@@ -4,6 +4,7 @@ import { createSupabaseServerClient } from '@/lib/supabase-server'
 import { DEFAULT_MACRO_TARGETS, getMacroTargets, resolveTargetsByDate } from './macroUtils'
 import type { MacroTargets, MacroTargetRow } from './macroUtils'
 import { checkAITrialQuota, incrementAITrialUsage, trialExhaustedBody } from '@/lib/ai-trial'
+import { logAiUsage, normalizeUsage, servedModel } from '@/lib/ai-usage'
 
 export const dynamic = 'force-dynamic'
 
@@ -838,14 +839,32 @@ Trả về JSON hợp lệ với đúng cấu trúc sau (không thêm/bỏ field
     }),
   })
 
+  // Records one entry for this provider call whatever happens to it. A failure does NOT
+  // imply zero cost: a provider that refuses before generating anything reports no tokens
+  // and really was free, but a completion that arrived whole and was then rejected as
+  // unusable was billed, and that money has to show up somewhere (FR-005a).
+  const recordUsage = (outcome: 'success' | 'error', body: unknown) =>
+    logAiUsage({
+      surface: 'notes_analyze',
+      provider: 'deepseek',
+      model: servedModel(body, 'deepseek-v4-flash'),
+      usage: normalizeUsage((body as { usage?: unknown } | null)?.usage, 'deepseek'),
+      outcome,
+      userId: user!.id,
+      actor: 'user',
+    })
+
   if (!res.ok) {
     const err = await res.text()
+    // Refused upstream: no completion, no tokens, nothing billed.
+    await recordUsage('error', null)
     return NextResponse.json({ error: `DeepSeek API error: ${err}` }, { status: 502 })
   }
 
   const data    = await res.json()
   const content = data.choices?.[0]?.message?.content
   if (!content) {
+    await recordUsage('error', data)
     return NextResponse.json({ error: 'Empty response from DeepSeek' }, { status: 502 })
   }
 
@@ -853,11 +872,18 @@ Trả về JSON hợp lệ với đúng cấu trúc sau (không thêm/bỏ field
   try {
     insights = JSON.parse(content)
   } catch {
+    // Billed and unusable — the expensive kind of failure, and the one worth seeing.
+    await recordUsage('error', data)
     return NextResponse.json({ error: 'DeepSeek returned invalid JSON', raw: content.slice(0, 200) }, { status: 502 })
   }
   const promptTokens     = data.usage?.prompt_tokens     ?? 0
   const completionTokens = data.usage?.completion_tokens ?? 0
   const totalTokens      = data.usage?.total_tokens      ?? 0
+
+  // Recorded before the analysis row so its id can be stored alongside. Null is a real
+  // outcome — telemetry is bounded and swallows its own failures — and the analysis must
+  // save either way, which is why usage_log_id is nullable.
+  const usageLogId = await recordUsage('success', data)
 
   const { data: saved, error: saveErr } = await supabaseAuth
     .from('ai_analysis_history')
@@ -867,6 +893,7 @@ Trả về JSON hợp lệ với đúng cấu trúc sau (không thêm/bỏ field
       prompt_tokens:     promptTokens,
       completion_tokens: completionTokens,
       total_tokens:      totalTokens,
+      usage_log_id:      usageLogId,
       period_label:      period.label,
       period_from:       period.from,
       period_to:         period.to,

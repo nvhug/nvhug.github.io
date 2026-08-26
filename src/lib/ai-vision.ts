@@ -37,6 +37,24 @@ export interface ImageInput {
 // Two calls run back to back, so each must finish well inside the route's maxDuration.
 const REQUEST_TIMEOUT_MS = 25_000
 
+/**
+ * What one provider call returned. The raw `usage` payload and the served model travel
+ * with the text because the caller has to record what the call cost, and this function is
+ * the only place they exist — returning the text alone would throw them away here, where
+ * no caller can recover them. Shapes differ per provider, so `usage` stays unparsed and
+ * is normalized by `normalizeUsage()` in `ai-usage.ts`.
+ */
+export interface ProviderResult {
+  text: string
+  usage: unknown
+  /** The model the provider reports having served, when it reports one. */
+  model: string | null
+  provider: UsageProviderName
+}
+
+/** Matches the provider values recorded in ai_usage_log. */
+export type UsageProviderName = 'deepseek' | 'gemini' | 'openai' | 'openrouter'
+
 export function resolveVisionConfig(): VisionConfig | null {
   const forced = process.env.FOOD_VISION_PROVIDER?.trim().toLowerCase() as VisionProvider | undefined
   const candidates: VisionProvider[] =
@@ -59,7 +77,7 @@ export function visionProviderNames(): string[] {
   return Object.values(KEY_ENV)
 }
 
-async function callGemini(config: VisionConfig, prompt: string, image?: ImageInput): Promise<string> {
+async function callGemini(config: VisionConfig, prompt: string, image?: ImageInput): Promise<ProviderResult> {
   const parts: Record<string, unknown>[] = [{ text: prompt }]
   if (image) parts.push({ inline_data: { mime_type: image.mimeType, data: image.data } })
 
@@ -83,17 +101,23 @@ async function callGemini(config: VisionConfig, prompt: string, image?: ImageInp
     ?.map((p: { text?: string }) => p.text ?? '')
     .join('')
   if (!text) throw new Error('Empty response from Gemini')
-  return text
+  return {
+    text,
+    usage: data?.usageMetadata ?? null,
+    model: typeof data?.modelVersion === 'string' ? data.modelVersion : null,
+    provider: 'gemini',
+  }
 }
 
 async function callOpenAICompatible(
   baseUrl: string,
   label: string,
+  provider: UsageProviderName,
   apiKey: string,
   model: string,
   prompt: string,
   image?: ImageInput
-): Promise<string> {
+): Promise<ProviderResult> {
   const content: Record<string, unknown>[] = [{ type: 'text', text: prompt }]
   if (image) {
     content.push({
@@ -119,11 +143,16 @@ async function callOpenAICompatible(
   const data = await res.json()
   const text = data?.choices?.[0]?.message?.content
   if (!text) throw new Error(`Empty response from ${label}`)
-  return text
+  return {
+    text,
+    usage: data?.usage ?? null,
+    model: typeof data?.model === 'string' ? data.model : null,
+    provider,
+  }
 }
 
 /** Stage 1 — reads the photo with the configured vision provider. */
-export async function requestVisionJSON(prompt: string, image: ImageInput): Promise<string> {
+export async function requestVisionJSON(prompt: string, image: ImageInput): Promise<ProviderResult> {
   const config = resolveVisionConfig()
   if (!config) {
     throw new Error(`No vision provider configured. Set one of: ${visionProviderNames().join(', ')}`)
@@ -131,16 +160,25 @@ export async function requestVisionJSON(prompt: string, image: ImageInput): Prom
 
   if (config.provider === 'gemini') return callGemini(config, prompt, image)
   const baseUrl = config.provider === 'openai' ? 'https://api.openai.com/v1' : 'https://openrouter.ai/api/v1'
-  return callOpenAICompatible(baseUrl, config.provider, config.apiKey, config.model, prompt, image)
+  return callOpenAICompatible(
+    baseUrl,
+    config.provider,
+    config.provider,
+    config.apiKey,
+    config.model,
+    prompt,
+    image
+  )
 }
 
 /** Stage 2 — nutrition reasoning on DeepSeek, falling back to the vision provider when no key is set. */
-export async function requestTextJSON(prompt: string): Promise<string> {
+export async function requestTextJSON(prompt: string): Promise<ProviderResult> {
   const deepseekKey = process.env.DEEPSEEK_API_KEY
   if (deepseekKey) {
     return callOpenAICompatible(
       'https://api.deepseek.com/v1',
       'DeepSeek',
+      'deepseek',
       deepseekKey,
       process.env.DEEPSEEK_MODEL?.trim() || 'deepseek-v4-flash',
       prompt
@@ -155,5 +193,12 @@ export async function requestTextJSON(prompt: string): Promise<string> {
   }
   if (config.provider === 'gemini') return callGemini(config, prompt)
   const baseUrl = config.provider === 'openai' ? 'https://api.openai.com/v1' : 'https://openrouter.ai/api/v1'
-  return callOpenAICompatible(baseUrl, config.provider, config.apiKey, config.model, prompt)
+  return callOpenAICompatible(
+    baseUrl,
+    config.provider,
+    config.provider,
+    config.apiKey,
+    config.model,
+    prompt
+  )
 }

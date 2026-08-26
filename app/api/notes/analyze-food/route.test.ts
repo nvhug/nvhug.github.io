@@ -40,11 +40,32 @@ vi.mock('@/lib/supabase-server', () => ({
   createSupabaseServerClient: mockCreateSupabaseServerClient,
 }))
 
+// ai-vision now returns { text, usage, model, provider } rather than a bare string, so the
+// food photo path can record what each of its two provider calls cost. Wrapping here keeps
+// every mockResolvedValueOnce below returning a plain JSON string.
 vi.mock('@/lib/ai-vision', () => ({
   requestVisionJSON: vi.fn(),
-  requestTextJSON: mockRequestTextJSON,
+  requestTextJSON: async (prompt: string) => ({
+    text: await mockRequestTextJSON(prompt),
+    usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
+    model: 'deepseek-v4-flash',
+    provider: 'deepseek' as const,
+  }),
   resolveVisionConfig: vi.fn(() => true),
   visionProviderNames: vi.fn(() => []),
+}))
+
+// Usage recording owns a service-role client of its own; stubbed so these tests exercise
+// the route rather than the log.
+vi.mock('@/lib/ai-usage', () => ({
+  logAiUsage: vi.fn(async () => 'usage-log-id'),
+  normalizeUsage: vi.fn(() => ({
+    input_tokens: 0,
+    cached_input_tokens: 0,
+    output_tokens: 0,
+    reasoning_tokens: 0,
+  })),
+  servedModel: vi.fn((_raw: unknown, requested: string) => requested),
 }))
 
 // Trial quota: default to unlimited (simulates admin/paid) so existing tests are unaffected

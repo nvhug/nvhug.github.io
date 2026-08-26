@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase-server'
+import { logAiUsage, normalizeUsage, servedModel } from '@/lib/ai-usage'
 import { getServiceSupabaseClient } from '@/lib/supabase-admin'
 import {
   buildInterpretationPrompt,
@@ -233,6 +234,16 @@ export async function POST(request: Request) {
   let aborted = false
   try {
     const data = await res.json()
+
+    await logAiUsage({
+      surface: 'tuvi_interpret',
+      provider: 'deepseek',
+      model: servedModel(data, 'deepseek-v4-flash'),
+      usage: normalizeUsage(data.usage, 'deepseek'),
+      outcome: 'success',
+      userId,
+      actor: 'user',
+    })
     truncated = data.choices?.[0]?.finish_reason === 'length'
     const content: string = data.choices?.[0]?.message?.content ?? ''
     diagnosis = `finish_reason=${data.choices?.[0]?.finish_reason} chars=${content.length}`
