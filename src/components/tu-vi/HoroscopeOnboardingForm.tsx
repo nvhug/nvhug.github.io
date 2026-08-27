@@ -315,7 +315,12 @@ export function HoroscopeOnboardingForm({
           <div className="mt-2 flex gap-1.5">
             {calendar === 'solar' ? (
               <>
-                <Select label={t('tuVi.lunarDay')} value={solar.day} onChange={(day) => setSolar({ day })}>
+                <Select
+                  label={t('tuVi.lunarDay')}
+                  value={solar.day}
+                  onChange={(day) => setSolar({ day })}
+                  className="flex-1"
+                >
                   {RANGE(daysInSolarMonth(solar.month, solar.year)).map((day) => (
                     <option key={day} value={day}>{day}</option>
                   ))}
@@ -324,7 +329,7 @@ export function HoroscopeOnboardingForm({
                   label={t('tuVi.lunarMonth')}
                   value={solar.month}
                   onChange={(month) => setSolar({ month })}
-                  className="flex-[1.4]"
+                  className="flex-1"
                 >
                   {RANGE(12).map((month) => (
                     <option key={month} value={month}>{t('tuVi.lunarMonthOption', { month })}</option>
@@ -334,7 +339,7 @@ export function HoroscopeOnboardingForm({
                   label={t('tuVi.lunarYear')}
                   value={solar.year}
                   onChange={(year) => setSolar({ year })}
-                  className="flex-[1.3]"
+                  className="flex-1"
                 >
                   {getYearOptions(new Date().getFullYear(), solar.year).map((year) => (
                     <option key={year} value={year}>{year}</option>
@@ -343,7 +348,12 @@ export function HoroscopeOnboardingForm({
               </>
             ) : (
               <>
-                <Select label={t('tuVi.lunarDay')} value={lunarDate.day} onChange={(day) => setLunar({ day })}>
+                <Select
+                  label={t('tuVi.lunarDay')}
+                  value={lunarDate.day}
+                  onChange={(day) => setLunar({ day })}
+                  className="flex-1"
+                >
                   {RANGE(30).map((day) => (
                     <option key={day} value={day}>{day}</option>
                   ))}
@@ -352,7 +362,7 @@ export function HoroscopeOnboardingForm({
                   label={t('tuVi.lunarMonth')}
                   value={lunarDate.month}
                   onChange={(month) => setLunar({ month })}
-                  className="flex-[1.4]"
+                  className="flex-1"
                 >
                   {RANGE(12).map((month) => (
                     <option key={month} value={month}>{t('tuVi.lunarMonthOption', { month })}</option>
@@ -362,7 +372,7 @@ export function HoroscopeOnboardingForm({
                   label={t('tuVi.lunarYear')}
                   value={lunarDate.year}
                   onChange={(year) => setLunar({ year })}
-                  className="flex-[1.3]"
+                  className="flex-1"
                 >
                   {getYearOptions(new Date().getFullYear(), lunarDate.year).map((year) => (
                     <option key={year} value={year}>{year}</option>
