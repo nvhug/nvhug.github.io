@@ -11,7 +11,10 @@ RUN npm ci
 
 FROM node:22-alpine AS builder
 WORKDIR /app
-ENV HUSKY=0 NEXT_TELEMETRY_DISABLED=1
+# BUILD_STANDALONE switches next.config.js to output: 'standalone', which is what
+# produces the .next/standalone/server.js the runner stage below starts. Vercel builds
+# the same repo without it — see the comment in next.config.js.
+ENV HUSKY=0 NEXT_TELEMETRY_DISABLED=1 BUILD_STANDALONE=1
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
