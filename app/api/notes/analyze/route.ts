@@ -835,6 +835,10 @@ Trả về JSON hợp lệ với đúng cấu trúc sau (không thêm/bỏ field
       model: 'deepseek-v4-flash',
       messages: [{ role: 'user', content: prompt }],
       response_format: { type: 'json_object' },
+      // No max_tokens here, so this route does not truncate — but v4-flash still reasons
+      // by default, and reasoning tokens are billed as output. The prompt asks for JSON
+      // and gains nothing from chain-of-thought, so this is cost and latency for nothing.
+      thinking: { type: 'disabled' },
       temperature: 0.3,
     }),
   })

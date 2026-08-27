@@ -163,6 +163,10 @@ async function callOpenAICompatible(
       model,
       messages: [{ role: 'user', content: image ? content : prompt }],
       response_format: { type: 'json_object' },
+      // DeepSeek only — `thinking` is not an OpenAI/OpenRouter parameter and sending it
+      // there risks a 400. DeepSeek's v4 models reason by default and bill those tokens as
+      // output; this prompt wants JSON and gains nothing from chain-of-thought.
+      ...(provider === 'deepseek' ? { thinking: { type: 'disabled' } } : {}),
       temperature: 0.2,
     }),
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),

@@ -280,6 +280,10 @@ Trả về CHỈ JSON hợp lệ (không markdown, không giải thích):
         messages: [{ role: 'user', content: prompt }],
         response_format: { type: 'json_object' },
         temperature: 0.1,
+        // v4-flash reasons by default and spends those tokens out of max_tokens before
+        // producing any content. This budget is the smallest in the codebase and predates
+        // the model switch, so leaving thinking on empties it before a single suggestion.
+        thinking: { type: 'disabled' },
         max_tokens: 2000,
       }),
       signal: AbortSignal.timeout(50_000),

@@ -159,6 +159,13 @@ export async function POST(request: Request) {
           model: 'deepseek-v4-flash',
           messages: [{ role: 'user', content: buildPalacePrompt(reading, lang, indexes) }],
           response_format: { type: 'json_object' },
+          // v4-flash is a reasoning model and its reasoning tokens are spent out of
+          // max_tokens BEFORE any content is produced. The budget below was measured
+          // against deepseek-chat, which reasons not at all, so leaving thinking on burns
+          // the whole allowance on reasoning and returns finish_reason 'length' with an
+          // empty body — every reading fails. Nothing here asks for chain-of-thought: the
+          // prompt wants JSON.
+          thinking: { type: 'disabled' },
           temperature: 0.6,
           // Six palaces measured ~2350 output tokens; this leaves real headroom
           // without approaching what the request has time to receive.

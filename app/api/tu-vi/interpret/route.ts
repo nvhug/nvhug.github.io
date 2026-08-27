@@ -204,6 +204,10 @@ export async function POST(request: Request) {
         model: 'deepseek-v4-flash',
         messages: [{ role: 'user', content: prompt }],
         response_format: { type: 'json_object' },
+        // See the note in tu-vi/palaces: reasoning tokens come out of max_tokens before
+        // any content, and SECTIONS_MAX_TOKENS was measured against a model that does not
+        // reason. Leaving this on truncates every reading to nothing.
+        thinking: { type: 'disabled' },
         temperature: 0.6,
         // Sized from measured completions — see SECTIONS_MAX_TOKENS. Covers the
         // 11-section reading only; the twelve-palace block has its own route.

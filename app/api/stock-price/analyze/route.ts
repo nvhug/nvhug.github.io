@@ -332,6 +332,10 @@ export async function POST(request: Request) {
         model: 'deepseek-v4-flash',
         messages: [{ role: 'user', content: prompt }],
         response_format: { type: 'json_object' },
+        // v4-flash reasons by default and spends those tokens out of max_tokens before
+        // producing any content. This budget predates the model switch, so leaving
+        // thinking on returns finish_reason 'length' with an empty body.
+        thinking: { type: 'disabled' },
         temperature: 0.3,
         max_tokens: 3500,
       }),
