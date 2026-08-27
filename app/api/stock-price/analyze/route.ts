@@ -348,30 +348,42 @@ export async function POST(request: Request) {
 
   const data = await res.json()
 
-  await logAiUsage({
-    surface: 'stock_analyze',
-    provider: 'deepseek',
-    model: servedModel(data, 'deepseek-v4-flash'),
-    usage: normalizeUsage(data.usage, 'deepseek'),
-    outcome: 'success',
-    userId: user.id,
-    actor: 'user',
-  })
+  // Records this provider call whatever becomes of it. A failure does NOT imply zero cost:
+  // every rejection below happens AFTER a completion arrived and was billed, so filing them
+  // as successes would make wasted spend structurally invisible (FR-005a).
+  const recordUsage = (outcome: 'success' | 'error') =>
+    logAiUsage({
+      surface: 'stock_analyze',
+      provider: 'deepseek',
+      model: servedModel(data, 'deepseek-v4-flash'),
+      usage: normalizeUsage(data.usage, 'deepseek'),
+      outcome,
+      userId: user.id,
+      actor: 'user',
+    })
+
   const content = data.choices?.[0]?.message?.content
-  if (!content) return NextResponse.json({ error: 'Empty response from DeepSeek' }, { status: 502 })
+  if (!content) {
+    await recordUsage('error')
+    return NextResponse.json({ error: 'Empty response from DeepSeek' }, { status: 502 })
+  }
 
   let parsed: unknown
   try {
     parsed = JSON.parse(content)
   } catch {
+    await recordUsage('error')
     return NextResponse.json({ error: 'DeepSeek returned invalid JSON' }, { status: 502 })
   }
 
   const result = stockAnalysisSchema.safeParse(parsed)
   if (!result.success) {
+    await recordUsage('error')
     console.error('[stock-analysis] invalid response:', result.error.issues)
     return NextResponse.json({ error: 'AI trả về báo cáo chưa đầy đủ. Vui lòng phân tích lại.' }, { status: 502 })
   }
+
+  await recordUsage('success')
 
   const analyzedAt = new Date().toISOString()
   const finalResult = applyEvidence(result.data, fundamentals, governanceDisclosures)

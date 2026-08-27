@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { normalizeUsage, servedModel, SURFACES } from './ai-usage'
 
@@ -205,6 +207,35 @@ describe('normalizeUsage — reconciliation against the provider total', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     normalizeUsage({ prompt_tokens: 10, completion_tokens: 5 }, 'deepseek')
     expect(warn).not.toHaveBeenCalled()
+  })
+})
+
+describe('no instrumented route asserts its own outcome', () => {
+  // A structural guard, not a pure-function test, and deliberately so: the defect it exists
+  // to catch spanned six files and no function could express it. Every route once wrote
+  // `outcome: 'success'` as a literal, ABOVE the validation that can reject the completion —
+  // so a call that was billed in full and then thrown away filed as a success, and
+  // `failed_cost_usd` was structurally zero across the product. FR-005a inverted.
+  const ROUTES = [
+    'app/api/notes/analyze/route.ts',
+    'app/api/notes/analyze-food/route.ts',
+    'app/api/stock-price/analyze/route.ts',
+    'app/api/stock-suggestions/route.ts',
+    'app/api/tu-vi/interpret/route.ts',
+    'app/api/tu-vi/palaces/route.ts',
+  ]
+
+  const read = (rel: string) =>
+    readFileSync(resolve(__dirname, '../..', rel), 'utf8')
+
+  it.each(ROUTES)('%s never passes a literal success as the outcome', (rel) => {
+    // The type annotation `outcome: 'success' | 'error'` is fine; an object property
+    // `outcome: 'success',` is the bug.
+    expect(read(rel)).not.toMatch(/outcome:\s*'success'\s*,/)
+  })
+
+  it.each(ROUTES)('%s records a failure somewhere', (rel) => {
+    expect(read(rel)).toMatch(/'error'/)
   })
 })
 

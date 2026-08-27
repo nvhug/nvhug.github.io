@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createSupabaseServerClient } from '@/lib/supabase-server'
 import { requestVisionJSON, requestTextJSON, resolveVisionConfig, visionProviderNames } from '@/lib/ai-vision'
-import type { ProviderResult } from '@/lib/ai-vision'
+import { ProviderCallError, type ProviderResult } from '@/lib/ai-vision'
 import { logAiUsage, normalizeUsage, servedModel } from '@/lib/ai-usage'
 import { normalizeItemsWithInternalTable } from './nutrition-normalizer'
 import { checkAITrialQuota, incrementAITrialUsage, trialExhaustedBody } from '@/lib/ai-trial'
@@ -281,12 +281,15 @@ export async function POST(request: Request) {
   // One usage entry per PROVIDER call, not per user action: the image path calls a vision
   // provider and then a text provider, so it records two rows against the same surface and
   // user. Collapsing them would under-report call volume and make per-model cost wrong.
-  async function record(result: ProviderResult, outcome: 'success' | 'error') {
+  async function record(
+    call: Pick<ProviderResult, 'usage' | 'model' | 'provider'>,
+    outcome: 'success' | 'error'
+  ) {
     await logAiUsage({
       surface: 'food_analyze',
-      provider: result.provider,
-      model: servedModel({ model: result.model }, result.model ?? 'unknown'),
-      usage: normalizeUsage(result.usage, result.provider),
+      provider: call.provider,
+      model: servedModel({ model: call.model }, call.model ?? 'unknown'),
+      usage: normalizeUsage(call.usage, call.provider),
       outcome,
       userId: user!.id,
       actor: 'user',
@@ -294,6 +297,12 @@ export async function POST(request: Request) {
   }
 
   let raw: string
+  // Held back deliberately. The vision stage is recorded the moment it returns, because its
+  // output is consumed straight away and nothing later can invalidate it. The nutrition
+  // stage is not recorded until its output has been through resultSchema, because that
+  // parse is what decides whether the completion we paid for was usable — and a billed
+  // completion the app then rejects is the failure FR-005a exists to make visible.
+  let nutritionCall: Pick<ProviderResult, 'usage' | 'model' | 'provider'>
   let focusBox: [number, number, number, number] | null = null
   try {
     if (mode === 'image' && image) {
@@ -308,17 +317,19 @@ export async function POST(request: Request) {
       const nutrition = await requestTextJSON(
         buildNutritionPrompt(lang, { observation: vision.text, description })
       )
-      await record(nutrition, 'success')
+      nutritionCall = nutrition
       raw = nutrition.text
     } else {
       const nutrition = await requestTextJSON(buildNutritionPrompt(lang, { description }))
-      await record(nutrition, 'success')
+      nutritionCall = nutrition
       raw = nutrition.text
     }
   } catch (err) {
-    // A provider that never returned reported no tokens, so there is nothing to cost.
-    // Stages that DID return were already recorded above, with their real cost — a later
-    // stage failing does not make an earlier billed call free.
+    // A ProviderCallError means the provider answered, was paid, and the answer was
+    // unusable — record it with its real tokens and cost. Any other error means nothing
+    // was generated and there is nothing to cost. Stages that already returned were
+    // recorded above: a later stage failing does not make an earlier billed call free.
+    if (err instanceof ProviderCallError) await record(err.result, 'error')
     console.error('[analyze-food] provider call failed:', err)
     return NextResponse.json({ error: MSG.aiFailed[lang] }, { status: 502 })
   }
@@ -327,9 +338,12 @@ export async function POST(request: Request) {
   try {
     result = resultSchema.parse(extractJSON(raw))
   } catch (err) {
+    // Billed and unusable — the expensive kind of failure, and the one FR-005a is about.
+    await record(nutritionCall, 'error')
     console.error('[analyze-food] unparsable model output:', err, raw.slice(0, 300))
     return NextResponse.json({ error: MSG.aiFailed[lang] }, { status: 502 })
   }
+  await record(nutritionCall, 'success')
 
   const normalizedItems = normalizeItemsWithInternalTable(result.items)
 

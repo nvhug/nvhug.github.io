@@ -44,6 +44,29 @@ const REQUEST_TIMEOUT_MS = 25_000
  * no caller can recover them. Shapes differ per provider, so `usage` stays unparsed and
  * is normalized by `normalizeUsage()` in `ai-usage.ts`.
  */
+/**
+ * Thrown when a provider answered but the answer is unusable — an empty completion, a
+ * response cut off at the token ceiling, a safety block.
+ *
+ * It carries the usage payload because **that call was billed**. A 200 with populated
+ * `usageMetadata` and no text parts is a real and ordinary Gemini outcome, and throwing a
+ * bare Error here would destroy the only record of what it cost: `data` goes out of scope
+ * and no caller can recover it. That is the exact failure this module's return type was
+ * widened to prevent, so the error path has to carry the same information as the happy one.
+ *
+ * A non-2xx is different and stays a plain Error: nothing was generated, so there is nothing
+ * to cost.
+ */
+export class ProviderCallError extends Error {
+  constructor(
+    message: string,
+    readonly result: Pick<ProviderResult, 'usage' | 'model' | 'provider'>
+  ) {
+    super(message)
+    this.name = 'ProviderCallError'
+  }
+}
+
 export interface ProviderResult {
   text: string
   usage: unknown
@@ -100,7 +123,14 @@ async function callGemini(config: VisionConfig, prompt: string, image?: ImageInp
   const text = data?.candidates?.[0]?.content?.parts
     ?.map((p: { text?: string }) => p.text ?? '')
     .join('')
-  if (!text) throw new Error('Empty response from Gemini')
+  if (!text) {
+    // Billed and unusable — MAX_TOKENS, a safety block, or a thinking-only turn.
+    throw new ProviderCallError('Empty response from Gemini', {
+      usage: data?.usageMetadata ?? null,
+      model: typeof data?.modelVersion === 'string' ? data.modelVersion : null,
+      provider: 'gemini',
+    })
+  }
   return {
     text,
     usage: data?.usageMetadata ?? null,
@@ -142,7 +172,15 @@ async function callOpenAICompatible(
 
   const data = await res.json()
   const text = data?.choices?.[0]?.message?.content
-  if (!text) throw new Error(`Empty response from ${label}`)
+  if (!text) {
+    // Same shape as the Gemini case: a DeepSeek turn that emitted only reasoning_content,
+    // or stopped at the token ceiling, was billed and has usage worth recording.
+    throw new ProviderCallError(`Empty response from ${label}`, {
+      usage: data?.usage ?? null,
+      model: typeof data?.model === 'string' ? data.model : null,
+      provider,
+    })
+  }
   return {
     text,
     usage: data?.usage ?? null,

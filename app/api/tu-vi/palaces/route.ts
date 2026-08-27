@@ -182,25 +182,34 @@ export async function POST(request: Request) {
       // Inside generateBatch on purpose: the two batches are two provider calls and are
       // billed as two, so they are recorded as two (FR-001a). The insert is bounded at
       // 1s, which is negligible against the 50s provider ceiling this route already sets.
-      await logAiUsage({
-        surface: 'tuvi_palaces',
-        provider: 'deepseek',
-        model: servedModel(data, 'deepseek-v4-flash'),
-        usage: normalizeUsage(data.usage, 'deepseek'),
-        outcome: 'success',
-        userId,
-        actor: 'user',
-      })
+      //
+      // The outcome is decided after parsing, not assumed here. A batch that comes back
+      // whole and yields no usable palaces was still billed in full, and filing it as a
+      // success is what would make that wasted spend invisible (FR-005a). Note this is a
+      // different question from `refundable`, which is about the user's daily allowance.
+      const recordUsage = (outcome: 'success' | 'error') =>
+        logAiUsage({
+          surface: 'tuvi_palaces',
+          provider: 'deepseek',
+          model: servedModel(data, 'deepseek-v4-flash'),
+          usage: normalizeUsage(data.usage, 'deepseek'),
+          outcome,
+          userId,
+          actor: 'user',
+        })
+
       const content: string = data.choices?.[0]?.message?.content ?? ''
       const truncated = data.choices?.[0]?.finish_reason === 'length'
       const palaces = parsePalaceReadings(JSON.parse(content))
       if (Object.keys(palaces).length === 0) {
+        await recordUsage('error')
         console.error(
           `[tu-vi] palace batch empty: finish_reason=${data.choices?.[0]?.finish_reason} chars=${content.length}`,
         )
         // Truncation is a ceiling we set, not abuse, so it stays refundable.
         return { palaces: {}, refundable: truncated }
       }
+      await recordUsage('success')
       return { palaces, refundable: false }
     } catch (error) {
       // A timeout fires just as readily while the body is still streaming as it

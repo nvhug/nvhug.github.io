@@ -296,28 +296,37 @@ Trả về CHỈ JSON hợp lệ (không markdown, không giải thích):
   const aiData = await aiRes.json() as { choices?: { message?: { content?: string } }[] }
 
   // The cron path has no signed-in initiator, so it is attributed to the system rather
-  // than to whichever account happened to be handy (FR-007).
-  await logAiUsage({
-    surface: 'stock_suggestions',
-    provider: 'deepseek',
-    model: servedModel(aiData, 'deepseek-v4-flash'),
-    usage: normalizeUsage((aiData as { usage?: unknown }).usage, 'deepseek'),
-    outcome: 'success',
-    userId: isCronCall ? null : callerUserId,
-    actor: isCronCall ? 'system' : 'user',
-  })
+  // than to whichever account happened to be handy (FR-007). The outcome is decided by the
+  // validation below, not assumed here: every rejection past this point follows a
+  // completion that already arrived and was billed (FR-005a).
+  const recordUsage = (outcome: 'success' | 'error') =>
+    logAiUsage({
+      surface: 'stock_suggestions',
+      provider: 'deepseek',
+      model: servedModel(aiData, 'deepseek-v4-flash'),
+      usage: normalizeUsage((aiData as { usage?: unknown }).usage, 'deepseek'),
+      outcome,
+      userId: isCronCall ? null : callerUserId,
+      actor: isCronCall ? 'system' : 'user',
+    })
+
   const content = aiData.choices?.[0]?.message?.content
-  if (!content) return NextResponse.json({ error: 'Empty AI response' }, { status: 502 })
+  if (!content) {
+    await recordUsage('error')
+    return NextResponse.json({ error: 'Empty AI response' }, { status: 502 })
+  }
 
   let parsed: { suggestions?: unknown[] }
   try {
     parsed = JSON.parse(content) as { suggestions?: unknown[] }
   } catch {
+    await recordUsage('error')
     return NextResponse.json({ error: 'AI returned invalid JSON' }, { status: 502 })
   }
 
   const rawSuggestions = parsed.suggestions
   if (!Array.isArray(rawSuggestions) || rawSuggestions.length === 0) {
+    await recordUsage('error')
     return NextResponse.json({ error: 'AI returned no suggestions' }, { status: 502 })
   }
 
@@ -327,8 +336,11 @@ Trả về CHỈ JSON hợp lệ (không markdown, không giải thích):
     .map((r) => r.data)
 
   if (suggestions.length === 0) {
+    await recordUsage('error')
     return NextResponse.json({ error: 'AI returned no valid suggestions' }, { status: 502 })
   }
+
+  await recordUsage('success')
 
   const { error: insertError } = await supabase
     .from('stock_suggestions_cache')

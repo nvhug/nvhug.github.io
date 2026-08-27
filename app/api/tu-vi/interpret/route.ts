@@ -232,18 +232,15 @@ export async function POST(request: Request) {
   // model stopped.
   let diagnosis = 'no body read'
   let aborted = false
+  // Held until the outcome is known. This route already distinguishes a completion that
+  // never arrived from one that arrived and failed validation, which is exactly the
+  // distinction FR-005a needs — recording 'success' before that decision would file every
+  // billed-but-rejected reading as a success and hide the spend it wasted.
+  let usageBody: unknown = null
+
   try {
     const data = await res.json()
-
-    await logAiUsage({
-      surface: 'tuvi_interpret',
-      provider: 'deepseek',
-      model: servedModel(data, 'deepseek-v4-flash'),
-      usage: normalizeUsage(data.usage, 'deepseek'),
-      outcome: 'success',
-      userId,
-      actor: 'user',
-    })
+    usageBody = data
     truncated = data.choices?.[0]?.finish_reason === 'length'
     const content: string = data.choices?.[0]?.message?.content ?? ''
     diagnosis = `finish_reason=${data.choices?.[0]?.finish_reason} chars=${content.length}`
@@ -259,7 +256,23 @@ export async function POST(request: Request) {
     aborted = error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError')
     diagnosis += ` threw=${error instanceof Error ? `${error.name}: ${error.message}` : String(error)}`
   }
+  const recordUsage = (outcome: 'success' | 'error') =>
+    logAiUsage({
+      surface: 'tuvi_interpret',
+      provider: 'deepseek',
+      model: servedModel(usageBody, 'deepseek-v4-flash'),
+      usage: normalizeUsage((usageBody as { usage?: unknown } | null)?.usage, 'deepseek'),
+      outcome,
+      userId,
+      actor: 'user',
+    })
+
   if (!sections) {
+    // Whatever the reason, the reading failed. Cost is whatever the provider reported —
+    // zero when nothing arrived, real when a complete body was rejected. The refund below
+    // is a separate question about the user's daily allowance, not about the money.
+    await recordUsage('error')
+
     // A completion cut short by max_tokens is a limit we set, not abuse, so the
     // slot goes back — otherwise a few retries would lock the user out of a
     // reading they never received. A malformed body for any other reason was
@@ -279,6 +292,8 @@ export async function POST(request: Request) {
     console.error('[tu-vi] completion rejected by validation:', diagnosis)
     return NextResponse.json({ error: 'interpretation_unavailable' }, { status: 502 })
   }
+
+  await recordUsage('success')
 
   // Re-read profile_data before writing: the DeepSeek call takes seconds, so the
   // user may have saved a birth-data edit, or a concurrent first view may have
