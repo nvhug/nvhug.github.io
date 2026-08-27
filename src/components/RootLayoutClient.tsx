@@ -107,9 +107,9 @@ export function AccountMenu({
               <button
                 type="button"
                 onClick={() => { setOpen(false); setShowDonate(true) }}
-                className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-zinc-700 transition-colors hover:bg-zinc-50 hover:text-zinc-900"
+                className="flex w-full items-center gap-2.5 rounded-lg bg-amber-50 px-3 py-2 text-sm font-medium text-amber-700 transition-colors hover:bg-amber-100"
               >
-                <Coffee className="h-4 w-4 shrink-0 text-amber-400" />
+                <Coffee className="h-4 w-4 shrink-0 text-amber-500" />
                 {t('donate.menuLabel')}
               </button>
 

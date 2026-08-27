@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react'
 import {
   Sparkles, RefreshCw, ChevronRight,
   AlertCircle, Info, Lightbulb, History, ChevronDown, ChevronUp,
-  Scale, Utensils, BookOpen, Crown, X, Dumbbell, CalendarDays, Activity, Target,
+  Scale, Utensils, BookOpen, Coffee, Dumbbell, CalendarDays, Activity, Target,
 } from 'lucide-react'
 import { Note } from '@/types'
 import { useLanguage } from '@/lib/i18n/language-context'
@@ -408,9 +408,10 @@ export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note
       <button
         type="button"
         onClick={() => setShowDonateModal(true)}
-        className="mt-1 self-start text-xs font-medium text-zinc-400 underline-offset-2 transition hover:text-violet-600 hover:underline"
+        className="group inline-flex w-full items-center justify-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm font-semibold text-amber-700 shadow-sm transition-all hover:border-amber-300 hover:bg-amber-100 hover:shadow active:scale-[0.98] sm:w-auto sm:py-2 sm:text-xs dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-300 dark:hover:bg-amber-950/50"
       >
-        {t('donate.menuLabel')} ☕
+        <Coffee className="h-4 w-4 transition-transform group-hover:-rotate-12" />
+        {t('donate.menuLabel')}
       </button>
       <DonateModal open={showDonateModal} onClose={() => setShowDonateModal(false)} />
 
