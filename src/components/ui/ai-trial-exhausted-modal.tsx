@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { Clock, Coffee, X } from 'lucide-react'
+import { Clock, Coffee, Gauge, X } from 'lucide-react'
 import { Button } from './button'
 import { UpgradeModal } from '@/components/UpgradeModal'
 import { useUser } from '@/hooks/useUser'
@@ -88,9 +88,13 @@ export function AITrialExhaustedModal({ open, info, onClose }: Props) {
           <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 px-5 py-4">
             <div className="flex items-center gap-2.5">
               <div className={`flex h-8 w-8 items-center justify-center rounded-full ${hasPending ? 'bg-violet-100 dark:bg-violet-900/40' : 'bg-amber-100 dark:bg-amber-900/40'}`}>
+                {/* The coffee cup belongs to the buy-me-a-coffee pitch — show a plain
+                    quota icon when nothing is being sold. See ADR-017. */}
                 {hasPending
                   ? <Clock className="h-4 w-4 text-violet-600" />
-                  : <Coffee className="h-4 w-4 text-amber-600" />
+                  : MONETIZATION_ENABLED
+                    ? <Coffee className="h-4 w-4 text-amber-600" />
+                    : <Gauge className="h-4 w-4 text-amber-600" />
                 }
               </div>
               <p className="font-poppins text-sm font-semibold text-zinc-900 dark:text-white">

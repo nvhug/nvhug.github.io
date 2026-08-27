@@ -394,7 +394,8 @@ export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note
                   ? <RefreshCw className="h-3.5 w-3.5 animate-spin" />
                   : <Sparkles className="h-3.5 w-3.5" />}
                 {loading ? t('notesAIInsights.analyzing') : t('notesAIInsights.analyzeAI')}
-                {!canUseAI && <Crown className="h-3.5 w-3.5 text-amber-300" />}
+                {/* No crown badge: a missing permission is an admin setting, not a
+                    premium tier, and nothing here is for sale. See ADR-017. */}
               </button>
             }
           />

@@ -50,12 +50,15 @@ export function DonateModal({ open, onClose }: Props) {
   }
 
   return (
+    // Scroll on the backdrop, not the flex box: centering a panel taller than the
+    // viewport clips its top instead of letting it scroll into view.
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      className="fixed inset-0 z-50 overflow-y-auto bg-black/50 p-4"
       onClick={close}
     >
+      <div className="flex min-h-full items-center justify-center">
       <div
-        className="relative w-full max-w-sm rounded-2xl bg-white p-8 shadow-2xl dark:bg-zinc-900"
+        className="relative w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl sm:p-8 dark:bg-zinc-900"
         onClick={e => e.stopPropagation()}
       >
         <button
@@ -72,7 +75,7 @@ export function DonateModal({ open, onClose }: Props) {
         </p>
         <div className="mt-5 flex justify-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/dnm.jpg" alt="Donate QR" className="h-56 w-56 rounded-xl object-cover" />
+          <img src="/dnm.jpg" alt="Donate QR" className="h-44 w-44 rounded-xl object-cover sm:h-56 sm:w-56" />
         </div>
 
         {sent ? (
@@ -96,6 +99,7 @@ export function DonateModal({ open, onClose }: Props) {
             </button>
           </div>
         )}
+      </div>
       </div>
     </div>
   )
