@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
-import { checkAITrialQuota, incrementAITrialUsage, trialExhaustedBody } from '@/lib/ai-trial'
 import { logAiUsage, normalizeUsage, servedModel } from '@/lib/ai-usage'
 
 const suggestedTickerSchema = z.object({
@@ -139,26 +138,31 @@ export async function GET() {
   return NextResponse.json({ suggestions: data.suggestions, generatedAt: data.generated_at, tickerCount: data.ticker_count, screenerTickers: DEFAULT_SCREENER_TICKERS })
 }
 
-// POST: generate new AI suggestions (cron secret OR authenticated user via Bearer token)
+// POST: generate new AI suggestions. Admin-only, and only on an explicit button press.
+//
+// There is deliberately no scheduled path any more. Generating on a timer meant paying for
+// a completion nobody had asked for, on a schedule that happened to sit inside DeepSeek's
+// peak window — double rate, for suggestions that might never be read. Everyone else reads
+// the cached result through GET; only an admin decides when a fresh one is worth buying.
+//
+// The ALERT_SECRET bypass went with it. Keeping a secret that grants unauthenticated
+// generation, for a feature now restricted to one role, is an auth surface with no
+// remaining purpose. (The secret itself lives on: stock-alerts/check still uses it.)
+//
 // Uses adminClient().auth.getUser(token) to avoid createSupabaseServerClient's Set-Cookie
 // which can contain non-Latin-1 characters and fail ByteString validation in fetch headers.
 export async function POST(request: Request) {
   const authHeader = request.headers.get('Authorization')
-  const secret = process.env.ALERT_SECRET
-  const isCronCall = !!(secret && authHeader === `Bearer ${secret}`)
 
-  let isAuthorized = isCronCall
   let callerUserId: string | null = null
   let callerRole: string = 'user'
 
-  if (!isAuthorized && authHeader?.startsWith('Bearer ')) {
+  if (authHeader?.startsWith('Bearer ')) {
     const token = authHeader.slice(7)
     const { data: { user } } = await adminClient().auth.getUser(token)
     if (user) {
-      isAuthorized = true
       callerUserId = user.id
-      const supabase = adminClient()
-      const { data: profile } = await supabase
+      const { data: profile } = await adminClient()
         .from('user_profiles')
         .select('role')
         .eq('id', user.id)
@@ -167,21 +171,22 @@ export async function POST(request: Request) {
     }
   }
 
-  if (!isAuthorized) {
+  if (!callerUserId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  // Cron calls are exempt from trial quota; user-triggered calls are not
-  if (!isCronCall && callerUserId) {
-    const supabase = adminClient()
-    const quota = await checkAITrialQuota(supabase, callerUserId, 'stock_suggestions', callerRole)
-    if (!quota.allowed) {
-      return NextResponse.json(
-        trialExhaustedBody('stock_suggestions', quota.used, quota.limit),
-        { status: 402 },
-      )
-    }
+  // Enforced here, not only in the UI. StockWatchlist already hides the button from
+  // non-admins, but a hidden button is not a permission: without this check any signed-in
+  // account could POST directly and spend a generation.
+  if (callerRole !== 'admin') {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
+
+  // No trial quota here any more. `checkAITrialQuota` is a lifetime free trial that
+  // converts a `user` into a paying one, and it returns unlimited for `admin` — so with
+  // the route restricted to admins it was a database round-trip that could only ever pass,
+  // guarding a path no trial user can reach. The 402 / upgrade-modal branch went with it.
+  // If generation is ever opened up beyond admins, the quota comes back with it.
 
   let requestedTickers: unknown
   try {
@@ -304,10 +309,10 @@ Trả về CHỈ JSON hợp lệ (không markdown, không giải thích):
 
   const aiData = await aiRes.json() as { choices?: { message?: { content?: string } }[] }
 
-  // The cron path has no signed-in initiator, so it is attributed to the system rather
-  // than to whichever account happened to be handy (FR-007). The outcome is decided by the
-  // validation below, not assumed here: every rejection past this point follows a
-  // completion that already arrived and was billed (FR-005a).
+  // Always a real admin now that the scheduled path is gone, so there is no 'system' actor
+  // from this route. The outcome is decided by the validation below, not assumed here:
+  // every rejection past this point follows a completion that already arrived and was
+  // billed (FR-005a).
   const recordUsage = (outcome: 'success' | 'error') =>
     logAiUsage({
       surface: 'stock_suggestions',
@@ -315,8 +320,8 @@ Trả về CHỈ JSON hợp lệ (không markdown, không giải thích):
       model: servedModel(aiData, 'deepseek-v4-flash'),
       usage: normalizeUsage((aiData as { usage?: unknown }).usage, 'deepseek'),
       outcome,
-      userId: isCronCall ? null : callerUserId,
-      actor: isCronCall ? 'system' : 'user',
+      userId: callerUserId,
+      actor: 'user',
       at: startedAt,
     })
 
@@ -358,11 +363,6 @@ Trả về CHỈ JSON hợp lệ (không markdown, không giải thích):
 
   if (insertError) {
     return NextResponse.json({ error: insertError.message }, { status: 500 })
-  }
-
-  // Increment trial usage for user-triggered calls (cron is exempt)
-  if (!isCronCall && callerUserId && callerRole !== 'admin' && callerRole !== 'paid') {
-    await incrementAITrialUsage(adminClient(), callerUserId, 'stock_suggestions')
   }
 
   // Keep only the latest 10 rows

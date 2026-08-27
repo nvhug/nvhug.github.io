@@ -7,7 +7,6 @@ import { supabase } from '@/lib/supabase'
 import { getUpsidePct, type SuggestedTicker } from './stockSuggestions'
 import { fmt } from './stockChartUtils'
 import { type PriceData, type WatchRow } from './stockTypes'
-import { AITrialExhaustedModal, type AITrialExhaustedInfo } from '@/components/ui/ai-trial-exhausted-modal'
 import { useUserRole } from '@/lib/useUserRole'
 
 // localStorage key kept as migration fallback only
@@ -313,7 +312,6 @@ export function SuggestionsSection({ onAdd, onSelect }: {
 }) {
   const { role } = useUserRole()
   const isAdmin = role === 'admin'
-  const [trialExhausted, setTrialExhausted] = useState<AITrialExhaustedInfo | null>(null)
   const [suggestions, setSuggestions] = useState<SuggestedTicker[]>([])
   const [generatedAt, setGeneratedAt] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -366,13 +364,12 @@ export function SuggestionsSection({ onAdd, onSelect }: {
         },
         body: JSON.stringify({ tickers: screenerTickers }),
       })
-      const data = await res.json() as { suggestions?: SuggestedTicker[]; error?: string; trialExhausted?: boolean; feature?: string; used?: number; limit?: number }
+      const data = await res.json() as { suggestions?: SuggestedTicker[]; error?: string }
       if (!res.ok) {
-        if (res.status === 402 && data.trialExhausted) {
-          setTrialExhausted({ feature: data.feature ?? 'stock_suggestions', used: data.used ?? 0, limit: data.limit ?? 0 })
-        } else {
-          toast.error(data.error ?? 'Không tạo được gợi ý')
-        }
+        // No trial-exhausted branch: generation is admin-only, and the trial quota is a
+        // path a `user` account walks. The button is hidden from them and the route now
+        // answers 403, so a 402 can no longer arrive here.
+        toast.error(data.error ?? 'Không tạo được gợi ý')
         return
       }
       setSuggestions(data.suggestions ?? [])
@@ -417,11 +414,6 @@ export function SuggestionsSection({ onAdd, onSelect }: {
 
   return (
     <>
-    <AITrialExhaustedModal
-      open={!!trialExhausted}
-      info={trialExhausted}
-      onClose={() => setTrialExhausted(null)}
-    />
     <div className="rounded-2xl border border-amber-100 bg-white p-4 shadow-[0_8px_24px_-8px_rgba(251,191,36,0.2)]">
       <div className="mb-3 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
