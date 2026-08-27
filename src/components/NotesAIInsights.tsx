@@ -14,6 +14,8 @@ import { useFeatureAccess } from '@/lib/useFeatureAccess'
 import { getSupabaseBrowserClient } from '@/lib/supabase-browser'
 import { useUserRole } from '@/lib/useUserRole'
 import { AITrialExhaustedModal, type AITrialExhaustedInfo } from '@/components/ui/ai-trial-exhausted-modal'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { cn } from '@/lib/utils'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -275,6 +277,11 @@ export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note
 
   // Total data items available for analysis (notes in period + all habits)
   const totalItems = filteredNotes.length + habits.length
+  const notEnoughData = totalItems < MIN_NOTES_REQUIRED
+  const [showDataHint, setShowDataHint] = useState(false)
+  const dataHintMessage = totalItems === 0
+    ? t('notesAIInsights.noDataForPeriod', { period: selectedPeriod.label })
+    : t('notesAIInsights.minNotesHint', { min: MIN_NOTES_REQUIRED, n: totalItems })
 
   function handleAnalyzeClick() {
     if (!canUseAI) {
@@ -388,17 +395,31 @@ export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note
           <span className="text-zinc-400">(+ cân, gym, lịch)</span>
         </span>
 
-        <button
-          onClick={handleAnalyzeClick}
-          disabled={loading || fetching || totalItems < MIN_NOTES_REQUIRED}
-          className="ml-auto flex items-center gap-1.5 rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-violet-700 disabled:opacity-60"
-        >
-          {loading
-            ? <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-            : <Sparkles className="h-3.5 w-3.5" />}
-          {loading ? t('notesAIInsights.analyzing') : t('notesAIInsights.analyzeAI')}
-          {!canUseAI && <Crown className="h-3.5 w-3.5 text-amber-300" />}
-        </button>
+        <Tooltip open={notEnoughData && showDataHint} onOpenChange={setShowDataHint}>
+          <TooltipTrigger
+            render={
+              <button
+                onClick={() => {
+                  if (notEnoughData) { setShowDataHint(true); return }
+                  handleAnalyzeClick()
+                }}
+                disabled={loading || fetching}
+                aria-disabled={notEnoughData}
+                className={cn(
+                  'ml-auto flex items-center gap-1.5 rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-violet-700 disabled:opacity-60',
+                  notEnoughData && 'cursor-not-allowed opacity-60 hover:bg-violet-600'
+                )}
+              >
+                {loading
+                  ? <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                  : <Sparkles className="h-3.5 w-3.5" />}
+                {loading ? t('notesAIInsights.analyzing') : t('notesAIInsights.analyzeAI')}
+                {!canUseAI && <Crown className="h-3.5 w-3.5 text-amber-300" />}
+              </button>
+            }
+          />
+          <TooltipContent>{dataHintMessage}</TooltipContent>
+        </Tooltip>
         </div>
       </div>
 
