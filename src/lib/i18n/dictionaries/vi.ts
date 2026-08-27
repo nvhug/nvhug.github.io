@@ -992,6 +992,74 @@ export const vi = {
         recentEvents: 'Sự kiện gần đây',
         empty: 'Chưa có dữ liệu telemetry.',
       },
+      aiUsage: {
+        tab: 'Token AI',
+        heading: 'Token & chi phí AI',
+        subtitle: 'Sáu tính năng AI đã tiêu bao nhiêu, ở đâu, và ai dùng.',
+        nonAdminTitle: 'Cần quyền quản trị',
+        nonAdminHint: 'Trang này chỉ hiển thị cho tài khoản admin.',
+
+        period7: '7 ngày',
+        period30: '30 ngày',
+        period90: '90 ngày',
+        periodLabel: 'Khoảng thời gian',
+
+        tileCost: 'Chi phí',
+        tileCalls: 'Lượt gọi',
+        tileTokens: 'Token',
+        tileUsers: 'Người dùng',
+        // Named so the count can never be mistaken for a plain user count.
+        tileUsersDetail: '{n} tài khoản{deleted}{system}',
+        tileUsersDeleted: ' · {n} đã xoá',
+        tileUsersSystem: ' · hệ thống riêng',
+
+        // The offending model is named because the admin's next action is to add its price.
+        unpricedNote: 'Chưa tính được giá cho {n} lượt gọi ({models})',
+        unpricedMin: 'tối thiểu',
+
+        bySurface: 'Theo tính năng',
+        byModel: 'Theo model',
+        byUser: 'Theo người dùng',
+        recentCalls: 'Lượt gọi gần đây',
+        trend: 'Chi phí theo ngày',
+        trendPeak: 'đỉnh {n}',
+
+        colCalls: 'Lượt',
+        colTokens: 'Token',
+        colCost: 'Chi phí',
+        colShare: 'Tỉ trọng',
+        colTime: 'Thời điểm',
+        colUser: 'Người dùng',
+        colSurface: 'Tính năng',
+        colModel: 'Model',
+        colOutcome: 'Kết quả',
+
+        outcomeError: 'Lỗi',
+        // The whole of FR-005a, said in one sentence where the admin will meet it.
+        outcomeErrorHint: 'Provider đã trả kết quả và vẫn tính phí, nhưng app không dùng được.',
+        costUnknown: 'chưa biết',
+        costUnknownHint: 'Model này chưa có trong bảng giá.',
+
+        deletedUser: 'Người dùng đã xoá',
+        deletedUserHint: 'Gộp chung mọi tài khoản đã xoá — danh tính không còn để tách.',
+        systemActor: 'Hệ thống',
+        systemActorHint: 'Tác vụ tự động, không phải người dùng.',
+        unknownUser: 'Không tra được tên',
+        viewAll: 'Xem tất cả',
+        viewUser: 'Xem chi tiết của {name}',
+        clearFilter: 'Bỏ lọc',
+        filteredBy: 'Đang lọc theo {name}',
+
+        // Says WHY it is empty, so forward-only recording is not filed as a bug.
+        emptyAll: 'Chưa có lượt gọi AI nào được ghi. Thống kê bắt đầu từ ngày tính năng này lên.',
+        emptyPeriod: 'Không có lượt gọi nào trong {period}.',
+        emptyPeriodAction: 'Xem 90 ngày',
+        emptyChart: 'Không có dữ liệu',
+        emptyModels: 'Chưa có model nào được ghi nhận trong kỳ này.',
+        loadError: 'Không tải được thống kê.',
+        logLoadError: 'Không tải được nhật ký. Các số liệu phía trên vẫn đúng.',
+        retry: 'Thử lại',
+      },
     },
   },
 

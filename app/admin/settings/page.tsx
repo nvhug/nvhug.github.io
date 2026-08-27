@@ -174,7 +174,10 @@ export default function AdminUsersPage() {
 
   return (
     <div className="space-y-4">
-      <div className="inline-flex items-center gap-1 rounded-lg border border-zinc-200 bg-white p-1">
+      {/* Scrolls itself rather than the page: four Vietnamese labels overflow a 375px
+          content box, and a body that scrolls sideways is the one thing this page's
+          responsive rule forbids. */}
+      <div className="-mx-1 flex max-w-full items-center gap-1 overflow-x-auto rounded-lg border border-zinc-200 bg-white p-1 sm:mx-0 sm:inline-flex">
         <Link
           href="/admin/settings"
           className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
@@ -204,6 +207,16 @@ export default function AdminUsersPage() {
           }`}
         >
           {t('admin.settings.nutritionTab')}
+        </Link>
+        <Link
+          href="/admin/settings/ai-usage"
+          className={`whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+            pathname === '/admin/settings/ai-usage'
+              ? 'bg-emerald-500 text-white'
+              : 'text-zinc-600 hover:bg-zinc-100'
+          }`}
+        >
+          {t('admin.settings.aiUsage.tab')}
         </Link>
       </div>
 
