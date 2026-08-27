@@ -18,14 +18,14 @@ import { westernZodiacSign } from '@/lib/western-zodiac'
 import { LaSoFull, LaSoLegend } from '@/components/tu-vi/LaSoGrid'
 import { PalaceDetail } from '@/components/tu-vi/PalaceDetail'
 import { ReadingSections } from '@/components/tu-vi/ReadingSections'
+import { TUVI_CARD, TUVI_PAGE_SHELL } from '@/components/tu-vi/shell'
 
 // The page ground and the document card are shared by the loading, error and
 // loaded states, so a retry or a slow profile fetch never changes the shape of
-// the screen under the reader.
-const PAGE_SHELL =
-  'min-h-svh bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.14),transparent_38%),radial-gradient(circle_at_82%_12%,rgba(52,211,153,0.14),transparent_32%),linear-gradient(180deg,#ffffff_0%,#f6fef9_100%)] px-4 pb-16 pt-24 sm:px-6'
-const CARD =
-  'relative overflow-hidden rounded-3xl border border-emerald-200/70 bg-white/85 shadow-[0_30px_60px_-45px_rgba(16,185,129,0.45)] backdrop-blur'
+// the screen under the reader — and by the birth-data form, so filling it in and
+// reading the result look like one document.
+const PAGE_SHELL = TUVI_PAGE_SHELL
+const CARD = TUVI_CARD
 
 const GENDER_LABEL: Record<string, string> = {
   nam: 'tuVi.genderNam',

@@ -51,6 +51,41 @@ export async function checkAITrialQuota(
 }
 
 /**
+ * Full access decision for an AI feature: trial quota plus the "pending upgrade,
+ * no rejection yet" bypass. Single source of truth for both the enforcement path
+ * (the route that actually spends money) and any client-facing status check, so
+ * the two can never disagree.
+ */
+export async function resolveAIAccess(
+  supabase: SupabaseClient,
+  userId: string,
+  feature: AIFeature,
+  role: string,
+): Promise<{ allowed: boolean; used: number; limit: number; unlimited: boolean }> {
+  const quota = await checkAITrialQuota(supabase, userId, feature, role)
+  if (quota.allowed) {
+    return {
+      allowed: true,
+      used: quota.used ?? 0,
+      limit: quota.limit ?? AI_TRIAL_LIMITS[feature],
+      unlimited: !!quota.unlimited,
+    }
+  }
+
+  const { data: requests } = await supabase
+    .from('upgrade_requests')
+    .select('status')
+    .eq('user_id', userId)
+    .in('status', ['pending', 'rejected'])
+  const statuses = (requests ?? []).map((r: { status: string }) => r.status)
+  const hasPending = statuses.includes('pending')
+  const hasRejected = statuses.includes('rejected')
+  const bypassed = hasPending && !hasRejected
+
+  return { allowed: bypassed, used: quota.used, limit: quota.limit, unlimited: false }
+}
+
+/**
  * Atomically increment a user's usage count for a feature.
  * Uses a SECURITY DEFINER RPC to bypass RLS.
  */

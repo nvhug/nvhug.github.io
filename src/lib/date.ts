@@ -21,3 +21,9 @@ export function getYearOptions(currentYear: number, includeYear: number): number
   for (let year = max; year >= min; year--) options.push(year)
   return options
 }
+
+// How many days a solar month actually has, so a day <select> cannot offer
+// 31 February. Day 0 of the next month is the last day of this one.
+export function daysInSolarMonth(month: number, year: number): number {
+  return new Date(Date.UTC(year, month, 0)).getUTCDate()
+}

@@ -5,7 +5,7 @@ import { requestVisionJSON, requestTextJSON, resolveVisionConfig, visionProvider
 import { ProviderCallError, type ProviderResult } from '@/lib/ai-vision'
 import { logAiUsage, normalizeUsage, servedModel } from '@/lib/ai-usage'
 import { normalizeItemsWithInternalTable } from './nutrition-normalizer'
-import { checkAITrialQuota, incrementAITrialUsage, trialExhaustedBody } from '@/lib/ai-trial'
+import { resolveAIAccess, incrementAITrialUsage, trialExhaustedBody } from '@/lib/ai-trial'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -239,24 +239,12 @@ export async function POST(request: Request) {
     .maybeSingle()
   const role = profile?.role ?? 'user'
 
-  const quota = await checkAITrialQuota(supabase, user.id, 'food_analyze', role)
-  if (!quota.allowed) {
-    // Allow if user has a pending upgrade request with no prior rejection (benefit of the doubt)
-    const { data: requests } = await supabase
-      .from('upgrade_requests')
-      .select('status')
-      .eq('user_id', user.id)
-      .in('status', ['pending', 'rejected'])
-    const statuses = (requests ?? []).map((r: { status: string }) => r.status)
-    const hasPending = statuses.includes('pending')
-    const hasRejected = statuses.includes('rejected')
-    const bypassed = hasPending && !hasRejected
-    if (!bypassed) {
-      return NextResponse.json(
-        trialExhaustedBody('food_analyze', quota.used, quota.limit, lang),
-        { status: 402 },
-      )
-    }
+  const access = await resolveAIAccess(supabase, user.id, 'food_analyze', role)
+  if (!access.allowed) {
+    return NextResponse.json(
+      trialExhaustedBody('food_analyze', access.used, access.limit, lang),
+      { status: 402 },
+    )
   }
 
   if (mode === 'image') {
@@ -389,7 +377,7 @@ export async function POST(request: Request) {
   }
 
   // Increment trial usage counter (no-op for admin/paid since quota check returned unlimited)
-  if (!quota.unlimited) {
+  if (!access.unlimited) {
     await incrementAITrialUsage(supabase, user.id, 'food_analyze')
   }
 
@@ -401,4 +389,25 @@ export async function POST(request: Request) {
     notes: result.notes,
     focusBox,
   })
+}
+
+/**
+ * Quota status only — lets the UI grey out the capture buttons before the user
+ * spends time on a photo, without duplicating the role + bypass logic that
+ * actually gates the POST above. Same resolveAIAccess call, same verdict.
+ */
+export async function GET() {
+  const supabase = await createSupabaseServerClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const { data: profile } = await supabase
+    .from('user_profiles')
+    .select('role')
+    .eq('id', user.id)
+    .maybeSingle()
+  const role = profile?.role ?? 'user'
+
+  const access = await resolveAIAccess(supabase, user.id, 'food_analyze', role)
+  return NextResponse.json({ allowed: access.allowed, used: access.used, limit: access.limit })
 }

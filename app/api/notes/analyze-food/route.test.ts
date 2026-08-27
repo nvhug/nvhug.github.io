@@ -70,7 +70,7 @@ vi.mock('@/lib/ai-usage', () => ({
 
 // Trial quota: default to unlimited (simulates admin/paid) so existing tests are unaffected
 vi.mock('@/lib/ai-trial', () => ({
-  checkAITrialQuota: vi.fn(async () => ({ allowed: true, unlimited: true })),
+  resolveAIAccess: vi.fn(async () => ({ allowed: true, used: 0, limit: 270, unlimited: true })),
   incrementAITrialUsage: vi.fn(async () => {}),
   trialExhaustedBody: vi.fn((feature: string, used: number, limit: number) => ({
     error: `Trial exhausted (${used}/${limit})`,

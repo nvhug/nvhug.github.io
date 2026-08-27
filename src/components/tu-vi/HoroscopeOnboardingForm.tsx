@@ -1,13 +1,14 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
+import { ChevronDown } from 'lucide-react'
 import { toast } from 'sonner'
 import { getSupabaseBrowserClient } from '@/lib/supabase-browser'
 import { useLanguage } from '@/lib/i18n/language-context'
-import { DatePicker } from '@/components/ui/date-picker'
 import { TimePicker } from '@/components/ui/time-picker'
-import { getTodayLocalISODate, getYearOptions } from '@/lib/date'
-import { solarToLunar, type LunarDate } from '@/lib/lunar-calendar'
+import { daysInSolarMonth, getTodayLocalISODate, getYearOptions } from '@/lib/date'
+import { lunarToSolar, solarToLunar, type LunarDate, type SolarDate } from '@/lib/lunar-calendar'
+import { TUVI_CARD } from './shell'
 import {
   buildHoroscopeProfile,
   isValidLunarBirthDate,
@@ -25,22 +26,129 @@ const GENDER_LABEL_KEY: Record<Gender, string> = {
 
 type Calendar = 'solar' | 'lunar'
 
-function parseSolarISO(iso: string): { day: number; month: number; year: number } {
+function parseSolarISO(iso: string): SolarDate {
   const [year, month, day] = iso.split('-').map(Number)
   return { day, month, year }
 }
 
-const TOGGLE_ACTIVE = 'border-emerald-400 bg-emerald-500 text-white'
-const TOGGLE_INACTIVE = 'border-emerald-200 bg-white text-zinc-700 hover:bg-emerald-50/50'
-const SELECT_CLASS =
-  'h-9 flex-1 rounded-lg border border-emerald-200 bg-white px-2 text-sm text-zinc-900 outline-none transition-colors focus:border-emerald-500'
+function toSolarISO({ day, month, year }: SolarDate): string {
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+}
+
+const RANGE = (length: number) => Array.from({ length }, (_, i) => i + 1)
+
+/**
+ * One field of the form: a serif label over its control, with the error text
+ * reserved to the same place every time so a message appearing never shifts the
+ * fields below it.
+ */
+function Field({
+  label,
+  error,
+  children,
+}: {
+  label: string
+  error?: string | false
+  children: React.ReactNode
+}) {
+  return (
+    <div>
+      <p className="font-tuvi-serif text-sm text-[#3f3f46]">{label}</p>
+      <div className="mt-2">{children}</div>
+      {error && (
+        <p className="mt-1.5 font-tuvi-sans text-xs text-[#dc2626]" aria-live="polite">
+          {error}
+        </p>
+      )}
+    </div>
+  )
+}
+
+/**
+ * The one control shape this form uses for every either/or choice — calendar and
+ * gender both. A single inset track with the choice riding in it reads as "two
+ * views of one field", which two separately outlined buttons did not.
+ */
+function Segmented<T extends string>({
+  options,
+  value,
+  onChange,
+  invalid,
+}: {
+  options: Array<{ value: T; label: string }>
+  value: T | null
+  onChange: (value: T) => void
+  invalid?: boolean
+}) {
+  return (
+    <div
+      className={`flex w-full gap-1 rounded-xl bg-emerald-50/70 p-1 ring-1 transition-colors ${
+        invalid ? 'ring-red-300' : 'ring-emerald-100'
+      }`}
+    >
+      {options.map((option) => {
+        const active = value === option.value
+        return (
+          <button
+            key={option.value}
+            type="button"
+            aria-pressed={active}
+            onClick={() => onChange(option.value)}
+            className={`flex-1 rounded-lg px-2 py-1.5 font-tuvi-sans text-sm font-medium transition-all focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#047857] ${
+              active
+                ? 'bg-white text-[#047857] shadow-[0_1px_2px_rgba(16,185,129,0.25)] ring-1 ring-emerald-200'
+                : 'text-[#52525b] hover:text-[#047857]'
+            }`}
+          >
+            {option.label}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+/** A native select that matches the rest of the form; the chevron replaces the
+    browser's own arrow, which differs on every platform. */
+function Select({
+  label,
+  value,
+  onChange,
+  children,
+  className = '',
+}: {
+  label: string
+  value: number
+  onChange: (value: number) => void
+  children: React.ReactNode
+  className?: string
+}) {
+  return (
+    <div className={`relative ${className}`}>
+      <select
+        aria-label={label}
+        value={value}
+        onChange={(event) => onChange(Number(event.target.value))}
+        className="h-10 w-full cursor-pointer appearance-none rounded-xl border border-emerald-200 bg-white pr-7 pl-3 font-tuvi-sans text-sm text-[#18181b] tabular-nums outline-none transition-colors hover:border-emerald-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15"
+      >
+        {children}
+      </select>
+      <ChevronDown
+        aria-hidden="true"
+        className="pointer-events-none absolute top-1/2 right-2 h-3.5 w-3.5 -translate-y-1/2 text-[#a1a1aa]"
+      />
+    </div>
+  )
+}
 
 export function HoroscopeOnboardingForm({
   userId,
+  title,
   initialProfile,
   onSaved,
 }: {
   userId: string
+  title: string
   initialProfile: HoroscopeProfile | null
   onSaved: (profile: HoroscopeProfile) => void
 }) {
@@ -60,6 +168,43 @@ export function HoroscopeOnboardingForm({
   // itself takes milliseconds; the reading takes half a minute, and a reader watching a
   // button that still says "Đang lưu" after twenty seconds assumes it has hung.
   const [generating, setGenerating] = useState(false)
+
+  const solar = parseSolarISO(birthDateSolar)
+
+  function setSolar(next: Partial<SolarDate>) {
+    const merged = { ...solar, ...next }
+    // Changing month or year can strand the selected day (31 → February), which
+    // would otherwise be a date the reader can see but not save.
+    merged.day = Math.min(merged.day, daysInSolarMonth(merged.month, merged.year))
+    setBirthDateSolar(toSolarISO(merged))
+    setDateError(false)
+  }
+
+  function setLunar(next: Partial<LunarDate>) {
+    setLunarDate((current) => ({ ...current, ...next }))
+    setDateError(false)
+  }
+
+  // The same date in the other calendar. This is what makes the two tabs one
+  // field rather than two: whichever calendar the reader knows their birthday
+  // in, they can see it land correctly in the other one before saving.
+  const counterpart = useMemo(() => {
+    if (calendar === 'solar') {
+      if (!isValidSolarBirthDate(birthDateSolar, new Date())) return null
+      const converted = solarToLunar(solar)
+      const leap = converted.isLeapMonth ? ` (${t('tuVi.lunarLeapMonth').toLowerCase()})` : ''
+      return t('tuVi.equivalentLunar', {
+        date: `${converted.day}/${converted.month}${leap}/${converted.year}`,
+      })
+    }
+    if (!isValidLunarBirthDate(lunarDate, new Date())) return null
+    const converted = lunarToSolar(lunarDate)
+    return t('tuVi.equivalentSolar', {
+      date: `${converted.day}/${converted.month}/${converted.year}`,
+    })
+    // `solar` is derived from birthDateSolar, so it needs no separate entry.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [calendar, birthDateSolar, lunarDate, t])
 
   async function handleSubmit() {
     const validDate =
@@ -133,133 +278,164 @@ export function HoroscopeOnboardingForm({
     }
   }
 
+  const busy = saving || generating
+
   return (
-    <div className="mx-auto w-full max-w-md rounded-2xl border border-emerald-200/70 bg-white/85 p-6 shadow-[0_20px_42px_-32px_rgba(16,185,129,0.28)]">
-      <p className="text-xs text-zinc-500">{t('tuVi.disclaimer')}</p>
+    <div className={`${TUVI_CARD} mx-auto w-full max-w-md p-6 sm:p-7`}>
+      {/* The same flourish the reading screen carries, so the form reads as the
+          first page of that document rather than a separate utility screen. */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute -top-16 -right-10 size-44 rounded-full bg-emerald-300/20 blur-3xl"
+      />
 
-      <div className="mt-5 space-y-1.5">
-        <label className="block text-sm font-medium text-zinc-700">
-          {calendar === 'solar' ? t('tuVi.birthDateLabel') : t('tuVi.birthDateLunarLabel')}
-        </label>
-        <div className="flex gap-1.5">
-          {(['solar', 'lunar'] as const).map((option) => (
-            <button
-              key={option}
-              type="button"
-              aria-pressed={calendar === option}
-              onClick={() => { setCalendar(option); setDateError(false) }}
-              className={`flex-1 rounded-lg border px-2.5 py-1.5 text-sm font-medium transition-colors ${
-                calendar === option ? TOGGLE_ACTIVE : TOGGLE_INACTIVE
-              }`}
-            >
-              {t(option === 'solar' ? 'tuVi.calendarSolar' : 'tuVi.calendarLunar')}
-            </button>
-          ))}
-        </div>
+      <header className="relative">
+        <p className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50/80 px-2.5 py-0.5 font-tuvi-serif text-[11px] tracking-[0.22em] text-[#047857]">
+          {t('tuVi.overviewHeading')}
+        </p>
+        <h1 className="mt-2 font-tuvi-serif text-2xl leading-tight text-[#18181b]">{title}</h1>
+      </header>
 
-        {calendar === 'solar' ? (
-          <DatePicker value={birthDateSolar} onChange={(v) => { setBirthDateSolar(v); setDateError(false) }} />
-        ) : (
-          <>
-            <div className="flex gap-1.5">
-              <select
-                aria-label={t('tuVi.lunarDay')}
-                value={lunarDate.day}
-                onChange={(e) => { setLunarDate((d) => ({ ...d, day: Number(e.target.value) })); setDateError(false) }}
-                className={SELECT_CLASS}
-              >
-                {Array.from({ length: 30 }, (_, i) => i + 1).map((day) => (
-                  <option key={day} value={day}>{day}</option>
-                ))}
-              </select>
-              <select
-                aria-label={t('tuVi.lunarMonth')}
-                value={lunarDate.month}
-                onChange={(e) => { setLunarDate((d) => ({ ...d, month: Number(e.target.value) })); setDateError(false) }}
-                className={SELECT_CLASS}
-              >
-                {Array.from({ length: 12 }, (_, i) => i + 1).map((month) => (
-                  <option key={month} value={month}>{t('tuVi.lunarMonthOption', { month })}</option>
-                ))}
-              </select>
-              <select
-                aria-label={t('tuVi.lunarYear')}
-                value={lunarDate.year}
-                onChange={(e) => { setLunarDate((d) => ({ ...d, year: Number(e.target.value) })); setDateError(false) }}
-                className={SELECT_CLASS}
-              >
-                {getYearOptions(new Date().getFullYear(), lunarDate.year).map((year) => (
-                  <option key={year} value={year}>{year}</option>
-                ))}
-              </select>
-            </div>
-            <label className="flex items-center gap-1.5 pt-1 text-sm text-zinc-600">
+      <div className="relative mt-6 space-y-5">
+        <Field
+          label={t('tuVi.birthDateFieldLabel')}
+          error={dateError && t(calendar === 'solar' ? 'tuVi.errorDate' : 'tuVi.errorLunarDate')}
+        >
+          <Segmented
+            value={calendar}
+            onChange={(next) => { setCalendar(next); setDateError(false) }}
+            options={[
+              { value: 'solar' as Calendar, label: t('tuVi.calendarSolar') },
+              { value: 'lunar' as Calendar, label: t('tuVi.calendarLunar') },
+            ]}
+          />
+
+          {/* Both calendars use the same three selects in the same order, so
+              switching between them moves nothing on screen. */}
+          <div className="mt-2 flex gap-1.5">
+            {calendar === 'solar' ? (
+              <>
+                <Select label={t('tuVi.lunarDay')} value={solar.day} onChange={(day) => setSolar({ day })}>
+                  {RANGE(daysInSolarMonth(solar.month, solar.year)).map((day) => (
+                    <option key={day} value={day}>{day}</option>
+                  ))}
+                </Select>
+                <Select
+                  label={t('tuVi.lunarMonth')}
+                  value={solar.month}
+                  onChange={(month) => setSolar({ month })}
+                  className="flex-[1.4]"
+                >
+                  {RANGE(12).map((month) => (
+                    <option key={month} value={month}>{t('tuVi.lunarMonthOption', { month })}</option>
+                  ))}
+                </Select>
+                <Select
+                  label={t('tuVi.lunarYear')}
+                  value={solar.year}
+                  onChange={(year) => setSolar({ year })}
+                  className="flex-[1.3]"
+                >
+                  {getYearOptions(new Date().getFullYear(), solar.year).map((year) => (
+                    <option key={year} value={year}>{year}</option>
+                  ))}
+                </Select>
+              </>
+            ) : (
+              <>
+                <Select label={t('tuVi.lunarDay')} value={lunarDate.day} onChange={(day) => setLunar({ day })}>
+                  {RANGE(30).map((day) => (
+                    <option key={day} value={day}>{day}</option>
+                  ))}
+                </Select>
+                <Select
+                  label={t('tuVi.lunarMonth')}
+                  value={lunarDate.month}
+                  onChange={(month) => setLunar({ month })}
+                  className="flex-[1.4]"
+                >
+                  {RANGE(12).map((month) => (
+                    <option key={month} value={month}>{t('tuVi.lunarMonthOption', { month })}</option>
+                  ))}
+                </Select>
+                <Select
+                  label={t('tuVi.lunarYear')}
+                  value={lunarDate.year}
+                  onChange={(year) => setLunar({ year })}
+                  className="flex-[1.3]"
+                >
+                  {getYearOptions(new Date().getFullYear(), lunarDate.year).map((year) => (
+                    <option key={year} value={year}>{year}</option>
+                  ))}
+                </Select>
+              </>
+            )}
+          </div>
+
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
+            {counterpart ? (
+              <p className="font-tuvi-sans text-xs text-[#52525b] tabular-nums">{counterpart}</p>
+            ) : (
+              <span />
+            )}
+            {calendar === 'lunar' && (
+              <label className="flex items-center gap-1.5 font-tuvi-sans text-xs text-[#52525b]">
+                <input
+                  type="checkbox"
+                  checked={lunarDate.isLeapMonth}
+                  onChange={(event) => setLunar({ isLeapMonth: event.target.checked })}
+                  className="size-4 rounded border-emerald-300 accent-emerald-600"
+                />
+                {t('tuVi.lunarLeapMonth')}
+              </label>
+            )}
+          </div>
+        </Field>
+
+        <Field label={t('tuVi.genderLabel')} error={genderError && t('tuVi.errorGender')}>
+          <Segmented
+            value={gender}
+            invalid={genderError}
+            onChange={(next) => { setGender(next); setGenderError(false) }}
+            options={GENDER_OPTIONS.map((option) => ({ value: option, label: t(GENDER_LABEL_KEY[option]) }))}
+          />
+        </Field>
+
+        <Field label={t('tuVi.birthTimeLabel')}>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <TimePicker value={birthTime} onChange={setBirthTime} disabled={birthTimeUnknown} />
+            <label className="flex items-center gap-1.5 font-tuvi-sans text-sm text-[#52525b]">
               <input
                 type="checkbox"
-                checked={lunarDate.isLeapMonth}
-                onChange={(e) => { setLunarDate((d) => ({ ...d, isLeapMonth: e.target.checked })); setDateError(false) }}
-                className="h-3.5 w-3.5 rounded border-emerald-300 text-emerald-500 focus:ring-emerald-400"
+                checked={birthTimeUnknown}
+                onChange={(event) => setBirthTimeUnknown(event.target.checked)}
+                className="size-4 rounded border-emerald-300 accent-emerald-600"
               />
-              {t('tuVi.lunarLeapMonth')}
+              {t('tuVi.birthTimeUnknown')}
             </label>
-          </>
-        )}
-
-        {dateError && (
-          <p className="text-xs text-red-500" aria-live="polite">
-            {t(calendar === 'solar' ? 'tuVi.errorDate' : 'tuVi.errorLunarDate')}
-          </p>
-        )}
-      </div>
-
-      <div className="mt-5 space-y-1.5">
-        <label className="block text-sm font-medium text-zinc-700">{t('tuVi.genderLabel')}</label>
-        <div className="flex gap-1.5">
-          {GENDER_OPTIONS.map((option) => (
-            <button
-              key={option}
-              type="button"
-              aria-pressed={gender === option}
-              onClick={() => { setGender(option); setGenderError(false) }}
-              className={`flex-1 rounded-lg border px-2.5 py-1.5 text-sm font-medium transition-colors ${
-                gender === option
-                  ? 'border-emerald-400 bg-emerald-500 text-white'
-                  : 'border-emerald-200 bg-white text-zinc-700 hover:bg-emerald-50/50'
-              }`}
-            >
-              {t(GENDER_LABEL_KEY[option])}
-            </button>
-          ))}
-        </div>
-        {genderError && (
-          <p className="text-xs text-red-500" aria-live="polite">
-            {t('tuVi.errorGender')}
-          </p>
-        )}
-      </div>
-
-      <div className="mt-5 space-y-1.5">
-        <label className="block text-sm font-medium text-zinc-700">{t('tuVi.birthTimeLabel')}</label>
-        <TimePicker value={birthTime} onChange={setBirthTime} disabled={birthTimeUnknown} />
-        <label className="flex items-center gap-1.5 pt-1 text-sm text-zinc-600">
-          <input
-            type="checkbox"
-            checked={birthTimeUnknown}
-            onChange={(e) => setBirthTimeUnknown(e.target.checked)}
-            className="h-3.5 w-3.5 rounded border-emerald-300 text-emerald-500 focus:ring-emerald-400"
-          />
-          {t('tuVi.birthTimeUnknown')}
-        </label>
+          </div>
+          {/* Said here rather than only on the reading: without the hour, half the
+              stars are never placed, and that is a choice worth making knowingly. */}
+          {birthTimeUnknown && (
+            <p className="mt-2 font-tuvi-sans text-xs leading-relaxed text-[#b45309]">
+              {t('tuVi.birthTimeHint')}
+            </p>
+          )}
+        </Field>
       </div>
 
       <button
         type="button"
         onClick={() => void handleSubmit()}
-        disabled={saving || generating}
-        className="mt-6 w-full rounded-lg bg-emerald-500 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-emerald-600 disabled:opacity-50"
+        disabled={busy}
+        className="relative mt-6 w-full rounded-xl bg-[#047857] px-4 py-3 font-tuvi-sans text-sm font-medium text-white shadow-[0_10px_24px_-14px_rgba(4,120,87,0.9)] transition-all hover:bg-[#065f46] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#047857] active:scale-[0.99] disabled:opacity-60"
       >
         {generating ? t('tuVi.submitGenerating') : saving ? t('tuVi.submitSaving') : t('tuVi.submit')}
       </button>
+
+      <p className="relative mt-5 border-t border-emerald-100/80 pt-4 font-tuvi-sans text-xs leading-relaxed text-[#52525b]">
+        {t('tuVi.disclaimer')}
+      </p>
     </div>
   )
 }

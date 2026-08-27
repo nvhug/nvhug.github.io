@@ -6,6 +6,7 @@ import { useLanguage } from '@/lib/i18n/language-context'
 import { useRequireAuth } from '@/hooks/useRequireAuth'
 import { fetchHoroscopeProfile } from '@/lib/horoscope-profile-client'
 import { HoroscopeOnboardingForm } from '@/components/tu-vi/HoroscopeOnboardingForm'
+import { TUVI_CARD, TUVI_PAGE_SHELL } from '@/components/tu-vi/shell'
 import type { HoroscopeProfile } from '@/lib/horoscope-profile'
 
 export default function TuViEditPage() {
@@ -40,24 +41,24 @@ export default function TuViEditPage() {
 
   if (authLoading || loadingProfile || !user) {
     return (
-      <main className="min-h-svh bg-[#f7fef9] pt-24">
-        <p className="text-center text-sm text-zinc-500">{t('common.loading')}</p>
+      <main className={TUVI_PAGE_SHELL}>
+        <p className="text-center font-tuvi-sans text-sm text-[#52525b]">{t('common.loading')}</p>
       </main>
     )
   }
 
   if (loadFailed) {
     return (
-      <main className="min-h-svh bg-[#f7fef9] px-4 pb-16 pt-24 sm:px-6">
-        <div className="mx-auto w-full max-w-md rounded-2xl border border-emerald-200/70 bg-white/85 p-6 text-center">
-          <p className="text-sm text-zinc-500">{t('tuVi.loadError')}</p>
+      <main className={TUVI_PAGE_SHELL}>
+        <div className={`${TUVI_CARD} mx-auto w-full max-w-md p-6 text-center`}>
+          <p className="font-tuvi-sans text-sm text-[#52525b]">{t('tuVi.loadError')}</p>
           <button
             type="button"
             onClick={() => {
               setLoadingProfile(true)
               setReloadKey((key) => key + 1)
             }}
-            className="mt-3 rounded-lg border border-emerald-300 px-3 py-1.5 text-sm font-medium text-emerald-700 transition-colors hover:bg-emerald-50"
+            className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50/60 px-3 py-1.5 font-tuvi-sans text-sm font-medium text-[#047857] transition-all hover:bg-emerald-100/70 active:scale-[0.98]"
           >
             {t('tuVi.loadRetry')}
           </button>
@@ -67,12 +68,10 @@ export default function TuViEditPage() {
   }
 
   return (
-    <main className="min-h-svh bg-[#f7fef9] px-4 pb-16 pt-24 sm:px-6">
-      <h1 className="mx-auto mb-4 max-w-md text-center text-lg font-semibold text-zinc-900">
-        {t('tuVi.editTitle')}
-      </h1>
+    <main className={TUVI_PAGE_SHELL}>
       <HoroscopeOnboardingForm
         userId={user.id}
+        title={t('tuVi.editTitle')}
         initialProfile={initialProfile}
         // The form reads initialProfile only in its useState initialisers, so
         // storing it back would change nothing on screen. Go to the reading,

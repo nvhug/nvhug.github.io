@@ -9,8 +9,6 @@ import { TimePicker } from '@/components/ui/time-picker'
 import { useLanguage } from '@/lib/i18n/language-context'
 import type { NormalizedSource, NormalizedTableKey, NormalizationWarning } from '@/types/nutrition-normalization'
 import { AITrialExhaustedModal, type AITrialExhaustedInfo } from '@/components/ui/ai-trial-exhausted-modal'
-import { checkAITrialQuota } from '@/lib/ai-trial'
-import { getSupabaseBrowserClient } from '@/lib/supabase-browser'
 
 const MAX_EDGE_PX = 1024
 const JPEG_QUALITY = 0.82
@@ -201,25 +199,20 @@ export function FoodPhotoAnalyzer({ date, onAdded, inputMode = 'photo' }: FoodPh
   }
 
   useEffect(() => {
+    // Single round trip to the same access check the POST enforces (resolveAIAccess) —
+    // this only greys out the capture buttons pre-emptively, so a transient failure here
+    // must not block a user the real gate would allow. Fail open: only set the exhausted
+    // state on an explicit "not allowed" response from the server.
     async function preCheckQuota() {
-      const client = getSupabaseBrowserClient()
-      const { data: { user } } = await client.auth.getUser()
-      if (!user) return
-      const { data: profile } = await client.from('user_profiles').select('role').eq('id', user.id).single()
-      const role = (profile?.role as string) ?? 'user'
-      const result = await checkAITrialQuota(client, user.id, 'food_analyze', role)
-      if (!result.allowed) {
-        // Check upgrade requests: pending + no rejection = bypass (allowed)
-        const { data: requests } = await client
-          .from('upgrade_requests')
-          .select('status')
-          .eq('user_id', user.id)
-          .in('status', ['pending', 'rejected'])
-        const statuses = (requests ?? []).map((r: { status: string }) => r.status)
-        const hasPending = statuses.includes('pending')
-        const hasRejected = statuses.includes('rejected')
-        if (hasPending && !hasRejected) return // bypass: first-time pending, allow use
-        setPhotoQuotaExhausted({ feature: 'food_analyze', used: result.used, limit: result.limit })
+      try {
+        const res = await fetch('/api/notes/analyze-food')
+        if (!res.ok) return
+        const data = await res.json() as { allowed: boolean; used: number; limit: number }
+        if (!data.allowed) {
+          setPhotoQuotaExhausted({ feature: 'food_analyze', used: data.used, limit: data.limit })
+        }
+      } catch {
+        // Network hiccup — let the real submit-time check decide.
       }
     }
     void preCheckQuota()
