@@ -13,7 +13,7 @@ import type { Palace, Star } from '@/lib/tuvi/types'
 function StarChip({ star }: { star: Star }) {
   return (
     <span
-      className={`shrink-0 rounded-md px-1.5 py-0.5 font-tuvi-sans text-xs ${
+      className={`shrink-0 rounded-md px-1.5 py-0.5 font-tuvi-sans text-sm ${
         star.kind === 'chinh'
           ? 'bg-emerald-50 font-medium text-[#065f46]'
           : 'bg-[#f4f4f5] text-[#52525b]'
@@ -69,7 +69,7 @@ export function PalaceDetail({
           {
             key: `trangSinh-${palace.trangSinh}`,
             label: (
-              <span className="shrink-0 rounded-md bg-[#f4f4f5] px-1.5 py-0.5 font-tuvi-sans text-xs text-[#52525b]">
+              <span className="shrink-0 rounded-md bg-[#f4f4f5] px-1.5 py-0.5 font-tuvi-sans text-sm text-[#52525b]">
                 {palace.trangSinh}
               </span>
             ),
@@ -82,7 +82,7 @@ export function PalaceDetail({
       .map((mark) => ({
         key: `mark-${mark}`,
         label: (
-          <span className="shrink-0 rounded-md bg-red-50 px-1.5 py-0.5 font-tuvi-sans text-xs text-[#dc2626]">
+          <span className="shrink-0 rounded-md bg-red-50 px-1.5 py-0.5 font-tuvi-sans text-sm text-[#dc2626]">
             {mark}
           </span>
         ),
@@ -97,12 +97,12 @@ export function PalaceDetail({
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <h3 className="font-tuvi-serif text-sm text-[#18181b]">
+          <h3 className="font-tuvi-serif text-base text-[#18181b]">
             {palace.name ?? t('tuVi.needHour')}
           </h3>
           {/* Separate cells rather than a chain of middle dots: taste-skill 9.F
               rations the dot to one per metadata line. */}
-          <p className="mt-0.5 font-tuvi-mono text-[11px] text-[#71717a]">
+          <p className="mt-0.5 font-tuvi-mono text-xs text-[#71717a]">
             {STEMS[palace.pillar.stem]} {BRANCHES[palace.pillar.branch]}
           </p>
         </div>
@@ -117,17 +117,17 @@ export function PalaceDetail({
       </div>
 
       {rows.length === 0 ? (
-        <p className="mt-2.5 font-tuvi-sans text-xs text-[#a1a1aa]">{t('tuVi.noStars')}</p>
+        <p className="mt-2.5 font-tuvi-sans text-sm text-[#a1a1aa]">{t('tuVi.noStars')}</p>
       ) : (
         <ul className="mt-3 flex flex-col gap-2">
           {palace.stars.every((star) => star.kind !== 'chinh') && (
-            <li className="font-tuvi-sans text-xs text-[#b45309]">{t('tuVi.voChinhDieu')}</li>
+            <li className="font-tuvi-sans text-sm text-[#b45309]">{t('tuVi.voChinhDieu')}</li>
           )}
           {rows.map((row) => (
             <li key={row.key} className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
               {row.label}
               {row.note ? (
-                <span className="min-w-0 flex-1 font-tuvi-sans text-xs leading-relaxed text-[#3f3f46]">
+                <span className="min-w-0 flex-1 font-tuvi-sans text-sm leading-relaxed text-[#3f3f46]">
                   {row.note}
                 </span>
               ) : (
@@ -143,14 +143,14 @@ export function PalaceDetail({
       )}
 
       {reading?.summary && (
-        <p className="mt-3 border-t border-emerald-100 pt-2.5 font-tuvi-sans text-xs leading-relaxed text-[#27272a]">
+        <p className="mt-3 border-t border-emerald-100 pt-2.5 font-tuvi-sans text-sm leading-relaxed text-[#27272a]">
           <span className="font-medium text-[#047857]">{t('tuVi.sectionOverall')}: </span>
           {reading.summary}
         </p>
       )}
 
       {(state.status === 'failed' || (state.status === 'ready' && !reading)) && (
-        <p className="mt-3 border-t border-emerald-100 pt-2.5 font-tuvi-sans text-xs text-[#52525b]">
+        <p className="mt-3 border-t border-emerald-100 pt-2.5 font-tuvi-sans text-sm text-[#52525b]">
           {t('tuVi.interpretError')}{' '}
           <button
             type="button"
@@ -163,7 +163,7 @@ export function PalaceDetail({
       )}
 
       {state.status === 'needHour' && (
-        <p className="mt-3 border-t border-emerald-100 pt-2.5 font-tuvi-sans text-xs text-[#b45309]">
+        <p className="mt-3 border-t border-emerald-100 pt-2.5 font-tuvi-sans text-sm text-[#b45309]">
           {t('tuVi.needHourBody')}
         </p>
       )}
@@ -172,7 +172,7 @@ export function PalaceDetail({
           independently of the sections one, and borrowing that message would
           claim a limit the reader has not actually reached. */}
       {state.status === 'limited' && (
-        <p className="mt-3 border-t border-emerald-100 pt-2.5 font-tuvi-sans text-xs text-[#52525b]">
+        <p className="mt-3 border-t border-emerald-100 pt-2.5 font-tuvi-sans text-sm text-[#52525b]">
           {t('tuVi.palaceLimit')}
         </p>
       )}

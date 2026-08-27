@@ -55,7 +55,7 @@ function Skeleton({ className }: { className: string }) {
 function BirthFacts({ facts }: { facts: NonNullable<ReturnType<typeof birthFacts>> }) {
   const { t } = useLanguage()
   return (
-    <dl className="mt-3 space-y-1 rounded-xl border border-emerald-100 bg-emerald-50/30 px-3 py-2.5 font-tuvi-sans text-xs">
+    <dl className="mt-3 space-y-1 rounded-xl border border-emerald-100 bg-emerald-50/30 px-3 py-2.5 font-tuvi-sans text-sm">
       <div className="flex items-baseline justify-between gap-3">
         <dt className="text-[#52525b]">{t('tuVi.birthDateLabel')}</dt>
         <dd className="font-medium tabular-nums text-[#18181b]">{facts.solar}</dd>
@@ -217,15 +217,15 @@ export default function TuViOverviewPage() {
 
         <header className="relative flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50/80 px-2.5 py-0.5 font-tuvi-serif text-[10px] tracking-[0.22em] text-[#047857]">
+            <p className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50/80 px-2.5 py-0.5 font-tuvi-serif text-[11px] tracking-[0.22em] text-[#047857]">
               {t('tuVi.overviewHeading')}
             </p>
-            <h1 className="mt-2 font-tuvi-serif text-2xl leading-tight text-[#18181b] md:text-4xl">
+            <h1 className="mt-2 font-tuvi-serif text-3xl leading-tight text-[#18181b] md:text-4xl">
               {reading.yearName}
             </h1>
             {/* One middle dot on this line, which is the ration (taste-skill 9.F);
                 the Western sign is parenthetical rather than a second dot. */}
-            <p className="mt-1 font-tuvi-sans text-sm text-[#52525b]">
+            <p className="mt-1 font-tuvi-sans text-base text-[#52525b]">
               {/* Nạp âm is not repeated here: it sits in the thiên bàn at the
                   centre of the chart, which is where a lá số traditionally
                   carries it, and printing it twice on one screen said nothing
@@ -235,14 +235,14 @@ export default function TuViOverviewPage() {
             </p>
             <Link
               href="/tu-vi/edit"
-              className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-white/70 px-2.5 py-1 text-xs text-[#047857] transition-all hover:bg-emerald-50 active:scale-[0.98]"
+              className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-white/70 px-2.5 py-1 text-sm text-[#047857] transition-all hover:bg-emerald-50 active:scale-[0.98]"
             >
               <Pencil className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
               {t('tuVi.editTitle')}
             </Link>
           </div>
           <div className="flex shrink-0 flex-col items-end gap-2.5">
-            <dl className="font-tuvi-sans text-[11px] leading-relaxed text-[#52525b] sm:text-xs">
+            <dl className="font-tuvi-sans text-xs leading-relaxed text-[#52525b] sm:text-sm">
               {displayName && (
                 <div className="flex items-baseline justify-end gap-1.5">
                   <dt>{t('tuVi.identityNameLabel')}:</dt>
@@ -296,7 +296,7 @@ export default function TuViOverviewPage() {
                 }
               />
             </div>
-            <p className="mt-2.5 text-center font-tuvi-sans text-xs text-[#52525b]">
+            <p className="mt-2.5 text-center font-tuvi-sans text-sm text-[#52525b]">
               {t('tuVi.chartHint')}
             </p>
             <LaSoLegend />
@@ -320,7 +320,7 @@ export default function TuViOverviewPage() {
           </div>
         </div>
 
-        <p className="relative mt-6 border-t border-emerald-100/80 pt-4 text-xs leading-relaxed text-[#52525b]">
+        <p className="relative mt-6 border-t border-emerald-100/80 pt-4 text-sm leading-relaxed text-[#52525b]">
           {t('tuVi.disclaimer')}
         </p>
       </div>

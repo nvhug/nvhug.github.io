@@ -250,7 +250,7 @@ const LEGEND: ReadonlyArray<{ tone: PalaceTone; label: string }> = [
 export function LaSoLegend() {
   const { t } = useLanguage()
   return (
-    <ul className="mt-2.5 flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 font-tuvi-sans text-xs text-[#52525b]">
+    <ul className="mt-2.5 flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 font-tuvi-sans text-sm text-[#52525b]">
       {LEGEND.map(({ tone, label }) => (
         <li key={tone} className="flex items-center gap-1.5">
           <span

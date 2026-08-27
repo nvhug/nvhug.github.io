@@ -66,9 +66,9 @@ export function ScoreMeter({ value, size = 'sm' }: { value: number; size?: 'sm' 
           style={{ width: `${shown}%` }}
         />
       </span>
-      <span className="font-tuvi-sans text-sm font-medium tabular-nums text-[#18181b]">
+      <span className="font-tuvi-sans text-base font-medium tabular-nums text-[#18181b]">
         {clamped}
-        <span className="text-xs font-normal text-[#52525b]">/100</span>
+        <span className="text-sm font-normal text-[#52525b]">/100</span>
       </span>
       <span className="sr-only">
         {clamped} {t('tuVi.scoreOutOf100')}

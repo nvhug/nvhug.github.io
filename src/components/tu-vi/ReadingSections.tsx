@@ -82,11 +82,11 @@ function NeedHour() {
   const { t } = useLanguage()
   return (
     <div className="rounded-2xl border border-amber-200 bg-linear-to-br from-amber-50 to-white p-4">
-      <p className="flex items-center gap-2 font-tuvi-serif text-sm text-[#b45309]">
+      <p className="flex items-center gap-2 font-tuvi-serif text-base text-[#b45309]">
         <Clock aria-hidden="true" className="h-4 w-4 shrink-0 sm:h-3.5 sm:w-3.5" />
         {t('tuVi.needHour')}
       </p>
-      <p className="mt-1 text-sm leading-relaxed text-[#52525b]">{t('tuVi.needHourBody')}</p>
+      <p className="mt-1 text-base leading-relaxed text-[#52525b]">{t('tuVi.needHourBody')}</p>
       <Link
         href="/tu-vi/edit"
         className="mt-2.5 inline-flex items-center rounded-lg border border-amber-300 bg-white px-2.5 py-1 text-sm font-medium text-[#b45309] transition-all hover:bg-amber-50 active:scale-[0.98]"
@@ -116,7 +116,7 @@ function PalaceScoreDetail({ palace }: { palace: Palace | null | undefined }) {
   const voidLabel = [palace.tuan ? 'Tuần' : '', palace.triet ? 'Triệt' : ''].filter(Boolean).join(', ')
 
   return (
-    <div className="font-tuvi-sans text-xs leading-relaxed text-[#52525b]">
+    <div className="font-tuvi-sans text-sm leading-relaxed text-[#52525b]">
       <p className="flex flex-wrap items-center gap-1.5">
         {breakdown.stars.length === 0 ? (
           <span>{t('tuVi.noStars')}</span>
@@ -177,12 +177,12 @@ function LuckDetail({ reading }: { reading: Reading }) {
 
   if (found.size === 0) {
     return (
-      <p className="font-tuvi-sans text-xs leading-relaxed text-[#52525b]">{t('tuVi.luckNoStars')}</p>
+      <p className="font-tuvi-sans text-sm leading-relaxed text-[#52525b]">{t('tuVi.luckNoStars')}</p>
     )
   }
 
   return (
-    <p className="flex flex-wrap gap-1.5 font-tuvi-sans text-xs">
+    <p className="flex flex-wrap gap-1.5 font-tuvi-sans text-sm">
       {[...found].map((name) => (
         <span key={name} className="rounded-md bg-emerald-50 px-1.5 py-0.5 font-medium text-[#065f46]">
           {name}
@@ -211,14 +211,14 @@ function InterpretationNote({
 
   if (state.status === 'loading') {
     return (
-      <span className="mt-1 inline-block h-3 w-full max-w-55 overflow-hidden rounded-full bg-[#f4f4f5]">
+      <span className="mt-1 inline-block h-3.5 w-full max-w-55 overflow-hidden rounded-full bg-[#f4f4f5]">
         <span className="relative block h-full w-1/3 animate-shimmer-sweep bg-white/60 motion-reduce:hidden" />
       </span>
     )
   }
 
   if (state.status === 'limited') {
-    return <span className="font-tuvi-sans text-xs text-[#52525b]">{t('tuVi.interpretLimit')}</span>
+    return <span className="font-tuvi-sans text-sm text-[#52525b]">{t('tuVi.interpretLimit')}</span>
   }
 
   // Nothing stored for this birth data and lunar month. The per-section slots stay quiet —
@@ -229,7 +229,7 @@ function InterpretationNote({
 
   if (state.status === 'failed') {
     return (
-      <span className="font-tuvi-sans text-xs text-[#52525b]">
+      <span className="font-tuvi-sans text-sm text-[#52525b]">
         {t('tuVi.interpretError')}{' '}
         <button
           type="button"
@@ -246,7 +246,7 @@ function InterpretationNote({
   if (!text) return null
 
   if (field === 'short') {
-    return <p className="font-tuvi-sans text-xs leading-snug text-[#52525b]">{text}</p>
+    return <p className="font-tuvi-sans text-sm leading-snug text-[#52525b]">{text}</p>
   }
 
   // A detail reading runs 3-5 dense sentences; as one block it is a wall of
@@ -254,7 +254,7 @@ function InterpretationNote({
   return (
     <div className="mt-2 flex max-w-prose flex-col gap-2">
       {splitReadingParagraphs(text).map((paragraph, index) => (
-        <p key={index} className="font-tuvi-sans text-sm leading-relaxed text-[#27272a]">
+        <p key={index} className="font-tuvi-sans text-base leading-relaxed text-[#27272a]">
           {paragraph}
         </p>
       ))}
@@ -267,15 +267,15 @@ function PalaceCard({ title, palace }: { title: string; palace: Reading['menh'] 
   return (
     <div className="flex-1 rounded-xl border border-emerald-100 bg-linear-to-br from-white to-emerald-50/60 p-3">
       {/* A field label, not a section eyebrow: it names the value directly below it. */}
-      <p className="font-tuvi-serif text-xs text-[#52525b]">{title}</p>
+      <p className="font-tuvi-serif text-sm text-[#52525b]">{title}</p>
       {palace ? (
-        <p className="mt-1 font-tuvi-sans text-sm leading-snug font-medium text-[#18181b]">
+        <p className="mt-1 font-tuvi-sans text-base leading-snug font-medium text-[#18181b]">
           {/* A palace with no major star is vô chính diệu; a supporting star
               standing in for one would misread the chart. */}
           {majorStarNames(palace) || t('tuVi.voChinhDieu')}
         </p>
       ) : (
-        <p className="mt-1 font-tuvi-sans text-sm text-[#b45309]">{t('tuVi.needHour')}</p>
+        <p className="mt-1 font-tuvi-sans text-base text-[#b45309]">{t('tuVi.needHour')}</p>
       )}
     </div>
   )
@@ -376,7 +376,7 @@ export function ReadingSections({
               <ScoreMeter value={scores.overall} size="lg" />
               <div className="min-w-0 flex-1">
                 {reading.chart.cuc && (
-                  <p className="font-tuvi-serif text-base leading-tight text-[#18181b]">
+                  <p className="font-tuvi-serif text-lg leading-tight text-[#18181b]">
                     {reading.chart.cuc.name}
                   </p>
                 )}
@@ -425,7 +425,7 @@ export function ReadingSections({
                     <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-[#047857] ring-1 ring-emerald-100">
                       <Icon aria-hidden="true" className="h-4 w-4" />
                     </span>
-                    <span className="min-w-0 flex-1 text-sm text-[#18181b]">{row.label}</span>
+                    <span className="min-w-0 flex-1 text-base text-[#18181b]">{row.label}</span>
                     <ScoreMeter value={row.value} />
                     <ChevronDown
                       aria-hidden="true"
@@ -462,12 +462,12 @@ export function ReadingSections({
             >
               {/* A field label naming the value beside/below it, same treatment
                   as the Mệnh and Thân cards. */}
-              <p className="font-tuvi-serif text-xs text-[#52525b]">{t(CYCLE_LABEL[cycle.key])}</p>
+              <p className="font-tuvi-serif text-sm text-[#52525b]">{t(CYCLE_LABEL[cycle.key])}</p>
               <div className="text-right lg:mt-1 lg:text-left">
                 {cycle.name && (
-                  <p className="font-tuvi-sans text-sm font-medium text-[#18181b]">{cycle.name}</p>
+                  <p className="font-tuvi-sans text-base font-medium text-[#18181b]">{cycle.name}</p>
                 )}
-                <p className="font-tuvi-sans text-xs text-[#52525b]">{spanText(cycle.span)}</p>
+                <p className="font-tuvi-sans text-sm text-[#52525b]">{spanText(cycle.span)}</p>
               </div>
             </div>
           ))}
@@ -493,7 +493,7 @@ function RemainingNote({ state }: { state: InterpretationState }) {
   if (state.remaining > REMAINING_WARN_AT) return null
 
   return (
-    <p className="mt-3 font-tuvi-sans text-xs text-[#b45309]">
+    <p className="mt-3 font-tuvi-sans text-sm text-[#b45309]">
       {t('tuVi.interpretRemaining', { n: state.remaining })}
     </p>
   )
