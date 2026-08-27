@@ -55,6 +55,42 @@ describe('normalizeUsage — DeepSeek / OpenAI-compatible', () => {
   })
 })
 
+describe('normalizeUsage — OpenAI and OpenRouter spell cached tokens differently', () => {
+  // Both are reachable via FOOD_VISION_PROVIDER, and both were previously read with
+  // DeepSeek's field name, so every call recorded zero cached tokens. Harmless while their
+  // models are unpriced; a ~10x over-report the moment they are priced.
+  it.each(['openai', 'openrouter'] as const)(
+    'reads prompt_tokens_details.cached_tokens for %s',
+    (provider) => {
+      const usage = normalizeUsage(
+        {
+          prompt_tokens: 10_000,
+          prompt_tokens_details: { cached_tokens: 7_500 },
+          completion_tokens: 2_000,
+          total_tokens: 12_000,
+        },
+        provider
+      )
+      expect(usage.input_tokens).toBe(10_000)
+      expect(usage.cached_input_tokens).toBe(7_500)
+      expect(usage.output_tokens).toBe(2_000)
+    }
+  )
+
+  it('still prefers the DeepSeek field when both are present', () => {
+    const usage = normalizeUsage(
+      {
+        prompt_tokens: 100,
+        prompt_cache_hit_tokens: 60,
+        prompt_tokens_details: { cached_tokens: 10 },
+        completion_tokens: 5,
+      },
+      'deepseek'
+    )
+    expect(usage.cached_input_tokens).toBe(60)
+  })
+})
+
 describe('normalizeUsage — Gemini', () => {
   // Gemini's candidatesTokenCount EXCLUDES thoughtsTokenCount, but thoughts are billed as
   // output. Omitting them understates the bill — the opposite mistake to DeepSeek's.

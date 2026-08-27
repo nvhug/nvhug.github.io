@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { computeCostUsd, formatUsd, isPeakHour, PRICING_VERSION, USD_TO_VND, usdToVnd } from './ai-pricing'
+import {
+  computeCostUsd,
+  formatUsd,
+  formatUsdAggregate,
+  isPeakHour,
+  PRICING_VERSION,
+  resolvePriceKey,
+  USD_TO_VND,
+  usdToVnd,
+} from './ai-pricing'
 
 // 2026-08-24 is a Monday, 2026-08-29 a Saturday, 2026-08-30 a Sunday.
 const mon = (hms: string) => new Date(`2026-08-24T${hms}Z`)
@@ -122,11 +131,92 @@ describe('computeCostUsd', () => {
   })
 })
 
+describe('resolvePriceKey — the served id is not always a price-table key', () => {
+  it('matches an exact id', () => {
+    expect(resolvePriceKey('deepseek-v4-flash')).toBe('deepseek-v4-flash')
+  })
+
+  it('strips a point-release suffix, which is what Gemini actually returns', () => {
+    // Ask for gemini-3.6-flash and the response reports gemini-3.6-flash-002. Indexing the
+    // table with the served id would miss on every Gemini call and report $0 for real spend.
+    expect(resolvePriceKey('gemini-3.6-flash-002')).toBe('gemini-3.6-flash')
+  })
+
+  it('falls back to the requested model when the served id is unknown', () => {
+    expect(resolvePriceKey('some-internal-alias', 'deepseek-v4-flash')).toBe('deepseek-v4-flash')
+  })
+
+  it('returns null rather than a prototype member', () => {
+    // A bare MODEL_PRICES[model] index returns Object.prototype.constructor here, and the
+    // cost arithmetic then produces NaN.
+    for (const evil of ['constructor', 'toString', 'valueOf', '__proto__', 'hasOwnProperty']) {
+      expect(resolvePriceKey(evil), evil).toBeNull()
+    }
+  })
+})
+
+describe('price table covers every model the code can request', () => {
+  // The highest-value test here: a model id that misses the table costs nothing on the
+  // dashboard while costing real money at the provider.
+  const REQUESTABLE = [
+    'deepseek-v4-flash',
+    'deepseek-v4-pro',
+    'deepseek-v4-flash-vision-exp',
+    'gemini-3.6-flash',
+  ]
+
+  it.each(REQUESTABLE)('%s resolves to a price', (model) => {
+    expect(resolvePriceKey(model)).not.toBeNull()
+  })
+
+  it.each(REQUESTABLE)('%s still resolves when served with a -002 suffix', (model) => {
+    expect(resolvePriceKey(`${model}-002`)).not.toBeNull()
+  })
+})
+
+describe('computeCostUsd — hostile model ids', () => {
+  const at = new Date('2026-08-24T12:00:00Z')
+
+  it('returns null, never NaN, for a prototype-chain key', () => {
+    // NaN is worse than null here: JSON.stringify turns it into null while pricing_version
+    // stays set, which violates the table's cost-and-version-together CHECK and drops the
+    // whole row instead of just its cost.
+    const cost = computeCostUsd({ input: 1000, cached: 0, output: 500 }, 'constructor', at)
+    expect(cost).toBeNull()
+    expect(Number.isNaN(cost as unknown as number)).toBe(false)
+  })
+
+  it('prices a versioned served id off its base model', () => {
+    const versioned = computeCostUsd({ input: 1e6, cached: 0, output: 0 }, 'gemini-3.6-flash-002', at)
+    const base = computeCostUsd({ input: 1e6, cached: 0, output: 0 }, 'gemini-3.6-flash', at)
+    expect(versioned).toBeCloseTo(base as number, 10)
+  })
+})
+
 describe('formatUsd', () => {
-  it('uses four decimals below one cent so small costs are not shown as $0.00', () => {
-    expect(formatUsd(0.0000021)).toBe('$0.0000')
+  // The property, not a fixed string. The previous version of this test asserted
+  // `formatUsd(0.0000021) === '$0.0000'` — locking in the exact failure the function exists
+  // to prevent, because a row of zeros claims the call was free just as loudly as "$0.00".
+  it('never renders a non-zero cost as all zeros', () => {
+    for (const usd of [0.0000021, 1e-9, 2.1e-6, 0.0001, 0.0099, 0.00000004]) {
+      const out = formatUsd(usd)
+      expect(out, `formatUsd(${usd}) = ${out}`).toMatch(/[1-9]/)
+    }
+  })
+
+  it('scales precision to the magnitude below one cent', () => {
     expect(formatUsd(0.0021)).toBe('$0.0021')
     expect(formatUsd(0.0099)).toBe('$0.0099')
+    expect(formatUsd(0.0000021)).toBe('$0.0000021')
+  })
+
+  it('states a bound rather than zeros below the display floor', () => {
+    expect(formatUsd(1e-14)).toBe('< $0.0000000001')
+  })
+
+  it('returns a dash for a non-finite value instead of "$NaN"', () => {
+    expect(formatUsd(NaN)).toBe('—')
+    expect(formatUsd(Infinity)).toBe('—')
   })
 
   it('uses two decimals at one cent and above', () => {
@@ -137,6 +227,23 @@ describe('formatUsd', () => {
 
   it('renders a real zero as two decimals', () => {
     expect(formatUsd(0)).toBe('$0.00')
+  })
+})
+
+describe('formatUsdAggregate', () => {
+  // Tiles and totals want a floor, not precision: "$0.0083" in 30px type is noise.
+  it('floors a sub-cent aggregate rather than showing its digits', () => {
+    expect(formatUsdAggregate(0.0083)).toBe('< $0.01')
+    expect(formatUsdAggregate(0.0000021)).toBe('< $0.01')
+  })
+
+  it('never claims a non-zero aggregate is zero', () => {
+    expect(formatUsdAggregate(0.0083)).not.toBe('$0.00')
+  })
+
+  it('formats a real figure normally', () => {
+    expect(formatUsdAggregate(13.021)).toBe('$13.02')
+    expect(formatUsdAggregate(0)).toBe('$0.00')
   })
 })
 

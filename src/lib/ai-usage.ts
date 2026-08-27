@@ -83,7 +83,15 @@ export function normalizeUsage(raw: unknown, provider: UsageProvider): Normalize
     reportedTotal = count(u.totalTokenCount)
   } else {
     input = count(u.prompt_tokens)
-    cached = count(u.prompt_cache_hit_tokens)
+    // Two spellings, because `UsageProvider` has four members and they do not agree:
+    // DeepSeek reports `prompt_cache_hit_tokens`, OpenAI and OpenRouter report
+    // `prompt_tokens_details.cached_tokens`. Reading only the first made two of the four
+    // providers record zero cached tokens on every call — which costs nothing today only
+    // because their models are unpriced, and becomes a ~10x over-report the moment they are
+    // priced. The token reconciliation below cannot catch it: cached is a subset of input,
+    // so input + output still matches the provider's total.
+    const promptDetails = (u.prompt_tokens_details ?? {}) as Record<string, unknown>
+    cached = count(u.prompt_cache_hit_tokens) || count(promptDetails.cached_tokens)
     output = count(u.completion_tokens)
     const details = (u.completion_tokens_details ?? {}) as Record<string, unknown>
     reasoning = count(details.reasoning_tokens)
@@ -169,8 +177,22 @@ export async function logAiUsage(params: LogAiUsageParams): Promise<string | nul
     at
   )
 
+  // A finite number or nothing. `cost === null` alone is the wrong guard: any non-finite
+  // value JSON-serialises to null while pricing_version stays set, which violates the
+  // table's cost-and-version-together CHECK and loses the ENTIRE row rather than just its
+  // cost. The two fields are derived from one predicate so they cannot disagree.
+  const priced = typeof cost === 'number' && Number.isFinite(cost)
+
+  // AbortController rather than Promise.race against a timer. A race leaves the timer
+  // running after the insert wins — holding a serverless invocation open for the remainder
+  // of the timeout on every AI call — and cancels nothing when the timer wins, so the row
+  // often still lands while this function has already returned null. That combination is
+  // what silently breaks the usage_log_id link.
+  const abort = new AbortController()
+  const timer = setTimeout(() => abort.abort(), TELEMETRY_TIMEOUT_MS)
+
   try {
-    const insert = getServiceSupabaseClient()
+    const { data, error } = await getServiceSupabaseClient()
       .from('ai_usage_log')
       .insert({
         user_id: params.userId,
@@ -179,21 +201,17 @@ export async function logAiUsage(params: LogAiUsageParams): Promise<string | nul
         provider: params.provider,
         model: params.model,
         ...params.usage,
-        // Present or absent together: a cost with no version is unauditable, a version
-        // with no cost is meaningless.
-        cost_usd: cost,
-        pricing_version: cost === null ? null : PRICING_VERSION,
+        cost_usd: priced ? cost : null,
+        pricing_version: priced ? PRICING_VERSION : null,
         outcome: params.outcome,
         created_at: at.toISOString(),
       })
       .select('id')
+      // Before .single(), not after: abortSignal lives on PostgrestTransformBuilder and
+      // .single() narrows to PostgrestBuilder, which does not carry it.
+      .abortSignal(abort.signal)
       .single()
 
-    const timeout = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('telemetry insert timed out')), TELEMETRY_TIMEOUT_MS)
-    )
-
-    const { data, error } = await Promise.race([insert, timeout])
     if (error) throw error
     return data?.id ?? null
   } catch (err) {
@@ -201,5 +219,7 @@ export async function logAiUsage(params: LogAiUsageParams): Promise<string | nul
     // here would be a broken feature for the user.
     console.error(`[ai-usage] failed to record ${params.surface} call:`, err)
     return null
+  } finally {
+    clearTimeout(timer)
   }
 }
