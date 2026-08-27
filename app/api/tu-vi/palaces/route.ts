@@ -76,9 +76,13 @@ export async function POST(request: Request) {
   }
 
   let lang: InterpretationLang = 'vi'
+  // See the note in tu-vi/interpret: opening a page must not spend money, so the reading
+  // screen asks in cache-only mode and offers a button when nothing is stored.
+  let cacheOnly = false
   try {
-    const body = (await request.json()) as { lang?: unknown }
+    const body = (await request.json()) as { lang?: unknown; cacheOnly?: unknown }
     if (body?.lang === 'en') lang = 'en'
+    cacheOnly = body?.cacheOnly === true
   } catch {
     // No body, or not JSON — Vietnamese stays the default.
   }
@@ -102,6 +106,10 @@ export async function POST(request: Request) {
   const cached = readCachedPalaces(byLang(profileData.horoscopePalaces)[lang], fingerprint, lunarMonth)
   if (cached) {
     return NextResponse.json({ palaces: palaceReadingsToList(cached), cached: true })
+  }
+
+  if (cacheOnly) {
+    return NextResponse.json({ palaces: [], needsGeneration: true })
   }
 
   const apiKey = process.env.DEEPSEEK_API_KEY

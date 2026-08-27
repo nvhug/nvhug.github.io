@@ -311,6 +311,31 @@ export default function TuViOverviewPage() {
           </section>
 
           <div className="mt-5 lg:mt-0">
+            {/* Offered once, at the top, rather than repeated in every section slot.
+                Opening this page reads the database and stops; the reading is bought when
+                birth data is saved, or here, when the reader asks for it. */}
+            {interpretation.state.status === 'needsGeneration' && (
+              <div className="mb-4 rounded-xl border border-emerald-200/70 bg-white/70 p-4 text-center">
+                <p className="font-tuvi-sans text-sm font-medium text-[#27272a]">
+                  {t('tuVi.generateTitle')}
+                </p>
+                <p className="mt-1 font-tuvi-sans text-xs leading-relaxed text-[#52525b]">
+                  {t('tuVi.generateHint')}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    interpretation.generate()
+                    // Both halves together: a reader who asked for the reading means the
+                    // whole reading, and the two run concurrently anyway.
+                    if (palaceReadings.state.status === 'needsGeneration') palaceReadings.generate()
+                  }}
+                  className="mt-3 rounded-lg bg-[#b4272b] px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 active:scale-[0.98]"
+                >
+                  {t('tuVi.generateAction')}
+                </button>
+              </div>
+            )}
             <ReadingSections reading={reading} interpretation={interpretation} />
           </div>
         </div>

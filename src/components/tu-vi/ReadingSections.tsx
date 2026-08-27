@@ -221,6 +221,12 @@ function InterpretationNote({
     return <span className="font-tuvi-sans text-xs text-[#52525b]">{t('tuVi.interpretLimit')}</span>
   }
 
+  // Nothing stored for this birth data and lunar month. The per-section slots stay quiet —
+  // the offer to generate belongs once at the top of the screen, not repeated eleven times.
+  if (state.status === 'needsGeneration') {
+    return null
+  }
+
   if (state.status === 'failed') {
     return (
       <span className="font-tuvi-sans text-xs text-[#52525b]">

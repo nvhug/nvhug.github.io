@@ -82,9 +82,16 @@ export async function POST(request: Request) {
 
   // The reader's language decides the prose, and is part of the cache identity.
   let lang: InterpretationLang = 'vi'
+  // Read the cache, and stop there rather than buying a completion.
+  //
+  // Opening a page should not spend money. Generation is triggered explicitly — by saving
+  // birth data, or by asking for it — so the reading screen asks in this mode and shows a
+  // button when there is nothing stored, instead of quietly billing on every mount.
+  let cacheOnly = false
   try {
-    const body = (await request.json()) as { lang?: unknown }
+    const body = (await request.json()) as { lang?: unknown; cacheOnly?: unknown }
     if (body?.lang === 'en') lang = 'en'
+    cacheOnly = body?.cacheOnly === true
   } catch {
     // No body, or not JSON — Vietnamese stays the default.
   }
@@ -105,6 +112,13 @@ export async function POST(request: Request) {
   )
   if (cached?.current) {
     return NextResponse.json({ ...cached, cached: true })
+  }
+
+  if (cacheOnly) {
+    // A reading from an older prompt is still worth showing — better than a button that
+    // asks the reader to pay for prose they already have a version of.
+    if (cached) return NextResponse.json({ ...cached, cached: true, stale: true })
+    return NextResponse.json({ needsGeneration: true })
   }
 
   const apiKey = process.env.DEEPSEEK_API_KEY

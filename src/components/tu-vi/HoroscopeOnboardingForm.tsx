@@ -44,7 +44,7 @@ export function HoroscopeOnboardingForm({
   initialProfile: HoroscopeProfile | null
   onSaved: (profile: HoroscopeProfile) => void
 }) {
-  const { t } = useLanguage()
+  const { t, lang } = useLanguage()
   const [calendar, setCalendar] = useState<Calendar>('solar')
   const [birthDateSolar, setBirthDateSolar] = useState(initialProfile?.birthDateSolar ?? getTodayLocalISODate())
   const [lunarDate, setLunarDate] = useState<LunarDate>(
@@ -56,6 +56,10 @@ export function HoroscopeOnboardingForm({
   const [dateError, setDateError] = useState(false)
   const [genderError, setGenderError] = useState(false)
   const [saving, setSaving] = useState(false)
+  // Separate from `saving` so the button can say what it is actually waiting for. The save
+  // itself takes milliseconds; the reading takes half a minute, and a reader watching a
+  // button that still says "Đang lưu" after twenty seconds assumes it has hung.
+  const [generating, setGenerating] = useState(false)
 
   async function handleSubmit() {
     const validDate =
@@ -91,6 +95,36 @@ export function HoroscopeOnboardingForm({
       if (error) throw error
 
       toast.success(t('tuVi.saveSuccess'))
+
+      // Saving the birth data is what buys the reading — the one explicit moment where the
+      // reader has asked for it. The reading screen itself only loads from the database, so
+      // without this step it would open to an empty state and a button.
+      //
+      // Both run concurrently: the wall time is one generation, not two.
+      //
+      // Failures are swallowed on purpose. The profile IS saved by this point, and the
+      // reading screen offers its own generate button, so a provider hiccup must not turn a
+      // successful save into an error the reader has to act on.
+      setGenerating(true)
+      try {
+        await Promise.all([
+          fetch('/api/tu-vi/interpret', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ lang }),
+          }),
+          fetch('/api/tu-vi/palaces', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ lang }),
+          }),
+        ])
+      } catch {
+        // Nothing to tell the reader: the screen they land on can generate on demand.
+      } finally {
+        setGenerating(false)
+      }
+
       onSaved(profile)
     } catch {
       toast.error(t('tuVi.saveError'))
@@ -221,10 +255,10 @@ export function HoroscopeOnboardingForm({
       <button
         type="button"
         onClick={() => void handleSubmit()}
-        disabled={saving}
+        disabled={saving || generating}
         className="mt-6 w-full rounded-lg bg-emerald-500 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-emerald-600 disabled:opacity-50"
       >
-        {saving ? t('tuVi.submitSaving') : t('tuVi.submit')}
+        {generating ? t('tuVi.submitGenerating') : saving ? t('tuVi.submitSaving') : t('tuVi.submit')}
       </button>
     </div>
   )
