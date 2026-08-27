@@ -25,7 +25,7 @@ export const en: Dictionary = {
   // as a downer. Say what the app is, then ask; don't explain what the gift isn't.
   donate: {
     title: '☕ Support the author',
-    body: 'This app is kept running by your support.\nIf you find it useful, a small donation helps me maintain and improve it.',
+    body: 'This app is free for everyone\nIf you find it useful, a small donation helps me maintain and improve it!',
     signoff: 'Thank you, beautiful people!',
     confirm: "I've donated 🎉",
     confirming: 'Noting it down...',
