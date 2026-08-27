@@ -11,7 +11,8 @@ export type PalaceReadingsState =
   | { status: 'needHour' }
   | { status: 'failed' }
   | { status: 'limited' }
-  /** Nothing stored yet. The screen offers to generate rather than doing it unasked. */
+  /** Nothing stored. Reached only when generation failed at save time; saving birth
+      data again is the way back. */
   | { status: 'needsGeneration' }
 
 /**
@@ -23,15 +24,16 @@ export type PalaceReadingsState =
  */
 const inFlight = new Map<string, Promise<Response>>()
 
-function fetchPalaces(lang: string, attempt: number, cacheOnly: boolean): Promise<Response> {
-  const key = `${lang}:${attempt}:${cacheOnly ? 'cache' : 'gen'}`
+function fetchPalaces(lang: string, attempt: number): Promise<Response> {
+  const key = `${lang}:${attempt}`
   const existing = inFlight.get(key)
   if (existing) return existing
 
   const request = fetch('/api/tu-vi/palaces', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ lang, cacheOnly }),
+    // Always cache-only, same rule as the sections hook.
+    body: JSON.stringify({ lang, cacheOnly: true }),
   }).finally(() => inFlight.delete(key))
 
   inFlight.set(key, request)
@@ -48,8 +50,6 @@ function fetchPalaces(lang: string, attempt: number, cacheOnly: boolean): Promis
 export function usePalaceReadings(lang: string) {
   const [state, setState] = useState<PalaceReadingsState>({ status: 'loading' })
   const [attempt, setAttempt] = useState(0)
-  // The mount reads the cache and stops; only an explicit generate() may buy a completion.
-  const [wantsGeneration, setWantsGeneration] = useState(false)
   // Reset during render rather than in the effect, the React-documented way to
   // react to a changed prop without a set-state-in-effect cascade.
   const [loadedLang, setLoadedLang] = useState(lang)
@@ -63,10 +63,7 @@ export function usePalaceReadings(lang: string) {
 
     async function load() {
       try {
-        // Not aborted on cleanup: the response is a paid, server-cached
-        // generation, so letting it finish and land in the cache beats throwing
-        // it away and asking for another one.
-        const res = (await fetchPalaces(lang, attempt, !wantsGeneration)).clone()
+        const res = (await fetchPalaces(lang, attempt)).clone()
         if (res.status === 429) {
           if (!cancelled) setState({ status: 'limited' })
           return
@@ -94,19 +91,13 @@ export function usePalaceReadings(lang: string) {
     return () => {
       cancelled = true
     }
-  }, [attempt, lang, wantsGeneration])
+  }, [attempt, lang])
 
-  /** Buy the twelve-palace readings. The only path that can, apart from saving birth data. */
-  const generate = () => {
-    setState({ status: 'loading' })
-    setWantsGeneration(true)
-    setAttempt((value) => value + 1)
-  }
-
+  /** Re-read the database. Never generates — see fetchPalaces. */
   const retry = () => {
     setState({ status: 'loading' })
     setAttempt((value) => value + 1)
   }
 
-  return { state, retry, generate }
+  return { state, retry }
 }

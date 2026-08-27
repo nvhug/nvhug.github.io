@@ -16,8 +16,9 @@ export type InterpretationState =
   | { status: 'ready'; sections: InterpretationSections; remaining?: number }
   | { status: 'failed' }
   | { status: 'limited' }
-  /** Nothing stored for this birth data and lunar month. The screen offers to
-      generate rather than doing it unasked: opening a page should not spend money. */
+  /** Nothing stored for this birth data. Reached only when generation failed at save
+      time — the sections render empty, and saving birth data again is the way back.
+      Deliberately not a prompt to buy one: this reading is context, not a record. */
   | { status: 'needsGeneration' }
 
 /**
@@ -27,26 +28,25 @@ export type InterpretationState =
 /**
  * In-flight requests, shared per (language, attempt).
  *
- * Two things make an un-deduplicated fetch here expensive rather than merely
- * wasteful: React Strict Mode mounts every effect twice in development, and the
- * route behind this claims a generation slot and bills a completion BEFORE it
- * can know the caller went away. Sharing the promise means the second mount
- * subscribes to the first request instead of paying for a second one.
+ * Cheap now that every request here is cache-only, but kept: Strict Mode mounts each
+ * effect twice in development, and one database read is better than two.
  *
- * Entries are dropped as soon as they settle, so a later remount refetches
- * rather than replaying an old result — including an old failure.
+ * Entries drop as soon as they settle, so a later remount refetches rather than
+ * replaying an old result — including an old failure.
  */
 const inFlight = new Map<string, Promise<Response>>()
 
-function fetchInterpretation(lang: string, attempt: number, cacheOnly: boolean): Promise<Response> {
-  const key = `${lang}:${attempt}:${cacheOnly ? 'cache' : 'gen'}`
+function fetchInterpretation(lang: string, attempt: number): Promise<Response> {
+  const key = `${lang}:${attempt}`
   const existing = inFlight.get(key)
   if (existing) return existing
 
   const request = fetch('/api/tu-vi/interpret', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ lang, cacheOnly }),
+    // Always cache-only. Nothing this screen does may buy a completion: the reading is
+    // paid for once, when birth data is saved.
+    body: JSON.stringify({ lang, cacheOnly: true }),
   }).finally(() => inFlight.delete(key))
 
   inFlight.set(key, request)
@@ -56,9 +56,6 @@ function fetchInterpretation(lang: string, attempt: number, cacheOnly: boolean):
 export function useInterpretation(lang: string) {
   const [state, setState] = useState<InterpretationState>({ status: 'loading' })
   const [attempt, setAttempt] = useState(0)
-  // The mount reads the cache and stops. Only an explicit `generate()` — the button on the
-  // reading screen, or saving birth data — is allowed to buy a completion.
-  const [wantsGeneration, setWantsGeneration] = useState(false)
   // Resets to 'loading' the moment `lang` changes, during render rather than
   // in the effect below — the React-documented way to react to a changed
   // prop without a set-state-in-effect cascade.
@@ -73,10 +70,7 @@ export function useInterpretation(lang: string) {
 
     async function load() {
       try {
-        // Not aborted on cleanup: the response is a paid, server-cached
-        // generation, so letting it finish and land in the cache is strictly
-        // better than throwing it away and asking for another one.
-        const res = (await fetchInterpretation(lang, attempt, !wantsGeneration)).clone()
+        const res = (await fetchInterpretation(lang, attempt)).clone()
         if (res.status === 429) {
           if (!cancelled) setState({ status: 'limited' })
           return
@@ -109,19 +103,13 @@ export function useInterpretation(lang: string) {
     return () => {
       cancelled = true
     }
-  }, [attempt, lang, wantsGeneration])
+  }, [attempt, lang])
 
-  /** Buy a reading. The only path that can, apart from saving birth data. */
-  const generate = () => {
-    setState({ status: 'loading' })
-    setWantsGeneration(true)
-    setAttempt((value) => value + 1)
-  }
-
+  /** Re-read the database. Never generates — see fetchInterpretation. */
   const retry = () => {
     setState({ status: 'loading' })
     setAttempt((value) => value + 1)
   }
 
-  return { state, retry, generate }
+  return { state, retry }
 }
