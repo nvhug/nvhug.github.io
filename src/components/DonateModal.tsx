@@ -75,10 +75,10 @@ export function DonateModal({ open, onClose }: Props) {
         <h3 className="text-center text-lg font-bold text-zinc-800 dark:text-white">
           {t('donate.title')}
         </h3>
-        <p className="mt-3 text-center text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+        <p className="mt-3 text-center text-sm leading-relaxed text-zinc-600 dark:text-zinc-300">
           {t('donate.body')}
         </p>
-        <p className="mt-2 text-center text-sm font-medium text-zinc-600 dark:text-zinc-300">
+        <p className="mt-3 text-center text-sm font-semibold text-zinc-800 dark:text-white">
           {t('donate.signoff')}
         </p>
         <div className="mt-5 flex justify-center">
@@ -94,7 +94,7 @@ export function DonateModal({ open, onClose }: Props) {
           <div className="mt-5 flex gap-3">
             <button
               onClick={close}
-              className="flex-1 rounded-lg border border-zinc-200 py-2.5 text-sm font-medium text-zinc-500 transition hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
+              className="flex-1 rounded-lg border border-zinc-200 py-2.5 text-sm font-medium text-zinc-600 transition hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
             >
               {t('donate.close')}
             </button>
