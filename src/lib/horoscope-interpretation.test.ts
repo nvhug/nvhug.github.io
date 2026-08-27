@@ -4,6 +4,7 @@ import type { HoroscopeProfile } from './horoscope-profile'
 import {
   buildInterpretationPrompt,
   lunarDayKey,
+  lunarMonthKey,
   parseInterpretationSections,
   profileFingerprint,
   INTERPRETATION_VERSION,
@@ -176,6 +177,52 @@ describe('parseInterpretationSections', () => {
   })
 })
 
+describe('lunarMonthKey — what a reading stays valid for', () => {
+  // The cache and the abuse fuse used to share one key, and it was the day's. Nothing in
+  // a reading is computed from the day — buildCycles takes Đại vận and Lưu niên from the
+  // lunar year and Lưu nguyệt from the year and month — so keying the cache on the day
+  // discarded a good reading every midnight and paid for a fresh one saying the same
+  // thing in different words. Roughly thirty completions a month where one would do.
+  // Takes a SOLAR date and resolves it to a lunar month, so a run of solar days can
+  // straddle a lunar boundary — solar 2026-08-01 is still lunar month 6, 2026-08-02 is
+  // month 7. These fixtures sit inside one lunar month deliberately.
+  // Fixtures computed from the real converter, not guessed: solar 2026-08-01..12 all
+  // resolve to lunar month 6, and 2026-08-13 onward to lunar month 7.
+  it('is the same for every day inside one lunar month', () => {
+    const first = lunarMonthKey({ day: 13, month: 8, year: 2026 })
+    for (const day of [14, 20, 25, 31]) {
+      expect(lunarMonthKey({ day, month: 8, year: 2026 })).toBe(first)
+    }
+  })
+
+  it('changes at the lunar boundary, which is when Lưu nguyệt genuinely changes', () => {
+    expect(lunarMonthKey({ day: 12, month: 8, year: 2026 })).toBe('2026-6')
+    expect(lunarMonthKey({ day: 13, month: 8, year: 2026 })).toBe('2026-7')
+  })
+
+  it('is a lunar month, not the Gregorian one it was handed', () => {
+    // Solar August 2026 spans two lunar months, so a key that merely echoed its input
+    // would pass every other test here and still be wrong.
+    expect(lunarMonthKey({ day: 20, month: 8, year: 2026 })).not.toBe('2026-8')
+  })
+
+  it('changes across years', () => {
+    expect(lunarMonthKey({ day: 5, month: 3, year: 2027 })).not.toBe(
+      lunarMonthKey({ day: 5, month: 3, year: 2026 })
+    )
+  })
+
+  it('stays distinct from the daily fuse key, which must keep resetting daily', () => {
+    // Conflating them again is the regression this guards. The fuse exists so a
+    // birth-hour edit loop cannot bill without limit, and it can only do that job if it
+    // resets every day.
+    const solar = { day: 20, month: 8, year: 2026 }
+    expect(lunarMonthKey(solar)).not.toBe(lunarDayKey(solar))
+    expect(lunarDayKey({ ...solar, day: 21 })).not.toBe(lunarDayKey(solar))
+    expect(lunarMonthKey({ ...solar, day: 21 })).toBe(lunarMonthKey(solar))
+  })
+})
+
 describe('lunarDayKey uniqueness', () => {
   it('never gives two different calendar days the same key, even across a leap month', () => {
     const seen = new Map<string, string>()
@@ -224,16 +271,16 @@ describe('vietnamTodaySolar', () => {
 
 describe('readCachedInterpretation', () => {
   const fingerprint = 'fp'
-  const lunarDay = '2026-7-13'
+  const lunarMonth = '2026-7-13'
   const valid = {
     sections: fullSections,
     profileFingerprint: fingerprint,
-    lunarDay,
+    lunarMonth,
     version: INTERPRETATION_VERSION,
   }
 
   it('returns the stored sections when the fingerprint and lunar day both match', () => {
-    expect(readCachedInterpretation(valid, fingerprint, lunarDay)).toEqual({
+    expect(readCachedInterpretation(valid, fingerprint, lunarMonth)).toEqual({
       sections: fullSections,
       current: true,
     })
@@ -243,14 +290,14 @@ describe('readCachedInterpretation', () => {
     // Returned rather than dropped: the route regenerates it, but falls back to
     // this text if the reader has no generation left today.
     const older = { ...valid, version: INTERPRETATION_VERSION - 1 }
-    expect(readCachedInterpretation(older, fingerprint, lunarDay)?.current).toBe(false)
+    expect(readCachedInterpretation(older, fingerprint, lunarMonth)?.current).toBe(false)
     // A record predating the version field at all counts the same way.
     const { version: _version, ...unversioned } = valid
-    expect(readCachedInterpretation(unversioned, fingerprint, lunarDay)?.current).toBe(false)
+    expect(readCachedInterpretation(unversioned, fingerprint, lunarMonth)?.current).toBe(false)
   })
 
   it('misses when the birth data changed', () => {
-    expect(readCachedInterpretation(valid, 'other', lunarDay)).toBeNull()
+    expect(readCachedInterpretation(valid, 'other', lunarMonth)).toBeNull()
   })
 
   it('misses when the lunar day rolled over', () => {
@@ -258,21 +305,21 @@ describe('readCachedInterpretation', () => {
   })
 
   it('misses on a malformed record instead of handing junk to the UI', () => {
-    expect(readCachedInterpretation(undefined, fingerprint, lunarDay)).toBeNull()
-    expect(readCachedInterpretation({ profileFingerprint: fingerprint, lunarDay }, fingerprint, lunarDay)).toBeNull()
+    expect(readCachedInterpretation(undefined, fingerprint, lunarMonth)).toBeNull()
+    expect(readCachedInterpretation({ profileFingerprint: fingerprint, lunarMonth }, fingerprint, lunarMonth)).toBeNull()
     expect(
       readCachedInterpretation(
-        { sections: { tongQuan: { nested: 1 } }, profileFingerprint: fingerprint, lunarDay },
+        { sections: { tongQuan: { nested: 1 } }, profileFingerprint: fingerprint, lunarMonth },
         fingerprint,
-        lunarDay,
+        lunarMonth,
       ),
     ).toBeNull()
     // A record written under the older, looser shape must also read as a miss.
     expect(
       readCachedInterpretation(
-        { sections: { tongQuan: 'a' }, profileFingerprint: fingerprint, lunarDay },
+        { sections: { tongQuan: 'a' }, profileFingerprint: fingerprint, lunarMonth },
         fingerprint,
-        lunarDay,
+        lunarMonth,
       ),
     ).toBeNull()
   })

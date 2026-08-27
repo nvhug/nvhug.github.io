@@ -101,9 +101,35 @@ export function profileFingerprint(profile: HoroscopeProfile): string {
  * The leap flag is part of the key: without it, day D of leap month N and of
  * regular month N collide and a month-old reading is re-served as fresh.
  */
+/**
+ * Identifies one lunar DAY. This is the abuse brake's unit, not the cache's.
+ *
+ * Keep the two apart: the daily fuse exists so that editing a birth hour in a loop cannot
+ * bill an unbounded number of completions, and it has to reset every day to do that job.
+ * What a reading is still VALID for is a different question entirely — see
+ * `lunarMonthKey`.
+ */
 export function lunarDayKey(todaySolar: SolarDate): string {
   const lunar = solarToLunar(todaySolar)
   return `${lunar.year}-${lunar.month}${lunar.isLeapMonth ? 'n' : ''}-${lunar.day}`
+}
+
+/**
+ * Identifies one lunar MONTH, and is what a cached reading is keyed on.
+ *
+ * Nothing in a reading changes daily. `buildCycles` derives Đại vận and Lưu niên from the
+ * lunar YEAR and Lưu nguyệt from the lunar YEAR and MONTH; no cycle is computed from the
+ * day, and the prompt never mentions today's date. Keying the cache on the day therefore
+ * threw away a perfectly valid reading every midnight and paid for a fresh one that said
+ * the same thing in different words — roughly thirty completions a month where one would
+ * do.
+ *
+ * The month is the real boundary: when Lưu nguyệt rolls over, the reading genuinely
+ * changes, and that is exactly when it should be regenerated.
+ */
+export function lunarMonthKey(todaySolar: SolarDate): string {
+  const lunar = solarToLunar(todaySolar)
+  return `${lunar.year}-${lunar.month}${lunar.isLeapMonth ? 'n' : ''}`
 }
 
 export type InterpretationLang = 'vi' | 'en'
@@ -545,12 +571,15 @@ export function palaceReadingsToList(palaces: Record<string, PalaceReading>) {
 export function readCachedPalaces(
   stored: unknown,
   fingerprint: string,
-  lunarDay: string,
+  lunarMonth: string,
 ): Record<string, PalaceReading> | null {
   if (typeof stored !== 'object' || stored === null) return null
 
   const record = stored as Record<string, unknown>
-  if (record.profileFingerprint !== fingerprint || record.lunarDay !== lunarDay) return null
+  // `lunarMonth`, not `lunarDay`. A record written before this change carries only the old
+  // day field, so it misses once and is replaced by a month-keyed one — a single
+  // regeneration per reader, then stable for the rest of the lunar month.
+  if (record.profileFingerprint !== fingerprint || record.lunarMonth !== lunarMonth) return null
   if (record.version !== PALACE_VERSION) return null
 
   const palaces = parsePalaceReadings({ cung: record.palaces })
@@ -583,7 +612,7 @@ export function vietnamTodaySolar(now: Date): SolarDate {
 export function readCachedInterpretation(
   stored: unknown,
   fingerprint: string,
-  lunarDay: string,
+  lunarMonth: string,
 ): {
   sections: Record<string, ParsedSection>
   /** False for a reading written by an older prompt. Still returned, so a caller
@@ -593,7 +622,9 @@ export function readCachedInterpretation(
   if (typeof stored !== 'object' || stored === null) return null
 
   const record = stored as Record<string, unknown>
-  if (record.profileFingerprint !== fingerprint || record.lunarDay !== lunarDay) return null
+  // See readCachedPalaces: a reading stays valid for the whole lunar month, because
+  // nothing in it is computed from the day.
+  if (record.profileFingerprint !== fingerprint || record.lunarMonth !== lunarMonth) return null
 
   const sections = parseInterpretationSections(record.sections)
   if (!sections) return null

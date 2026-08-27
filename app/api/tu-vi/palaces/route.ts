@@ -7,6 +7,7 @@ import {
   canReadPalaces,
   isUnlimitedTuviRole,
   lunarDayKey,
+  lunarMonthKey,
   PALACE_BATCHES,
   palaceReadingsToList,
   PALACE_VERSION,
@@ -92,9 +93,13 @@ export async function POST(request: Request) {
   }
 
   const fingerprint = profileFingerprint(profile)
+  // Two keys, two jobs — see the note in tu-vi/interpret. The fuse resets daily; the
+  // reading itself holds for the lunar month, because no cycle in it is computed from
+  // the day.
   const lunarDay = lunarDayKey(today)
+  const lunarMonth = lunarMonthKey(today)
 
-  const cached = readCachedPalaces(byLang(profileData.horoscopePalaces)[lang], fingerprint, lunarDay)
+  const cached = readCachedPalaces(byLang(profileData.horoscopePalaces)[lang], fingerprint, lunarMonth)
   if (cached) {
     return NextResponse.json({ palaces: palaceReadingsToList(cached), cached: true })
   }
@@ -286,7 +291,7 @@ export async function POST(request: Request) {
           [lang]: {
             palaces: palaceReadingsToList(palaces),
             version: PALACE_VERSION,
-            lunarDay,
+            lunarMonth,
             profileFingerprint: fingerprint,
             generatedAt: new Date().toISOString(),
           },

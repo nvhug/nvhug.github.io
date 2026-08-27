@@ -94,22 +94,22 @@ describe('parsePalaceReadings', () => {
 
 describe('readCachedPalaces', () => {
   const fingerprint = 'fp'
-  const lunarDay = '2026-7-13'
+  const lunarMonth = '2026-7-13'
   const stored = {
     palaces: [{ ten: 'Thiên Di', sao: [{ ten: 'Phá Quân', y: 'Thích tự do.' }], tongQuan: 'Năng động.' }],
     version: PALACE_VERSION,
     profileFingerprint: fingerprint,
-    lunarDay,
+    lunarMonth,
   }
 
   it('returns the readings when identity and version all match', () => {
-    expect(readCachedPalaces(stored, fingerprint, lunarDay)).toEqual({
+    expect(readCachedPalaces(stored, fingerprint, lunarMonth)).toEqual({
       'thien di': { stars: [{ name: 'Phá Quân', text: 'Thích tự do.' }], summary: 'Năng động.' },
     })
   })
 
   it('misses when the birth data changed', () => {
-    expect(readCachedPalaces(stored, 'other', lunarDay)).toBeNull()
+    expect(readCachedPalaces(stored, 'other', lunarMonth)).toBeNull()
   })
 
   it('misses when the lunar day rolled over', () => {
@@ -117,20 +117,20 @@ describe('readCachedPalaces', () => {
   })
 
   it('misses when an older palace prompt wrote it', () => {
-    expect(readCachedPalaces({ ...stored, version: PALACE_VERSION - 1 }, fingerprint, lunarDay)).toBeNull()
+    expect(readCachedPalaces({ ...stored, version: PALACE_VERSION - 1 }, fingerprint, lunarMonth)).toBeNull()
     const { version: _version, ...unversioned } = stored
-    expect(readCachedPalaces(unversioned, fingerprint, lunarDay)).toBeNull()
+    expect(readCachedPalaces(unversioned, fingerprint, lunarMonth)).toBeNull()
   })
 
   it('treats an empty record as a miss, not as "no reading"', () => {
     // Otherwise the panel is pinned to empty for the rest of the lunar day with
     // no way to ask again.
-    expect(readCachedPalaces({ ...stored, palaces: [] }, fingerprint, lunarDay)).toBeNull()
+    expect(readCachedPalaces({ ...stored, palaces: [] }, fingerprint, lunarMonth)).toBeNull()
   })
 
   it('misses on junk instead of handing it to the UI', () => {
-    expect(readCachedPalaces(undefined, fingerprint, lunarDay)).toBeNull()
-    expect(readCachedPalaces('nope', fingerprint, lunarDay)).toBeNull()
+    expect(readCachedPalaces(undefined, fingerprint, lunarMonth)).toBeNull()
+    expect(readCachedPalaces('nope', fingerprint, lunarMonth)).toBeNull()
   })
 })
 
@@ -204,7 +204,7 @@ describe('palaceReadingsToList', () => {
         {
           palaces: palaceReadingsToList(readings),
           version: PALACE_VERSION,
-          lunarDay: '2026-7-14',
+          lunarMonth: '2026-7-14',
           profileFingerprint: 'fp',
         },
         'fp',

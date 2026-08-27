@@ -7,6 +7,7 @@ import {
   INTERPRETATION_VERSION,
   isUnlimitedTuviRole,
   lunarDayKey,
+  lunarMonthKey,
   type InterpretationLang,
   type ParsedSection,
   missingRequiredSections,
@@ -32,7 +33,7 @@ type StoredInterpretation = {
   /** Which prompt wrote this. A record from an older one is regenerated rather
       than served, so a prompt fix is not silently held back by the cache. */
   version: number
-  lunarDay: string
+  lunarMonth: string
   profileFingerprint: string
   generatedAt: string
 }
@@ -90,12 +91,17 @@ export async function POST(request: Request) {
 
   const fingerprint = profileFingerprint(profile)
   const today = vietnamTodaySolar(new Date())
+  // Two keys, two jobs. The fuse below resets every day, because its job is to stop a
+  // birth-hour edit loop billing without limit. What the reading is still VALID for is a
+  // different question: nothing in it is derived from the day, so it holds for the whole
+  // lunar month. Sharing one key between them threw away a good reading every midnight.
   const lunarDay = lunarDayKey(today)
+  const lunarMonth = lunarMonthKey(today)
 
   const cached = readCachedInterpretation(
     readingsByLang(profileData.horoscopeReading)[lang],
     fingerprint,
-    lunarDay,
+    lunarMonth,
   )
   if (cached?.current) {
     return NextResponse.json({ ...cached, cached: true })
@@ -183,7 +189,7 @@ export async function POST(request: Request) {
       lang
     ],
     fingerprint,
-    lunarDay,
+    lunarMonth,
   )
   if (justCached?.current) {
     await refundSlot()
@@ -332,7 +338,7 @@ export async function POST(request: Request) {
   // data. Serve that one so two simultaneous first views agree, instead of
   // overwriting it with a second, differently-worded reading.
   const existingReadings = readingsByLang(freshData.horoscopeReading)
-  const raced = readCachedInterpretation(existingReadings[lang], fingerprint, lunarDay)
+  const raced = readCachedInterpretation(existingReadings[lang], fingerprint, lunarMonth)
   if (raced?.current) {
     return NextResponse.json({ ...raced, cached: true })
   }
@@ -340,7 +346,7 @@ export async function POST(request: Request) {
   const stored: StoredInterpretation = {
     sections,
     version: INTERPRETATION_VERSION,
-    lunarDay,
+    lunarMonth,
     profileFingerprint: fingerprint,
     generatedAt: new Date().toISOString(),
   }
