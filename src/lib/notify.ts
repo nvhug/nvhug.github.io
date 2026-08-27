@@ -170,7 +170,7 @@ export function buildNotifyEmailHtml(params: { title: string; subtitle?: string;
       </div>
       <div style="padding:24px;">${bodyHtml}</div>
       <div style="padding:14px 24px;background:#fafafa;border-top:1px solid #f0f0f0;">
-        <p style="margin:0;font-size:12px;color:#a1a1aa;">noteviet.vercel.app</p>
+        <p style="margin:0;font-size:12px;color:#a1a1aa;">notez.vn</p>
       </div>
     </div>
   </div>`

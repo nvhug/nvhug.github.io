@@ -41,7 +41,7 @@ function buildHtml(userName: string, userEmail: string, ts: string) {
         </table>
       </div>
       <div style="padding:14px 24px;background:#fafafa;border-top:1px solid #f0f0f0;">
-        <p style="margin:0;font-size:12px;color:#a1a1aa;">Tự động gửi từ noteviet.vercel.app</p>
+        <p style="margin:0;font-size:12px;color:#a1a1aa;">Tự động gửi từ notez.vn</p>
       </div>
     </div>
   </div>`

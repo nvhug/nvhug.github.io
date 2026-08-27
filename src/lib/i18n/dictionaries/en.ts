@@ -98,7 +98,7 @@ export const en: Dictionary = {
     title: 'Privacy Policy',
     lastUpdated: 'Last updated: July 21, 2026',
     overviewTitle: 'Overview',
-    overviewBody: 'Note Viet (noteviet.vercel.app) is a personal blog and notes platform. This policy explains what data is collected when you log in with Facebook or Google, how it is used, and how you can request deletion.',
+    overviewBody: 'Note Viet (notez.vn) is a personal blog and notes platform. This policy explains what data is collected when you log in with Facebook or Google, how it is used, and how you can request deletion.',
     dataCollectTitle: 'Data We Collect',
     dataCollectIntro: 'When you sign in with Facebook or Google, we receive only the basic profile information granted by that provider:',
     dataItems: ['Your name', 'Your email address', 'Your profile picture URL'],

@@ -96,7 +96,7 @@ export const vi = {
     title: 'Chính sách bảo mật',
     lastUpdated: 'Cập nhật lần cuối: 21 Tháng 7, 2026',
     overviewTitle: 'Tổng quan',
-    overviewBody: 'Note Viet (noteviet.vercel.app) là một blog cá nhân và nền tảng ghi chú. Chính sách này giải thích những dữ liệu được thu thập khi bạn đăng nhập bằng Facebook hoặc Google, cách sử dụng chúng, và cách bạn có thể yêu cầu xoá dữ liệu.',
+    overviewBody: 'Note Viet (notez.vn) là một blog cá nhân và nền tảng ghi chú. Chính sách này giải thích những dữ liệu được thu thập khi bạn đăng nhập bằng Facebook hoặc Google, cách sử dụng chúng, và cách bạn có thể yêu cầu xoá dữ liệu.',
     dataCollectTitle: 'Dữ liệu chúng tôi thu thập',
     dataCollectIntro: 'Khi bạn đăng nhập bằng Facebook hoặc Google, chúng tôi chỉ nhận thông tin hồ sơ cơ bản được nhà cung cấp đó cấp quyền:',
     dataItems: ['Tên của bạn', 'Địa chỉ email của bạn', 'URL ảnh đại diện của bạn'],
