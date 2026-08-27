@@ -19,10 +19,13 @@ export const en: Dictionary = {
     },
   },
 
-  // Tip jar. The copy must never promise anything in return — see ADR-017.
+  // Tip jar. The copy must never promise anything in return — see ADR-017. It also
+  // needs no disclaimer saying so: "free for everyone" already means there is
+  // nothing to unlock, and denying it at the moment someone is about to give reads
+  // as a downer. Say what the app is, then ask; don't explain what the gift isn't.
   donate: {
     title: '☕ Support the author',
-    body: 'This app is free for everyone. If you find it useful you can buy me a coffee — entirely voluntary, and it unlocks nothing extra.',
+    body: 'This app is free for everyone. If you find it useful, you can buy me a coffee.',
     confirm: "I've donated 🎉",
     confirming: 'Noting it down...',
     thanks: 'Thank you so much! 🙏',

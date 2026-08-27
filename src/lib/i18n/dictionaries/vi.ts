@@ -17,10 +17,13 @@ export const vi = {
     },
   },
 
-  // Tip jar. The copy must never promise anything in return — see ADR-017.
+  // Tip jar. The copy must never promise anything in return — see ADR-017. It also
+  // needs no disclaimer saying so: "free for everyone" already means there is
+  // nothing to unlock, and denying it at the moment someone is about to give reads
+  // as a downer. Say what the app is, then ask; don't explain what the gift isn't.
   donate: {
     title: '☕ Ủng hộ tác giả',
-    body: 'App miễn phí cho tất cả mọi người. Nếu thấy hữu ích, bạn có thể mời mình một ly cà phê — hoàn toàn tự nguyện, và không mở khoá thêm tính năng nào cả.',
+    body: 'App miễn phí cho tất cả mọi người. Nếu thấy hữu ích, bạn có thể mời mình một ly cà phê.',
     confirm: 'Mình đã ủng hộ 🎉',
     confirming: 'Đang ghi nhận...',
     thanks: 'Cảm ơn bạn rất nhiều! 🙏',
