@@ -571,15 +571,18 @@ export function palaceReadingsToList(palaces: Record<string, PalaceReading>) {
 export function readCachedPalaces(
   stored: unknown,
   fingerprint: string,
-  lunarMonth: string,
 ): Record<string, PalaceReading> | null {
   if (typeof stored !== 'object' || stored === null) return null
 
   const record = stored as Record<string, unknown>
-  // `lunarMonth`, not `lunarDay`. A record written before this change carries only the old
-  // day field, so it misses once and is replaced by a month-keyed one — a single
-  // regeneration per reader, then stable for the rest of the lunar month.
-  if (record.profileFingerprint !== fingerprint || record.lunarMonth !== lunarMonth) return null
+  // No date in the key at all, and that is not an oversight.
+  //
+  // `describePalaces` sends the palace name, its Can Chi, its stars, and Tuần/Triệt/Tràng
+  // Sinh — every one of them a property of the natal chart. It sends no cycle: not Đại
+  // vận, not Lưu niên, not Lưu nguyệt. So what a star means in the palace it landed in is
+  // the same answer next month and next year as it is today. These readings expire only
+  // when the birth data changes (fingerprint) or the prompt does (version).
+  if (record.profileFingerprint !== fingerprint) return null
   if (record.version !== PALACE_VERSION) return null
 
   const palaces = parsePalaceReadings({ cung: record.palaces })
@@ -615,18 +618,29 @@ export function readCachedInterpretation(
   lunarMonth: string,
 ): {
   sections: Record<string, ParsedSection>
-  /** False for a reading written by an older prompt. Still returned, so a caller
-      that cannot generate a replacement can serve this rather than nothing. */
+  /**
+   * False when the reading was written by an older prompt OR for an earlier lunar month.
+   * Either way it is still returned, because a slightly old reading beats none.
+   *
+   * The month case is worth spelling out: of the eleven sections, exactly one — `vanHan` —
+   * interprets the cycles, and even there only its Lưu nguyệt half goes out of date (Đại
+   * vận and Lưu niên turn over yearly). The other ten describe the natal chart, which does
+   * not move. Discarding all eleven to refresh one would be a bad trade, so the caller
+   * serves what it has and offers a refresh.
+   */
   current: boolean
 } | null {
   if (typeof stored !== 'object' || stored === null) return null
 
   const record = stored as Record<string, unknown>
-  // See readCachedPalaces: a reading stays valid for the whole lunar month, because
-  // nothing in it is computed from the day.
-  if (record.profileFingerprint !== fingerprint || record.lunarMonth !== lunarMonth) return null
+  // Fingerprint is the hard gate: a different birth date is a different person's chart and
+  // must never be served. The month is soft — see the note on `current` above.
+  if (record.profileFingerprint !== fingerprint) return null
 
   const sections = parseInterpretationSections(record.sections)
   if (!sections) return null
-  return { sections, current: record.version === INTERPRETATION_VERSION }
+  return {
+    sections,
+    current: record.version === INTERPRETATION_VERSION && record.lunarMonth === lunarMonth,
+  }
 }

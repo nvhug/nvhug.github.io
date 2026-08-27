@@ -286,6 +286,23 @@ describe('readCachedInterpretation', () => {
     })
   })
 
+  it('serves a reading from an earlier lunar month, marked not current', () => {
+    // Not null. Of the eleven sections exactly one — vanHan — interprets the cycles, and
+    // even there only its Lưu nguyệt half ages; the other ten describe the natal chart.
+    // Throwing all eleven away to refresh one would be a bad trade, so the caller shows
+    // what it has and offers a refresh.
+    const lastMonth = { ...valid, lunarMonth: '2026-6' }
+    const hit = readCachedInterpretation(lastMonth, fingerprint, '2026-7')
+    expect(hit?.sections).toEqual(valid.sections)
+    expect(hit?.current).toBe(false)
+  })
+
+  it('still refuses a reading belonging to different birth data', () => {
+    // The month is soft; the fingerprint is not. A different birth date is a different
+    // person's chart and must never be served, however fresh it looks.
+    expect(readCachedInterpretation({ ...valid, lunarMonth: '2026-7' }, 'other', '2026-7')).toBeNull()
+  })
+
   it('marks a reading from an older prompt as not current', () => {
     // Returned rather than dropped: the route regenerates it, but falls back to
     // this text if the reader has no generation left today.
@@ -300,8 +317,12 @@ describe('readCachedInterpretation', () => {
     expect(readCachedInterpretation(valid, 'other', lunarMonth)).toBeNull()
   })
 
-  it('misses when the lunar day rolled over', () => {
-    expect(readCachedInterpretation(valid, fingerprint, '2026-7-14')).toBeNull()
+  it('never returns a bare miss for a date change — only current: false', () => {
+    // Superseded deliberately. This used to assert null on a rolled-over day, which meant
+    // a reader lost eleven sections of prose to refresh the one that had actually aged.
+    const rolled = readCachedInterpretation(valid, fingerprint, '2026-12')
+    expect(rolled).not.toBeNull()
+    expect(rolled?.current).toBe(false)
   })
 
   it('misses on a malformed record instead of handing junk to the UI', () => {

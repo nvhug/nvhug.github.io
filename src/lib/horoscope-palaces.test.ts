@@ -103,34 +103,38 @@ describe('readCachedPalaces', () => {
   }
 
   it('returns the readings when identity and version all match', () => {
-    expect(readCachedPalaces(stored, fingerprint, lunarMonth)).toEqual({
+    expect(readCachedPalaces(stored, fingerprint)).toEqual({
       'thien di': { stars: [{ name: 'Phá Quân', text: 'Thích tự do.' }], summary: 'Năng động.' },
     })
   })
 
   it('misses when the birth data changed', () => {
-    expect(readCachedPalaces(stored, 'other', lunarMonth)).toBeNull()
+    expect(readCachedPalaces(stored, 'other')).toBeNull()
   })
 
-  it('misses when the lunar day rolled over', () => {
-    expect(readCachedPalaces(stored, fingerprint, '2026-7-14')).toBeNull()
+  it('does not expire with time at all', () => {
+    // Palace readings describe the natal chart — the palace, its Can Chi, its stars,
+    // Tuần/Triệt/Tràng Sinh. `describePalaces` sends no cycle, so what a star means in the
+    // palace it landed in is the same answer next month and next year. They expire only on
+    // a birth-data change or a prompt change, both covered below.
+    expect(readCachedPalaces(stored, fingerprint)).not.toBeNull()
   })
 
   it('misses when an older palace prompt wrote it', () => {
-    expect(readCachedPalaces({ ...stored, version: PALACE_VERSION - 1 }, fingerprint, lunarMonth)).toBeNull()
+    expect(readCachedPalaces({ ...stored, version: PALACE_VERSION - 1 }, fingerprint)).toBeNull()
     const { version: _version, ...unversioned } = stored
-    expect(readCachedPalaces(unversioned, fingerprint, lunarMonth)).toBeNull()
+    expect(readCachedPalaces(unversioned, fingerprint)).toBeNull()
   })
 
   it('treats an empty record as a miss, not as "no reading"', () => {
     // Otherwise the panel is pinned to empty for the rest of the lunar day with
     // no way to ask again.
-    expect(readCachedPalaces({ ...stored, palaces: [] }, fingerprint, lunarMonth)).toBeNull()
+    expect(readCachedPalaces({ ...stored, palaces: [] }, fingerprint)).toBeNull()
   })
 
   it('misses on junk instead of handing it to the UI', () => {
-    expect(readCachedPalaces(undefined, fingerprint, lunarMonth)).toBeNull()
-    expect(readCachedPalaces('nope', fingerprint, lunarMonth)).toBeNull()
+    expect(readCachedPalaces(undefined, fingerprint)).toBeNull()
+    expect(readCachedPalaces('nope', fingerprint)).toBeNull()
   })
 })
 
@@ -204,11 +208,9 @@ describe('palaceReadingsToList', () => {
         {
           palaces: palaceReadingsToList(readings),
           version: PALACE_VERSION,
-          lunarMonth: '2026-7-14',
           profileFingerprint: 'fp',
         },
         'fp',
-        '2026-7-14',
       ),
     ).toEqual(readings)
   })
