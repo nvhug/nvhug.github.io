@@ -75,7 +75,8 @@ export function DonateModal({ open, onClose }: Props) {
         <h3 className="text-center text-lg font-bold text-zinc-800 dark:text-white">
           {t('donate.title')}
         </h3>
-        <p className="mt-3 text-center text-sm leading-relaxed text-zinc-600 dark:text-zinc-300">
+        {/* whitespace-pre-line so the \n in donate.body renders as a line break */}
+        <p className="mt-3 text-center text-sm leading-relaxed whitespace-pre-line text-zinc-600 dark:text-zinc-300">
           {t('donate.body')}
         </p>
         <p className="mt-3 text-center text-sm font-semibold text-zinc-800 dark:text-white">
