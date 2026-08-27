@@ -375,6 +375,17 @@ export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note
           <span className="text-zinc-400">(+ cân, gym, lịch)</span>
         </span>
 
+        {/* Tip jar, paired with Analyze. Independent of access — it grants nothing
+            and is never a condition for running the analysis. See ADR-017. */}
+        <button
+          type="button"
+          onClick={() => setShowDonateModal(true)}
+          className="group ml-auto flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700 transition hover:border-amber-300 hover:bg-amber-100 active:scale-[0.98] dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-300 dark:hover:bg-amber-950/50"
+        >
+          <Coffee className="h-3.5 w-3.5 transition-transform group-hover:-rotate-12" />
+          {t('donate.menuLabel')}
+        </button>
+
         <Tooltip open={notEnoughData && showDataHint} onOpenChange={setShowDataHint}>
           <TooltipTrigger
             render={
@@ -386,7 +397,7 @@ export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note
                 disabled={loading || fetching}
                 aria-disabled={notEnoughData}
                 className={cn(
-                  'ml-auto flex items-center gap-1.5 rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-violet-700 disabled:opacity-60',
+                  'flex items-center gap-1.5 rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-violet-700 disabled:opacity-60',
                   notEnoughData && 'cursor-not-allowed opacity-60 hover:bg-violet-600'
                 )}
               >
@@ -404,15 +415,6 @@ export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note
         </div>
       </div>
 
-      {/* Tip jar. Independent of access — it grants nothing. See ADR-017. */}
-      <button
-        type="button"
-        onClick={() => setShowDonateModal(true)}
-        className="group inline-flex w-full items-center justify-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm font-semibold text-amber-700 shadow-sm transition-all hover:border-amber-300 hover:bg-amber-100 hover:shadow active:scale-[0.98] sm:w-auto sm:py-2 sm:text-xs dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-300 dark:hover:bg-amber-950/50"
-      >
-        <Coffee className="h-4 w-4 transition-transform group-hover:-rotate-12" />
-        {t('donate.menuLabel')}
-      </button>
       <DonateModal open={showDonateModal} onClose={() => setShowDonateModal(false)} />
 
       {/* Empty / insufficient notes warning */}

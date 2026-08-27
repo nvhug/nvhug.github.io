@@ -23,7 +23,8 @@ export const vi = {
   // as a downer. Say what the app is, then ask; don't explain what the gift isn't.
   donate: {
     title: '☕ Ủng hộ tác giả',
-    body: 'App miễn phí cho tất cả mọi người. Nếu thấy hữu ích, bạn có thể mời mình một ly cà phê. Xin đa tạ!',
+    body: 'App này được duy trì nhờ sự ủng hộ của bạn. Nếu thấy hữu ích, một khoản donate nhỏ để giúp mình duy trì và phát triển nó. ❤️',
+    signoff: 'Cảm ơn trai xinh gái đẹp! ❤️',
     confirm: 'Mình đã ủng hộ 🎉',
     confirming: 'Đang ghi nhận...',
     thanks: 'Cảm ơn bạn rất nhiều! 🙏',

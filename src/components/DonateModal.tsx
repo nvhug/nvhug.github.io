@@ -78,6 +78,9 @@ export function DonateModal({ open, onClose }: Props) {
         <p className="mt-3 text-center text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
           {t('donate.body')}
         </p>
+        <p className="mt-2 text-center text-sm font-medium text-zinc-600 dark:text-zinc-300">
+          {t('donate.signoff')}
+        </p>
         <div className="mt-5 flex justify-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/dnm.jpg" alt="Donate QR" className="h-44 w-44 rounded-xl object-cover sm:h-56 sm:w-56" />
