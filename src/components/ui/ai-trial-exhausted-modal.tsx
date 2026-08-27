@@ -6,6 +6,7 @@ import { Button } from './button'
 import { UpgradeModal } from '@/components/UpgradeModal'
 import { useUser } from '@/hooks/useUser'
 import { getSupabaseBrowserClient } from '@/lib/supabase-browser'
+import { MONETIZATION_ENABLED } from '@/lib/monetization'
 
 export interface AITrialExhaustedInfo {
   feature: string
@@ -37,6 +38,8 @@ export function AITrialExhaustedModal({ open, info, onClose }: Props) {
     if (!open || !info) return
     notifiedRef.current = false
     setHasPending(false)
+    // Nothing can be bought, so there is no pending request to look up.
+    if (!MONETIZATION_ENABLED) return
 
     async function checkPending() {
       const client = getSupabaseBrowserClient()
@@ -91,7 +94,7 @@ export function AITrialExhaustedModal({ open, info, onClose }: Props) {
                 }
               </div>
               <p className="font-poppins text-sm font-semibold text-zinc-900 dark:text-white">
-                {hasPending ? 'Yêu cầu đang chờ xét duyệt' : 'Đã dùng hết lượt thử'}
+                {hasPending ? 'Yêu cầu đang chờ xét duyệt' : 'Đã dùng hết lượt'}
               </p>
             </div>
             <button
@@ -126,10 +129,15 @@ export function AITrialExhaustedModal({ open, info, onClose }: Props) {
                 Yêu cầu nâng cấp của bạn đang được xem xét ⏳<br />
                 Mình sẽ kích hoạt Pro cho bạn <span className="font-medium text-violet-600">trong vài giờ</span>. Cảm ơn bạn đã ủng hộ! 🙏
               </p>
-            ) : (
+            ) : MONETIZATION_ENABLED ? (
               <p className="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed pt-1">
                 Bạn đã dùng hết {info.limit} lượt thử miễn phí 🎉<br />
                 Mua cho mình <span className="font-medium text-amber-600">một ly cà phê</span> (~30k) để mình tiếp tục duy trì AI cho bạn nhé ☕
+              </p>
+            ) : (
+              <p className="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed pt-1">
+                Bạn đã dùng hết {info.limit} lượt miễn phí của tính năng này 🙏<br />
+                Nếu bạn vẫn cần dùng tiếp, nhắn cho mình một tiếng để mình mở thêm nhé.
               </p>
             )}
           </div>
@@ -143,6 +151,13 @@ export function AITrialExhaustedModal({ open, info, onClose }: Props) {
               >
                 <Clock className="h-4 w-4 mr-1.5" />
                 Đã hiểu, chờ kích hoạt
+              </Button>
+            ) : !MONETIZATION_ENABLED ? (
+              <Button
+                className="flex-1 bg-zinc-800 hover:bg-zinc-900 text-white border-0 dark:bg-zinc-700 dark:hover:bg-zinc-600"
+                onClick={onClose}
+              >
+                Đã hiểu
               </Button>
             ) : (
               <>
@@ -166,7 +181,7 @@ export function AITrialExhaustedModal({ open, info, onClose }: Props) {
         </div>
       </div>
 
-      {!hasPending && (
+      {MONETIZATION_ENABLED && !hasPending && (
         <UpgradeModal
           open={showUpgrade}
           onClose={() => { setShowUpgrade(false); onClose() }}

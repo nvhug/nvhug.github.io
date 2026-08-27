@@ -1,11 +1,16 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { isAIFreeModeEnabled } from './ai-free-mode'
+import { MONETIZATION_ENABLED } from './monetization'
 
 // Free trial limits per feature (~3 months of typical usage):
 //   notes_analyze:     1/week × 12 weeks
 //   food_analyze:      3/day  × 90 days
 //   stock_analyze:     ~3 tickers/month × 3 months
 //   stock_suggestions: ~5/month × 3 months
+//
+// ADDING A NEW AI FEATURE? It must get an entry here, or it will have no quota at
+// all — neither a cost brake today nor a paywall if MONETIZATION_ENABLED is ever
+// switched back on. This table is the checklist; see ADR-017.
 export const AI_TRIAL_LIMITS = {
   notes_analyze: 12,
   food_analyze: 270,
@@ -77,6 +82,13 @@ export async function resolveAIAccess(
     }
   }
 
+  // The bypass exists so someone who has already transferred money isn't locked out
+  // while an admin approves by hand. With monetization off nobody can file a request,
+  // so skip the round-trip entirely.
+  if (!MONETIZATION_ENABLED) {
+    return { allowed: false, used: quota.used, limit: quota.limit, unlimited: false }
+  }
+
   const { data: requests } = await supabase
     .from('upgrade_requests')
     .select('status')
@@ -108,16 +120,30 @@ export async function incrementAITrialUsage(
   }
 }
 
-/** Standard 402 response body when a user's trial is exhausted. */
+/**
+ * HTTP status for an exhausted quota.
+ *
+ * 402 Payment Required only when something can actually be bought. With
+ * monetization off the cap is a plain rate limit, so it answers 429 — nothing is
+ * for sale and the status code should not imply otherwise. Clients accept both.
+ */
+export const QUOTA_EXHAUSTED_STATUS = MONETIZATION_ENABLED ? 402 : 429
+
+/** Standard response body when a user's quota is exhausted. */
 export function trialExhaustedBody(
   feature: AIFeature,
   used: number,
   limit: number,
   lang: 'vi' | 'en' = 'vi',
 ) {
-  const msg =
-    lang === 'en'
+  const msg = MONETIZATION_ENABLED
+    ? lang === 'en'
       ? `Free trial exhausted (${used}/${limit} uses). Please upgrade to Pro to continue using this feature.`
       : `Đã dùng hết ${used}/${limit} lượt dùng thử miễn phí. Vui lòng nâng cấp lên gói Pro để tiếp tục.`
+    : // No "come back later" — this cap is lifetime, not a daily reset, so promising
+      // a refill would be a lie. Nothing is for sale either; an admin grants more.
+      lang === 'en'
+      ? `You've used all ${used}/${limit} free runs for this feature.`
+      : `Bạn đã dùng hết ${used}/${limit} lượt miễn phí của tính năng này.`
   return { error: msg, trialExhausted: true, feature, used, limit }
 }

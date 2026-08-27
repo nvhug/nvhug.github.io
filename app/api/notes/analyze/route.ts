@@ -3,7 +3,7 @@ import { Note } from '@/types'
 import { createSupabaseServerClient } from '@/lib/supabase-server'
 import { DEFAULT_MACRO_TARGETS, getMacroTargets, resolveTargetsByDate } from './macroUtils'
 import type { MacroTargets, MacroTargetRow } from './macroUtils'
-import { checkAITrialQuota, incrementAITrialUsage, trialExhaustedBody } from '@/lib/ai-trial'
+import { checkAITrialQuota, incrementAITrialUsage, trialExhaustedBody, QUOTA_EXHAUSTED_STATUS } from '@/lib/ai-trial'
 import { logAiUsage, normalizeUsage, servedModel } from '@/lib/ai-usage'
 
 export const dynamic = 'force-dynamic'
@@ -531,7 +531,7 @@ export async function POST(request: Request) {
     if (!quota.allowed) {
       return NextResponse.json(
         trialExhaustedBody('notes_analyze', quota.used, quota.limit, activeLang),
-        { status: 402 },
+        { status: QUOTA_EXHAUSTED_STATUS },
       )
     }
   } else {

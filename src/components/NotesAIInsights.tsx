@@ -14,6 +14,7 @@ import { useFeatureAccess } from '@/lib/useFeatureAccess'
 import { getSupabaseBrowserClient } from '@/lib/supabase-browser'
 import { useUserRole } from '@/lib/useUserRole'
 import { AITrialExhaustedModal, type AITrialExhaustedInfo } from '@/components/ui/ai-trial-exhausted-modal'
+import { DonateModal } from '@/components/DonateModal'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 
@@ -244,8 +245,6 @@ export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note
   const [cooldownInfo,     setCooldownInfo]     = useState<string | null>(null)
   const [trialExhausted,   setTrialExhausted]   = useState<AITrialExhaustedInfo | null>(null)
   const [showDonateModal,  setShowDonateModal]  = useState(false)
-  const [donating,         setDonating]         = useState(false)
-  const [donated,          setDonated]          = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -284,33 +283,13 @@ export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note
     : t('notesAIInsights.minNotesHint', { min: MIN_NOTES_REQUIRED, n: totalItems })
 
   function handleAnalyzeClick() {
+    // Missing permission is an admin decision, not a purchase prompt. Donating has
+    // never granted access and must not appear to — see ADR-017.
     if (!canUseAI) {
-      setShowDonateModal(true)
+      setError(t('notesAIInsights.featureDisabled'))
       return
     }
     void analyze()
-  }
-
-  async function handleDonateConfirm() {
-    setDonating(true)
-    let succeeded = false
-    try {
-      const { data: { user } } = await getSupabaseBrowserClient().auth.getUser()
-      const res = await fetch('/api/donate-notify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userName:  user?.user_metadata?.full_name ?? user?.user_metadata?.name ?? '',
-          userEmail: user?.email ?? '',
-          ts: new Date().toLocaleString('vi-VN'),
-        }),
-      })
-      succeeded = res.ok
-    } finally {
-      setDonating(false)
-      setDonated(true)
-      if (succeeded) setTimeout(() => window.location.reload(), 2000)
-    }
   }
 
   async function analyze() {
@@ -335,7 +314,8 @@ export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note
       })
       const data = await res.json()
       if (!res.ok) {
-        if (res.status === 402 && data?.trialExhausted) {
+        // 402 when plans are on sale, 429 when the cap is just a rate limit — see QUOTA_EXHAUSTED_STATUS
+        if ((res.status === 402 || res.status === 429) && data?.trialExhausted) {
           setTrialExhausted({ feature: data.feature, used: data.used, limit: data.limit })
           return
         }
@@ -422,6 +402,16 @@ export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note
         </Tooltip>
         </div>
       </div>
+
+      {/* Tip jar. Independent of access — it grants nothing. See ADR-017. */}
+      <button
+        type="button"
+        onClick={() => setShowDonateModal(true)}
+        className="mt-1 self-start text-xs font-medium text-zinc-400 underline-offset-2 transition hover:text-violet-600 hover:underline"
+      >
+        {t('donate.menuLabel')} ☕
+      </button>
+      <DonateModal open={showDonateModal} onClose={() => setShowDonateModal(false)} />
 
       {/* Empty / insufficient notes warning */}
       {!loading && !fetching && totalItems === 0 && (
@@ -753,59 +743,6 @@ export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note
         </div>
       )}
 
-      {/* Donate modal — shown when user clicks Analyze without permission */}
-      {showDonateModal && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-          onClick={() => { setShowDonateModal(false); setDonated(false) }}
-        >
-          <div
-            className="relative w-full max-w-sm rounded-2xl bg-white p-8 shadow-2xl"
-            onClick={e => e.stopPropagation()}
-          >
-            <button
-              onClick={() => { setShowDonateModal(false); setDonated(false) }}
-              className="absolute right-4 top-4 rounded-full p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
-            >
-              <X className="h-4 w-4" />
-            </button>
-            <h3 className="text-center text-lg font-bold text-zinc-800">
-              {t('notesAIInsights.donateModalTitle')}
-            </h3>
-            <p className="mt-3 text-center text-sm leading-relaxed text-zinc-500">
-              {t('notesAIInsights.donateModalBody')}
-            </p>
-            <div className="mt-5 flex justify-center">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/dnm.jpg" alt="Donate QR" className="h-56 w-56 rounded-xl object-cover" />
-            </div>
-
-            {donated ? (
-              <p className="mt-5 text-center text-base font-semibold text-violet-600">
-                {t('notesAIInsights.donateModalThanks')}
-              </p>
-            ) : (
-              <div className="mt-5 flex gap-3">
-                <button
-                  onClick={() => { setShowDonateModal(false); setDonated(false) }}
-                  className="flex-1 rounded-lg border border-zinc-200 py-2.5 text-sm font-medium text-zinc-500 transition hover:bg-zinc-50"
-                >
-                  {t('notesAIInsights.donateModalClose')}
-                </button>
-                <button
-                  onClick={handleDonateConfirm}
-                  disabled={donating}
-                  className="flex-1 rounded-lg bg-violet-600 py-2.5 text-sm font-medium text-white transition hover:bg-violet-700 disabled:opacity-60"
-                >
-                  {donating
-                    ? t('notesAIInsights.donateModalConfirming')
-                    : t('notesAIInsights.donateModalConfirm')}
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
 
       {/* History */}
       {history.length > 1 && !fetching && (

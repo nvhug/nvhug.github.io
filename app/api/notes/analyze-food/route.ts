@@ -5,7 +5,7 @@ import { requestVisionJSON, requestTextJSON, resolveVisionConfig, visionProvider
 import { ProviderCallError, type ProviderResult } from '@/lib/ai-vision'
 import { logAiUsage, normalizeUsage, servedModel } from '@/lib/ai-usage'
 import { normalizeItemsWithInternalTable } from './nutrition-normalizer'
-import { resolveAIAccess, incrementAITrialUsage, trialExhaustedBody } from '@/lib/ai-trial'
+import { resolveAIAccess, incrementAITrialUsage, trialExhaustedBody, QUOTA_EXHAUSTED_STATUS } from '@/lib/ai-trial'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -243,7 +243,7 @@ export async function POST(request: Request) {
   if (!access.allowed) {
     return NextResponse.json(
       trialExhaustedBody('food_analyze', access.used, access.limit, lang),
-      { status: 402 },
+      { status: QUOTA_EXHAUSTED_STATUS },
     )
   }
 

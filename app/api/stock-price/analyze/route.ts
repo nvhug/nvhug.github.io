@@ -7,7 +7,7 @@ import { fetchGovernanceDisclosures, type GovernanceDisclosures } from './govern
 import { gradeFromOverallScore, overallScoreFromScores } from './scoring'
 import { stockAnalysisSchema } from './schema'
 import { cooldownMetadata } from './cooldown'
-import { checkAITrialQuota, incrementAITrialUsage, trialExhaustedBody } from '@/lib/ai-trial'
+import { checkAITrialQuota, incrementAITrialUsage, trialExhaustedBody, QUOTA_EXHAUSTED_STATUS } from '@/lib/ai-trial'
 import { logAiUsage, normalizeUsage, servedModel } from '@/lib/ai-usage'
 
 export const runtime = 'nodejs'
@@ -168,7 +168,7 @@ export async function POST(request: Request) {
   if (!quota.allowed) {
     return NextResponse.json(
       trialExhaustedBody('stock_analyze', quota.used, quota.limit),
-      { status: 402 },
+      { status: QUOTA_EXHAUSTED_STATUS },
     )
   }
 

@@ -309,7 +309,8 @@ export function FoodPhotoAnalyzer({ date, onAdded, inputMode = 'photo' }: FoodPh
       const payload = await res.json()
       if (!res.ok) {
         stopProgressTicker(0)
-        if (res.status === 402 && payload?.trialExhausted) {
+        // 402 when plans are on sale, 429 when the cap is just a rate limit — see QUOTA_EXHAUSTED_STATUS
+        if ((res.status === 402 || res.status === 429) && payload?.trialExhausted) {
           setTrialExhausted({ feature: payload.feature, used: payload.used, limit: payload.limit })
         } else {
           toast.error(payload?.error || t('foodPhoto.analyzeError'))

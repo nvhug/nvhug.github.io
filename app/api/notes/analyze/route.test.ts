@@ -72,6 +72,7 @@ vi.mock('@/lib/supabase-server', () => ({
 vi.mock('@/lib/ai-trial', () => ({
   checkAITrialQuota: mockCheckAITrialQuota,
   incrementAITrialUsage: mockIncrementAITrialUsage,
+  QUOTA_EXHAUSTED_STATUS: 429, // monetization off — see ADR-017
   trialExhaustedBody: vi.fn((feature: string, used: number, limit: number) => ({
     error: `Trial exhausted (${used}/${limit})`,
     trialExhausted: true,
@@ -142,7 +143,7 @@ describe('POST /api/notes/analyze', () => {
     mockCheckAITrialQuota.mockResolvedValue({ allowed: false, used: 12, limit: 12 })
 
     const response = await POST(makeRequest())
-    expect(response.status).toBe(402)
+    expect(response.status).toBe(429)
     expect(mockIncrementAITrialUsage).not.toHaveBeenCalled()
   })
 })

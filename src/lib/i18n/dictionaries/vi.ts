@@ -17,6 +17,17 @@ export const vi = {
     },
   },
 
+  // Tip jar. The copy must never promise anything in return — see ADR-017.
+  donate: {
+    title: '☕ Ủng hộ tác giả',
+    body: 'App miễn phí cho tất cả mọi người. Nếu thấy hữu ích, bạn có thể mời mình một ly cà phê — hoàn toàn tự nguyện, và không mở khoá thêm tính năng nào cả.',
+    confirm: 'Mình đã ủng hộ 🎉',
+    confirming: 'Đang ghi nhận...',
+    thanks: 'Cảm ơn bạn rất nhiều! 🙏',
+    close: 'Đóng',
+    menuLabel: 'Ủng hộ tác giả',
+  },
+
   header: {
     navHome: 'Trang chủ',
     navBlog: 'Bài viết',
@@ -556,14 +567,9 @@ export const vi = {
     cooldownError: 'Bạn chỉ có thể phân tích 1 lần mỗi tuần. Vui lòng thử lại sau {cooldown}.',
     cooldownHint: 'Dữ liệu của bạn chưa thay đổi nhiều trong tuần này — nhấn phân tích lại sẽ cho kết quả tương tự. Hãy quay lại sau {cooldown} để có góc nhìn mới nhé.',
     analyzeFailed: 'Phân tích thất bại',
+    featureDisabled: 'Tính năng phân tích AI đang tắt cho tài khoản của bạn. Liên hệ admin để được bật nhé.',
     analyzeError: 'Có lỗi khi phân tích. Vui lòng thử lại.',
     minNotesHint: 'Cần ít nhất {min} mục dữ liệu (notes + thói quen) để phân tích — đang có {n}',
-    donateModalTitle: '🤖 AI đang... bận việc riêng',
-    donateModalBody: 'Ủng hộ tác giả một ly ☕ - Để AI có thể tiếp tục giúp bạn!!',
-    donateModalConfirm: 'Đã ủng hộ rồi 🎉',
-    donateModalConfirming: 'Đang ghi nhận...',
-    donateModalThanks: 'Cảm ơn bạn rất nhiều! 🙏',
-    donateModalClose: 'Để sau',
     byMonth: 'Theo tháng',
     byQuarter: 'Theo quý',
     notesCount: '{n} mục dữ liệu',

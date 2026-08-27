@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { MONETIZATION_ENABLED } from '@/lib/monetization'
 
 import {
   Sidebar,
@@ -70,7 +71,10 @@ export function AdminSidebar() {
     { title: t('admin.settings.usersTab'), href: '/admin/settings', icon: Users },
     { title: t('admin.settings.pagesTab'), href: '/admin/settings/pages', icon: Shield },
     { title: t('admin.settings.nutritionTab'), href: '/admin/settings/nutrition-qa', icon: BarChart3 },
-    { title: 'Nâng cấp', href: '/admin/settings/upgrades', icon: CreditCard },
+    // Upgrade review only exists while plans are on sale — see ADR-017.
+    ...(MONETIZATION_ENABLED
+      ? [{ title: 'Nâng cấp', href: '/admin/settings/upgrades', icon: CreditCard }]
+      : []),
     { title: t('admin.settings.aiUsage.tab'), href: '/admin/settings/ai-usage', icon: Coins },
   ]
   const isSettingsActive = pathname.startsWith('/admin/settings')

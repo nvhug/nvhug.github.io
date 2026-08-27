@@ -72,6 +72,7 @@ vi.mock('@/lib/ai-usage', () => ({
 vi.mock('@/lib/ai-trial', () => ({
   resolveAIAccess: vi.fn(async () => ({ allowed: true, used: 0, limit: 270, unlimited: true })),
   incrementAITrialUsage: vi.fn(async () => {}),
+  QUOTA_EXHAUSTED_STATUS: 429, // monetization off — see ADR-017
   trialExhaustedBody: vi.fn((feature: string, used: number, limit: number) => ({
     error: `Trial exhausted (${used}/${limit})`,
     trialExhausted: true,

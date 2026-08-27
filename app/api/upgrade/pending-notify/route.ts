@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase-server'
 import { sendNotifyEmail, sendTeamsCard, escapeHtml } from '@/lib/notify'
+import { MONETIZATION_ENABLED } from '@/lib/monetization'
 
 const TO_EMAIL  = process.env.BUG_REPORT_TO_EMAIL
 const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'Notifications <onboarding@resend.dev>'
@@ -62,6 +63,10 @@ function buildHtml(email: string, feature: string, planId: string) {
 }
 
 export async function POST(request: Request) {
+  // No upgrades exist to be pending. See ADR-017.
+  if (!MONETIZATION_ENABLED) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  }
   if (!TO_EMAIL) return NextResponse.json({ ok: true }) // silently skip if not configured
 
   const supabase = await createSupabaseServerClient()

@@ -2,13 +2,14 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { BookOpen, CircleDollarSign, Home, LogOut, NotebookPen, Quote, Settings, Sparkles, User as UserIcon, type LucideIcon } from 'lucide-react'
+import { BookOpen, CircleDollarSign, Coffee, Home, LogOut, NotebookPen, Quote, Settings, Sparkles, User as UserIcon, type LucideIcon } from 'lucide-react'
 import { Toaster } from 'sonner'
 import { useEffect, useRef, useState } from 'react'
 import { getSupabaseBrowserClient } from '@/lib/supabase-browser'
 import { useLanguage } from '@/lib/i18n/language-context'
 import { LanguageSwitch } from '@/components/LanguageSwitch'
 import { BugReportButton } from '@/components/BugReportButton'
+import { DonateModal } from '@/components/DonateModal'
 import { getAvatarLetter, getAvatarLabel } from '@/lib/avatar'
 import type { User } from '@supabase/supabase-js'
 
@@ -27,6 +28,7 @@ export function AccountMenu({
   const letter = getAvatarLetter(user)
   const label = getAvatarLabel(user)
   const [open, setOpen] = useState(false)
+  const [showDonate, setShowDonate] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -101,6 +103,15 @@ export function AccountMenu({
                 <UserIcon className="h-4 w-4 shrink-0 text-zinc-400" />
                 {t('header.profile')}
               </Link>
+              {/* Tip jar — grants nothing, see ADR-017 */}
+              <button
+                type="button"
+                onClick={() => { setOpen(false); setShowDonate(true) }}
+                className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-zinc-700 transition-colors hover:bg-zinc-50 hover:text-zinc-900"
+              >
+                <Coffee className="h-4 w-4 shrink-0 text-amber-400" />
+                {t('donate.menuLabel')}
+              </button>
 
               <div className="my-1 h-px bg-zinc-100" />
 
@@ -120,6 +131,7 @@ export function AccountMenu({
           </div>
         </div>
       )}
+      <DonateModal open={showDonate} onClose={() => setShowDonate(false)} />
     </div>
   )
 }

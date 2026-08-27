@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { Check, X, CreditCard, Loader2, RefreshCw } from 'lucide-react'
 import { getPlan } from '@/lib/payment-config'
+import { MONETIZATION_ENABLED } from '@/lib/monetization'
 
 interface UpgradeRequest {
   id: string
@@ -31,6 +32,33 @@ const STATUS_LABEL = {
 }
 
 export default function UpgradesPage() {
+  if (!MONETIZATION_ENABLED) return <UpgradesDisabled />
+  return <UpgradesReview />
+}
+
+/**
+ * Shown while the app runs free for everyone. The review screen below is kept
+ * intact so re-enabling is one env var, not a rewrite. See ADR-017.
+ */
+function UpgradesDisabled() {
+  return (
+    <div className="mx-auto max-w-lg px-4 py-16 text-center">
+      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-zinc-100 dark:bg-zinc-800">
+        <CreditCard className="h-5 w-5 text-zinc-400" />
+      </div>
+      <h1 className="mt-4 font-poppins text-lg font-semibold text-zinc-900 dark:text-white">
+        Tính năng nâng cấp đang tắt
+      </h1>
+      <p className="mt-2 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+        App đang chạy miễn phí cho mọi người, ủng hộ không mở khoá thêm tính năng nào.
+        Để bật lại, đặt <code className="rounded bg-zinc-100 px-1.5 py-0.5 text-xs dark:bg-zinc-800">NEXT_PUBLIC_MONETIZATION=on</code>{' '}
+        rồi deploy lại — xem ADR-017 trong docs/DECISIONS.md.
+      </p>
+    </div>
+  )
+}
+
+function UpgradesReview() {
   const [requests, setRequests] = useState<UpgradeRequest[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<'pending' | 'all'>('pending')

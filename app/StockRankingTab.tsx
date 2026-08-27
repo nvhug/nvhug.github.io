@@ -182,7 +182,8 @@ export function RankingTab({ ticker, company, allPoints, historyMax, historyMin,
       })
       const data = await res.json()
       if (!res.ok) {
-        if (res.status === 402 && data?.trialExhausted) {
+        // 402 when plans are on sale, 429 when the cap is just a rate limit — see QUOTA_EXHAUSTED_STATUS
+        if ((res.status === 402 || res.status === 429) && data?.trialExhausted) {
           setTrialExhausted({ feature: data.feature, used: data.used, limit: data.limit })
           return
         }

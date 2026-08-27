@@ -1,6 +1,22 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { checkAITrialQuota, resolveAIAccess } from './ai-trial'
+
+/**
+ * MONETIZATION_ENABLED is read once at module load, so exercising the paid path
+ * means reloading the module under a stubbed env. Tests that don't call this run
+ * with monetization OFF — the shipped default.
+ */
+async function loadWithMonetizationOn() {
+  vi.resetModules()
+  vi.stubEnv('NEXT_PUBLIC_MONETIZATION', 'on')
+  return import('./ai-trial')
+}
+
+afterEach(() => {
+  vi.unstubAllEnvs()
+  vi.resetModules()
+})
 
 type TableResult = { data: unknown; error: unknown }
 
@@ -47,21 +63,33 @@ describe('resolveAIAccess', () => {
     expect(access).toEqual({ allowed: false, used: 270, limit: 270, unlimited: false })
   })
 
-  it('bypasses the block for a first-time pending upgrade request', async () => {
+  it('ignores a pending upgrade request while monetization is off', async () => {
+    // Nothing can be bought, so a leftover pending row must not grant access.
     const supabase = makeSupabase({
       ai_trial_usage: { data: { used_count: 270 }, error: null },
       upgrade_requests: { data: [{ status: 'pending' }], error: null },
     })
     const access = await resolveAIAccess(supabase, 'u1', 'food_analyze', 'user')
+    expect(access.allowed).toBe(false)
+  })
+
+  it('bypasses the block for a first-time pending upgrade request when monetization is on', async () => {
+    const { resolveAIAccess: resolve } = await loadWithMonetizationOn()
+    const supabase = makeSupabase({
+      ai_trial_usage: { data: { used_count: 270 }, error: null },
+      upgrade_requests: { data: [{ status: 'pending' }], error: null },
+    })
+    const access = await resolve(supabase, 'u1', 'food_analyze', 'user')
     expect(access.allowed).toBe(true)
   })
 
   it('keeps the block once a request has been rejected, even if a new one is pending', async () => {
+    const { resolveAIAccess: resolve } = await loadWithMonetizationOn()
     const supabase = makeSupabase({
       ai_trial_usage: { data: { used_count: 270 }, error: null },
       upgrade_requests: { data: [{ status: 'pending' }, { status: 'rejected' }], error: null },
     })
-    const access = await resolveAIAccess(supabase, 'u1', 'food_analyze', 'user')
+    const access = await resolve(supabase, 'u1', 'food_analyze', 'user')
     expect(access.allowed).toBe(false)
   })
 

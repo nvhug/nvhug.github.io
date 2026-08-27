@@ -19,6 +19,17 @@ export const en: Dictionary = {
     },
   },
 
+  // Tip jar. The copy must never promise anything in return — see ADR-017.
+  donate: {
+    title: '☕ Support the author',
+    body: 'This app is free for everyone. If you find it useful you can buy me a coffee — entirely voluntary, and it unlocks nothing extra.',
+    confirm: "I've donated 🎉",
+    confirming: 'Noting it down...',
+    thanks: 'Thank you so much! 🙏',
+    close: 'Close',
+    menuLabel: 'Support the author',
+  },
+
   header: {
     navHome: 'Home',
     navBlog: 'Blog',
@@ -558,14 +569,9 @@ export const en: Dictionary = {
     cooldownError: 'You can only run analysis once per week. Please try again after {cooldown}.',
     cooldownHint: "Your data hasn't changed much this week — analyzing again will give similar results. Come back after {cooldown} for fresh insights.",
     analyzeFailed: 'Analysis failed',
+    featureDisabled: 'AI analysis is turned off for your account. Contact the admin to have it enabled.',
     analyzeError: 'An error occurred during analysis. Please try again.',
     minNotesHint: 'Need at least {min} data items (notes + habits) to analyze — currently {n}',
-    donateModalTitle: '🤖 AI is... off the clock',
-    donateModalBody: "Treat the author to a coffee ☕ and help keep the AI going!",
-    donateModalConfirm: "I've Donated 🎉",
-    donateModalConfirming: 'Noting it down...',
-    donateModalThanks: 'Thank you so much! 🙏',
-    donateModalClose: 'Maybe later',
     byMonth: 'By month',
     byQuarter: 'By quarter',
     notesCount: '{n} items',
