@@ -2,7 +2,7 @@ export const APP_ROLES = ['admin', 'paid', 'user'] as const
 export type AppRole = (typeof APP_ROLES)[number]
 
 // Single source of truth for which route prefixes are gated by role.
-// Keep in sync with the seed rows in sql/phase4_roles_permissions.sql.
+// Keep in sync with the seed rows in sql/47.phase4_roles_permissions.sql.
 export const PROTECTED_PAGES = [
   { key: '/admin' },
   { key: '/admin/settings' },

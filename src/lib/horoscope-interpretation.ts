@@ -63,7 +63,7 @@ export const PALACE_VERSION = 2
 /**
  * How many generations one reader may spend per lunar day, per bucket.
  *
- * Mirrors `v_limit` in sql/tuvi_daily_usage.sql, which is the copy that actually
+ * Mirrors `v_limit` in sql/53.tuvi_daily_usage.sql, which is the copy that actually
  * enforces it — this one exists only so the screen can say how many are left
  * without a round trip the SQL function has no way to answer. A test reads the
  * .sql file and fails if the two ever drift.

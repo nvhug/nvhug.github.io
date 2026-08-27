@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase-server'
 import { logAiUsage, normalizeUsage, servedModel } from '@/lib/ai-usage'
 import { getServiceSupabaseClient } from '@/lib/supabase-admin'
+import { isAIFreeModeEnabled } from '@/lib/ai-free-mode'
 import {
   buildPalacePrompt,
   canReadPalaces,
@@ -117,6 +118,7 @@ export async function POST(request: Request) {
   // Same exemption the sections route makes: the cap is an abuse brake, and an
   // admin or a paying reader is not the account it is aimed at.
   const unlimited = isUnlimitedTuviRole(row?.role as string | null | undefined)
+    || await isAIFreeModeEnabled(supabase)
 
   let claimError: { message: string } | null = null
   let claimed: unknown = null

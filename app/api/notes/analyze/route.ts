@@ -519,9 +519,15 @@ export async function POST(request: Request) {
   const { data: profile } = await supabaseAuth.from('user_profiles').select('role').eq('id', user.id).single()
   const role = profile?.role ?? 'user'
 
+  // Hoisted out of the `if (role === 'user')` block below so the increment
+  // guard near the bottom of this handler can see whether this request was
+  // free (AI Free Mode) rather than re-deriving it from `role` alone.
+  let quotaUnlimited = false
+
   if (role === 'user') {
     // Trial users: check quota instead of page_permissions
     const quota = await checkAITrialQuota(supabaseAuth, user.id, 'notes_analyze', role)
+    quotaUnlimited = quota.unlimited === true
     if (!quota.allowed) {
       return NextResponse.json(
         trialExhaustedBody('notes_analyze', quota.used, quota.limit, activeLang),
@@ -912,8 +918,9 @@ Trả về JSON hợp lệ với đúng cấu trúc sau (không thêm/bỏ field
 
   if (saveErr) console.error('[analyze] DB save failed:', saveErr.message)
 
-  // Increment trial usage counter for non-admin/paid users
-  if (role === 'user') {
+  // Increment trial usage counter for non-admin/paid users — skipped when AI
+  // Free Mode made this request unlimited, so no allowance is consumed.
+  if (role === 'user' && !quotaUnlimited) {
     await incrementAITrialUsage(supabaseAuth, user.id, 'notes_analyze')
   }
 

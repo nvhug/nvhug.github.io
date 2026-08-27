@@ -983,6 +983,11 @@ export const en: Dictionary = {
         featureAiAnalysis: 'AI Analysis (in Notes)',
         updateSuccess: 'Access updated.',
         updateError: 'Could not update access.',
+        freeModeTitle: 'AI Free Mode',
+        freeModeDescription: 'When on, every AI feature is free and unlimited for all users, regardless of role.',
+        freeModeUpdateSuccess: 'AI Free Mode updated.',
+        freeModeUpdateError: 'Could not update AI Free Mode.',
+        freeModeLastChanged: 'Last changed by {name} on {date}',
       },
       nutrition: {
         heading: 'AI Nutrition QA Dashboard',

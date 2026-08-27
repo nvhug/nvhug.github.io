@@ -7,19 +7,31 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { getSupabaseBrowserClient } from '@/lib/supabase-browser'
 import { useLanguage } from '@/lib/i18n/language-context'
+import { getIntlLocale } from '@/lib/i18n/locale'
 import { APP_ROLES, EXTRA_FEATURES, type AppRole } from '@/lib/permissions'
 import type { PagePermission } from '@/types'
+
+interface AiFreeModeRow {
+  enabled: boolean
+  updated_by: string | null
+  updated_at: string | null
+}
 
 // Route-based rows (/admin, /notes, ...) are fixed policy — only non-route
 // feature flags (EXTRA_FEATURES) are togglable here.
 type CellKey = `${string}:${AppRole}`
 
 export default function AdminPageAccessPage() {
-  const { t } = useLanguage()
+  const { t, lang } = useLanguage()
   const pathname = usePathname()
   const [permissions, setPermissions] = useState<Map<CellKey, PagePermission>>(new Map())
   const [loading, setLoading] = useState(true)
   const [busyKey, setBusyKey] = useState<CellKey | null>(null)
+
+  const [freeMode, setFreeMode] = useState<AiFreeModeRow | null>(null)
+  const [freeModeUpdaterName, setFreeModeUpdaterName] = useState<string | null>(null)
+  const [freeModeLoading, setFreeModeLoading] = useState(true)
+  const [freeModeBusy, setFreeModeBusy] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -40,6 +52,66 @@ export default function AdminPageAccessPage() {
     }
     void load()
   }, [])
+
+  useEffect(() => {
+    async function loadFreeMode() {
+      const supabase = getSupabaseBrowserClient()
+      const { data, error } = await supabase
+        .from('ai_free_mode')
+        .select('enabled, updated_by, updated_at')
+        .eq('id', true)
+        .maybeSingle()
+
+      if (error) {
+        console.error('Error fetching AI Free Mode:', error)
+      } else if (data) {
+        const row = data as AiFreeModeRow
+        setFreeMode(row)
+        if (row.updated_by) {
+          const { data: profile } = await supabase
+            .from('user_profiles')
+            .select('email, full_name')
+            .eq('id', row.updated_by)
+            .maybeSingle()
+          setFreeModeUpdaterName((profile?.full_name || profile?.email) ?? null)
+        }
+      }
+      setFreeModeLoading(false)
+    }
+    void loadFreeMode()
+  }, [])
+
+  async function toggleFreeMode() {
+    const nextEnabled = freeMode ? !freeMode.enabled : true
+    setFreeModeBusy(true)
+    try {
+      const supabase = getSupabaseBrowserClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      const nowIso = new Date().toISOString()
+      const { data, error } = await supabase
+        .from('ai_free_mode')
+        .upsert(
+          { id: true, enabled: nextEnabled, updated_by: user?.id ?? null, updated_at: nowIso },
+          { onConflict: 'id' },
+        )
+        .select('enabled, updated_by, updated_at')
+        .single()
+      if (error) throw error
+      setFreeMode(data as AiFreeModeRow)
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('email, full_name')
+        .eq('id', user?.id ?? '')
+        .maybeSingle()
+      setFreeModeUpdaterName((profile?.full_name || profile?.email) ?? null)
+      toast.success(t('admin.settings.pages.freeModeUpdateSuccess'))
+    } catch (err) {
+      console.error('Error updating AI Free Mode:', err)
+      toast.error(t('admin.settings.pages.freeModeUpdateError'))
+    } finally {
+      setFreeModeBusy(false)
+    }
+  }
 
   async function toggle(pageKey: string, role: AppRole) {
     const key: CellKey = `${pageKey}:${role}`
@@ -176,6 +248,47 @@ export default function AdminPageAccessPage() {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+      </div>
+
+      {/* AI Free Mode card — a separate global switch, not part of the per-role matrix above */}
+      <div className="rounded-xl border border-zinc-100 bg-white p-4 shadow-sm">
+        {freeModeLoading ? (
+          <div className="py-2 text-center text-sm text-zinc-400">{t('common.loading')}</div>
+        ) : (
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <div className="text-[13px] font-medium text-zinc-900">
+                {t('admin.settings.pages.freeModeTitle')}
+              </div>
+              <p className="text-xs text-zinc-400">
+                {t('admin.settings.pages.freeModeDescription')}
+              </p>
+              {freeMode?.updated_by && freeMode.updated_at && (
+                <p className="mt-1 text-xs text-zinc-400">
+                  {t('admin.settings.pages.freeModeLastChanged', {
+                    name: freeModeUpdaterName ?? '—',
+                    date: new Intl.DateTimeFormat(getIntlLocale(lang), {
+                      year: 'numeric', month: 'short', day: 'numeric',
+                    }).format(new Date(freeMode.updated_at)),
+                  })}
+                </p>
+              )}
+            </div>
+            <button
+              type="button"
+              disabled={freeModeBusy}
+              aria-pressed={freeMode?.enabled ?? false}
+              onClick={toggleFreeMode}
+              className={`inline-flex h-5 w-5 shrink-0 items-center justify-center rounded border transition-all disabled:cursor-not-allowed ${
+                freeMode?.enabled
+                  ? 'border-emerald-500 bg-emerald-500 text-white shadow-[0_2px_6px_rgba(16,185,129,0.4)]'
+                  : 'border-zinc-300 bg-white text-transparent hover:border-emerald-400'
+              }`}
+            >
+              <Check className="h-3 w-3" />
+            </button>
           </div>
         )}
       </div>

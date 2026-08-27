@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { isAIFreeModeEnabled } from './ai-free-mode'
 
 // Free trial limits per feature (~3 months of typical usage):
 //   notes_analyze:     1/week × 12 weeks
@@ -31,6 +32,10 @@ export async function checkAITrialQuota(
   role: string,
 ): Promise<TrialQuotaResult> {
   if (role === 'admin' || role === 'paid') {
+    return { allowed: true, unlimited: true }
+  }
+
+  if (await isAIFreeModeEnabled(supabase)) {
     return { allowed: true, unlimited: true }
   }
 

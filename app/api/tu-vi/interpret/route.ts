@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase-server'
 import { logAiUsage, normalizeUsage, servedModel } from '@/lib/ai-usage'
 import { getServiceSupabaseClient } from '@/lib/supabase-admin'
+import { isAIFreeModeEnabled } from '@/lib/ai-free-mode'
 import {
   buildInterpretationPrompt,
   INTERPRETATION_VERSION,
@@ -135,6 +136,7 @@ export async function POST(request: Request) {
   // and admins and paying readers are not the account it is aimed at, so they
   // never claim a slot and never spend one.
   const unlimited = isUnlimitedTuviRole(row?.role as string | null | undefined)
+    || await isAIFreeModeEnabled(supabase)
 
   let claimError: { message: string } | null = null
   let claimed: unknown = null
@@ -143,7 +145,7 @@ export async function POST(request: Request) {
     claimError = result.error
     claimed = result.data
     if (claimError) {
-      // The counter is unavailable (sql/tuvi_daily_usage.sql not applied yet).
+      // The counter is unavailable (sql/53.tuvi_daily_usage.sql not applied yet).
       // Fail open rather than taking the feature down, but say so loudly.
       console.error('[tu-vi] generation counter unavailable:', claimError.message)
     } else if (claimed === false) {

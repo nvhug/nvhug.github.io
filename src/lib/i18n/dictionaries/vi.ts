@@ -981,6 +981,11 @@ export const vi = {
         featureAiAnalysis: 'Phân tích AI (trong Notes)',
         updateSuccess: 'Đã cập nhật quyền truy cập.',
         updateError: 'Không thể cập nhật quyền truy cập.',
+        freeModeTitle: 'Chế độ AI miễn phí',
+        freeModeDescription: 'Khi bật, tất cả tính năng AI sẽ miễn phí và không giới hạn cho mọi người dùng, bất kể vai trò.',
+        freeModeUpdateSuccess: 'Đã cập nhật chế độ AI miễn phí.',
+        freeModeUpdateError: 'Không thể cập nhật chế độ AI miễn phí.',
+        freeModeLastChanged: 'Thay đổi lần cuối bởi {name} vào {date}',
       },
       nutrition: {
         heading: 'Dashboard QA Dinh dưỡng AI',

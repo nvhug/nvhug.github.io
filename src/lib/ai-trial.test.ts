@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { resolveAIAccess } from './ai-trial'
+import { checkAITrialQuota, resolveAIAccess } from './ai-trial'
 
 type TableResult = { data: unknown; error: unknown }
 
@@ -63,5 +63,34 @@ describe('resolveAIAccess', () => {
     })
     const access = await resolveAIAccess(supabase, 'u1', 'food_analyze', 'user')
     expect(access.allowed).toBe(false)
+  })
+
+  it('is unlimited for a user role past the trial limit when AI Free Mode is on', async () => {
+    const supabase = makeSupabase({
+      ai_trial_usage: { data: { used_count: 270 }, error: null },
+      ai_free_mode: { data: { enabled: true }, error: null },
+    })
+    const access = await resolveAIAccess(supabase, 'u1', 'food_analyze', 'user')
+    expect(access).toEqual({ allowed: true, used: 0, limit: 270, unlimited: true })
+  })
+})
+
+describe('checkAITrialQuota', () => {
+  it('is unlimited for a user role when AI Free Mode is on, regardless of usage', async () => {
+    const supabase = makeSupabase({
+      ai_trial_usage: { data: { used_count: 270 }, error: null },
+      ai_free_mode: { data: { enabled: true }, error: null },
+    })
+    const quota = await checkAITrialQuota(supabase, 'u1', 'food_analyze', 'user')
+    expect(quota).toEqual({ allowed: true, unlimited: true })
+  })
+
+  it('enforces the trial limit as usual when AI Free Mode is off', async () => {
+    const supabase = makeSupabase({
+      ai_trial_usage: { data: { used_count: 270 }, error: null },
+      ai_free_mode: { data: { enabled: false }, error: null },
+    })
+    const quota = await checkAITrialQuota(supabase, 'u1', 'food_analyze', 'user')
+    expect(quota).toEqual({ allowed: false, used: 270, limit: 270 })
   })
 })
