@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 import { useLanguage } from '@/lib/i18n/language-context'
 import { getSupabaseBrowserClient } from '@/lib/supabase-browser'
@@ -20,8 +21,12 @@ export function DonateModal({ open, onClose }: Props) {
   const { t } = useLanguage()
   const [sending, setSending] = useState(false)
   const [sent, setSent] = useState(false)
-
-  if (!open) return null
+  // Portal to <body>. One mount point lives inside the site header, which uses
+  // backdrop-blur — and backdrop-filter makes an ancestor the containing block for
+  // position:fixed, trapping the overlay inside the header's ~57px box.
+  // The document guard is enough for SSR: `open` is always false on first render,
+  // so this never renders on the server and cannot cause a hydration mismatch.
+  if (!open || typeof document === 'undefined') return null
 
   function close() {
     setSent(false)
@@ -49,11 +54,11 @@ export function DonateModal({ open, onClose }: Props) {
     }
   }
 
-  return (
+  return createPortal(
     // Scroll on the backdrop, not the flex box: centering a panel taller than the
     // viewport clips its top instead of letting it scroll into view.
     <div
-      className="fixed inset-0 z-50 overflow-y-auto bg-black/50 p-4"
+      className="fixed inset-0 z-100 overflow-y-auto bg-black/50 p-4"
       onClick={close}
     >
       <div className="flex min-h-full items-center justify-center">
@@ -101,6 +106,7 @@ export function DonateModal({ open, onClose }: Props) {
         )}
       </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
