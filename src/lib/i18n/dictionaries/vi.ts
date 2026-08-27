@@ -35,9 +35,9 @@ export const vi = {
   header: {
     navHome: 'Trang chủ',
     navBlog: 'Bài viết',
-    navNotes: 'Sổ tay',
+    navNotes: 'Notes',
     navFinance: 'Sổ tài chính',
-    navTuVi: 'Sổ tử vi',
+    navTuVi: 'Tử vi',
     navQuotes: 'Quotes',
     admin: 'Quản trị',
     profile: 'Hồ sơ',

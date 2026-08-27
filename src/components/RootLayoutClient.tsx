@@ -159,10 +159,10 @@ export function RootLayoutClient({ children }: { children: React.ReactNode }) {
 
   const navItems = [
     { href: '/notes', label: t('header.navNotes'), icon: NotebookPen },
-    { href: '/finance', label: t('header.navFinance'), icon: CircleDollarSign },
-    { href: '/tu-vi', label: t('header.navTuVi'), icon: Sparkles },
     { href: '/blog', label: t('header.navBlog'), icon: BookOpen },
     { href: '/quotes', label: t('header.navQuotes'), icon: Quote },
+    { href: '/finance', label: t('header.navFinance'), icon: CircleDollarSign },
+    { href: '/tu-vi', label: t('header.navTuVi'), icon: Sparkles },
   ]
 
   async function handleLogout() {
@@ -194,9 +194,9 @@ export function RootLayoutClient({ children }: { children: React.ReactNode }) {
                         key={item.href}
                         href={item.href}
                         aria-label={item.label}
-                        className={`relative flex h-11 min-w-0 flex-1 touch-manipulation items-center justify-center rounded-lg transition-colors active:bg-emerald-50 ${
+                        className={`relative flex h-11 min-w-0 flex-1 touch-manipulation items-center justify-center transition-colors ${
                           isActive
-                            ? 'text-emerald-700'
+                            ? 'bg-emerald-100 text-emerald-700'
                             : 'text-zinc-500 hover:text-zinc-900'
                         }`}
                       >
