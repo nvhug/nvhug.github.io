@@ -320,6 +320,10 @@ export async function POST(request: Request) {
     '}',
   ].join('\n')
 
+  // Before the call, so a request that straddles a peak boundary is priced at the rate it
+  // was actually billed at.
+  const startedAt = new Date()
+
   let res: Response
   try {
     res = await fetch('https://api.deepseek.com/v1/chat/completions', {
@@ -364,6 +368,7 @@ export async function POST(request: Request) {
       outcome,
       userId: user.id,
       actor: 'user',
+      at: startedAt,
     })
 
   const content = data.choices?.[0]?.message?.content

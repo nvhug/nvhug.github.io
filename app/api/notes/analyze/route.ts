@@ -825,6 +825,10 @@ Trả về JSON hợp lệ với đúng cấu trúc sau (không thêm/bỏ field
   "recommendation": "3 hành động ưu tiên cho kỳ tới, mỗi hành động có con số mục tiêu rõ. Format: '1. ... 2. ... 3. ...'"
 }`
 
+  // Before the call, so a request that crosses a peak boundary is priced at the rate it was
+  // billed at rather than the rate in force when the answer came back.
+  const startedAt = new Date()
+
   const res = await fetch('https://api.deepseek.com/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -856,6 +860,7 @@ Trả về JSON hợp lệ với đúng cấu trúc sau (không thêm/bỏ field
       outcome,
       userId: user!.id,
       actor: 'user',
+      at: startedAt,
     })
 
   if (!res.ok) {

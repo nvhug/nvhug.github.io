@@ -192,6 +192,10 @@ export async function POST(request: Request) {
 
   const prompt = buildInterpretationPrompt(buildReading(profile, today), profile, lang)
 
+  // Before the call. Peak windows begin and end on the hour and the model gets 50 seconds,
+  // so pricing off the response time under-reports a call that straddles a boundary.
+  const startedAt = new Date()
+
   let res: Response
   try {
     res = await fetch('https://api.deepseek.com/v1/chat/completions', {
@@ -269,6 +273,7 @@ export async function POST(request: Request) {
       outcome,
       userId,
       actor: 'user',
+      at: startedAt,
     })
 
   if (!sections) {

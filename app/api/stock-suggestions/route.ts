@@ -267,6 +267,11 @@ Trả về CHỈ JSON hợp lệ (không markdown, không giải thích):
   ]
 }`
 
+  // Before the call. This one matters most of the six: the cron fires at 02:00 UTC, inside
+  // DeepSeek's 01:00-04:00 peak window, so pricing off the response time is the difference
+  // between reporting half the bill and reporting it.
+  const startedAt = new Date()
+
   let aiRes: Response
   try {
     aiRes = await fetch('https://api.deepseek.com/v1/chat/completions', {
@@ -312,6 +317,7 @@ Trả về CHỈ JSON hợp lệ (không markdown, không giải thích):
       outcome,
       userId: isCronCall ? null : callerUserId,
       actor: isCronCall ? 'system' : 'user',
+      at: startedAt,
     })
 
   const content = aiData.choices?.[0]?.message?.content

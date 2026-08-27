@@ -281,9 +281,14 @@ export async function POST(request: Request) {
   // One usage entry per PROVIDER call, not per user action: the image path calls a vision
   // provider and then a text provider, so it records two rows against the same surface and
   // user. Collapsing them would under-report call volume and make per-model cost wrong.
+  // `at` is when the provider call STARTED, not when this runs. The two stages are seconds
+  // apart and DeepSeek's peak windows turn on the hour, so pricing either off the logging
+  // instant can charge it at the wrong rate — and the nutrition stage is recorded well
+  // after it returned, once its output has been validated.
   async function record(
     call: Pick<ProviderResult, 'usage' | 'model' | 'provider'>,
-    outcome: 'success' | 'error'
+    outcome: 'success' | 'error',
+    at: Date
   ) {
     await logAiUsage({
       surface: 'food_analyze',
@@ -293,6 +298,7 @@ export async function POST(request: Request) {
       outcome,
       userId: user!.id,
       actor: 'user',
+      at,
     })
   }
 
@@ -303,23 +309,30 @@ export async function POST(request: Request) {
   // parse is what decides whether the completion we paid for was usable — and a billed
   // completion the app then rejects is the failure FR-005a exists to make visible.
   let nutritionCall: Pick<ProviderResult, 'usage' | 'model' | 'provider'>
+  let nutritionStart = new Date()
+  let stageStart = new Date()
   let focusBox: [number, number, number, number] | null = null
   try {
     if (mode === 'image' && image) {
       // Stage 1: vision model describes the plate. Stage 2: DeepSeek does the nutrition maths.
+      stageStart = new Date()
       const vision = await requestVisionJSON(buildVisionPrompt(lang, description), image)
-      await record(vision, 'success')
+      await record(vision, 'success', stageStart)
       try {
         focusBox = observationSchema.parse(extractJSON(vision.text)).focus_box
       } catch {
         focusBox = null
       }
+      nutritionStart = new Date()
+      stageStart = nutritionStart
       const nutrition = await requestTextJSON(
         buildNutritionPrompt(lang, { observation: vision.text, description })
       )
       nutritionCall = nutrition
       raw = nutrition.text
     } else {
+      nutritionStart = new Date()
+      stageStart = nutritionStart
       const nutrition = await requestTextJSON(buildNutritionPrompt(lang, { description }))
       nutritionCall = nutrition
       raw = nutrition.text
@@ -329,7 +342,7 @@ export async function POST(request: Request) {
     // unusable — record it with its real tokens and cost. Any other error means nothing
     // was generated and there is nothing to cost. Stages that already returned were
     // recorded above: a later stage failing does not make an earlier billed call free.
-    if (err instanceof ProviderCallError) await record(err.result, 'error')
+    if (err instanceof ProviderCallError) await record(err.result, 'error', stageStart)
     console.error('[analyze-food] provider call failed:', err)
     return NextResponse.json({ error: MSG.aiFailed[lang] }, { status: 502 })
   }
@@ -339,11 +352,11 @@ export async function POST(request: Request) {
     result = resultSchema.parse(extractJSON(raw))
   } catch (err) {
     // Billed and unusable — the expensive kind of failure, and the one FR-005a is about.
-    await record(nutritionCall, 'error')
+    await record(nutritionCall, 'error', nutritionStart)
     console.error('[analyze-food] unparsable model output:', err, raw.slice(0, 300))
     return NextResponse.json({ error: MSG.aiFailed[lang] }, { status: 502 })
   }
-  await record(nutritionCall, 'success')
+  await record(nutritionCall, 'success', nutritionStart)
 
   const normalizedItems = normalizeItemsWithInternalTable(result.items)
 

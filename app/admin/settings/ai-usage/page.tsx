@@ -91,6 +91,10 @@ export default function AiUsagePage() {
         p_from: bounds.from,
         p_to: bounds.to,
         p_user: scope?.kind === 'user' ? scope.userId : null,
+        // p_user alone cannot say "the deleted accounts": null already means unscoped, so
+        // sending it for that drill-down would return the global report and label it as one
+        // group's spend. The scope kind is what carries the distinction.
+        p_scope: scope?.kind ?? 'all',
       })
       if (error) throw error
       setReport(data as UsageReport)
@@ -228,10 +232,10 @@ export default function AiUsagePage() {
             ? t('admin.settings.aiUsage.systemActorHint')
             : undefined,
       figures: r,
-      // The system row is not drill-down-able: "what is this person doing" is not a
-      // question about a cron job. The deleted group is, because its history is exactly
-      // what an admin wants after removing an account.
-      onSelect: s.kind === 'system' ? undefined : () => selectScope(s),
+      // Every kind is drill-down-able now that the RPC can express all three. The system
+      // group earns it too: "which feature is the cron spending on" is a real question,
+      // even though "what is this person doing" is not.
+      onSelect: () => selectScope(s),
       selected: scope ? sameScope(scope, s) : false,
     }
   })

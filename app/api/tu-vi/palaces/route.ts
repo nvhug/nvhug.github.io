@@ -148,6 +148,12 @@ export async function POST(request: Request) {
     indexes: readonly number[],
   ): Promise<{ palaces: Record<string, PalaceReading>; refundable: boolean }> {
     let res: Response
+    // Captured before the call, not after it. DeepSeek's peak windows begin and end on the
+    // hour and this route allows the model 50 seconds, so a batch starting at 09:59:40 and
+    // returning at 10:00:30 was billed at the peak rate while being priced off-peak — a
+    // clean 50% under-report. It also keeps the row in the calendar day it belongs to.
+    const startedAt = new Date()
+
     try {
       res = await fetch('https://api.deepseek.com/v1/chat/completions', {
         method: 'POST',
@@ -203,6 +209,7 @@ export async function POST(request: Request) {
           outcome,
           userId,
           actor: 'user',
+          at: startedAt,
         })
 
       const content: string = data.choices?.[0]?.message?.content ?? ''
