@@ -6,28 +6,33 @@ import type { MacroTargets, MacroTargetRow } from './macroUtils'
 import { checkAITrialQuota, incrementAITrialUsage, trialExhaustedBody, QUOTA_EXHAUSTED_STATUS } from '@/lib/ai-trial'
 import { logAiUsage, normalizeUsage, servedModel } from '@/lib/ai-usage'
 
+import { weightProgress } from '@/lib/weight-progress'
+
 export const dynamic = 'force-dynamic'
 
-const CALORIE_TARGET = 2400
-const WEIGHT_START   = 61
-const WEIGHT_TARGET  = 75
+const CALORIE_TARGET = 1800
+// Must stay in step with START_WEIGHT / TARGET_WEIGHT in WeightTracker.tsx:
+// the same goal described twice. Flipped to a loss goal with feature 009 —
+// advising a surplus to a user set up to lose 5kg is worse than saying nothing.
+const WEIGHT_START   = 70
+const WEIGHT_TARGET  = 65
 const ANALYZE_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000
 type Lang = 'vi' | 'en'
 
 function buildUserProfile(lang: Lang, macroTargets: MacroTargets) {
   const profiles: Record<Lang, string> = {
     vi: `- Giới tính: Nam, 34 tuổi
-- Mục tiêu: Tăng cân từ ${WEIGHT_START}kg lên ${WEIGHT_TARGET}kg (lean bulk)
+- Mục tiêu: Giảm cân từ ${WEIGHT_START}kg xuống ${WEIGHT_TARGET}kg
 - Công việc: Văn phòng (ít vận động trong giờ làm)
-- Nhu cầu calo: ${CALORIE_TARGET} kcal/ngày (surplus ~300–400 kcal cho lean bulk)
+- Nhu cầu calo: ${CALORIE_TARGET} kcal/ngày
 - Mục tiêu macro: Protein ${macroTargets.protein}g | Carbs ${macroTargets.carbs}g | Fat ${macroTargets.fat}g mỗi ngày
-- Tốc độ tăng cân mục tiêu: 0.25–0.5 kg/tuần`,
+- Tốc độ giảm cân mục tiêu: 0.25–0.5 kg/tuần`,
     en: `- Gender: Male, 34 years old
-- Goal: Gain weight from ${WEIGHT_START}kg to ${WEIGHT_TARGET}kg (lean bulk)
+- Goal: Lose weight from ${WEIGHT_START}kg to ${WEIGHT_TARGET}kg
 - Job: Office work (sedentary during work hours)
-- Calorie needs: ${CALORIE_TARGET} kcal/day (surplus ~300–400 kcal for lean bulk)
+- Calorie needs: ${CALORIE_TARGET} kcal/day
 - Macro targets: Protein ${macroTargets.protein}g | Carbs ${macroTargets.carbs}g | Fat ${macroTargets.fat}g per day
-- Target weight gain rate: 0.25–0.5 kg/week`,
+- Target weight loss rate: 0.25–0.5 kg/week`,
   }
 
   return profiles[lang]
@@ -150,10 +155,11 @@ function buildWeightSummary(logs: WeightLog[]) {
     1,
     (new Date(latest.date).getTime() - new Date(oldest.date).getTime()) / 86400000
   )
-  const totalGain   = latest.weight - oldest.weight
-  const gainPerWeek = (totalGain / daysDiff) * 7
+  // Loss is positive here, matching the tracker's card (FR-008b).
+  const totalLost   = oldest.weight - latest.weight
+  const lostPerWeek = (totalLost / daysDiff) * 7
   const progressPct = Math.round(
-    ((latest.weight - WEIGHT_START) / (WEIGHT_TARGET - WEIGHT_START)) * 100
+    weightProgress(latest.weight, WEIGHT_START, WEIGHT_TARGET).percent
   )
   // Avoid inflated rate when the span is shorter than one week
   const logsPerWeek = daysDiff >= 7
@@ -179,8 +185,8 @@ function buildWeightSummary(logs: WeightLog[]) {
     latest_weight_kg:  latest.weight,
     first_recorded_kg: oldest.weight,
     date_range:        { from: oldest.date, to: latest.date },
-    total_gain_kg:     parseFloat(totalGain.toFixed(1)),
-    gain_per_week_kg:  parseFloat(gainPerWeek.toFixed(2)),
+    total_lost_kg:     parseFloat(totalLost.toFixed(1)),
+    lost_per_week_kg:  parseFloat(lostPerWeek.toFixed(2)),
     progress_pct:      Math.min(100, Math.max(0, progressPct)),
     total_logs:        logs.length,
     logs_per_week:     logsPerWeek,
@@ -237,7 +243,13 @@ function buildCalorieSummary(foods: DailyFood[], meals: MealRow[], targetRows: M
   const daysHitCarbs   = macroDays.filter(([d]) => macroByDate[d].carbs   >= targetsByDate[d].carbs   * 0.9).length
   const daysHitFat     = macroDays.filter(([d]) => macroByDate[d].fat     >= targetsByDate[d].fat     * 0.9).length
   const totalDeficit   = Math.round(trackedDays * CALORIE_TARGET - totalActual) // >0=thiếu, <0=dư
-  const daysMetTarget  = dailyTotals.filter(c => c >= CALORIE_TARGET).length
+  // A loss goal: a day at or under the target met it. Before the flip this was
+  // `c >= CALORIE_TARGET`, which reported over-eating as on-target. A 90-100%
+  // band was tried first and was worse: it left 100-115% counting as neither
+  // met, under, nor over, so a month at 1950 kcal reported zeroes across all
+  // three. `daysUnder` and `daysOver` below stay as the separate signals they
+  // already were — they are not meant to partition with this one.
+  const daysMetTarget  = dailyTotals.filter(c => c <= CALORIE_TARGET).length
   const daysUnder      = dailyTotals.filter(c => c < CALORIE_TARGET * 0.9).length
   const daysOver       = dailyTotals.filter(c => c > CALORIE_TARGET * 1.15).length
 
@@ -695,7 +707,7 @@ ${goalsSummary ? JSON.stringify(goalsSummary, null, 2) : 'No goals data.'}
 
 FIELD GUIDE:
 [NOTES] total_notes, good_pct/bad_pct, completion_rate_pct, avg_priority(1–5), weekly_breakdown, habits, recent_content_samples.
-[WEIGHT] gain_per_week_kg (target 0.25–0.5), progress_pct (% to 75 kg), weekly_trend, logs_per_week.
+[WEIGHT] lost_per_week_kg (target 0.25–0.5), progress_pct (% to ${WEIGHT_TARGET} kg), weekly_trend, logs_per_week.
 [NUTRITION] total_calorie_deficit_kcal(>0=under), days_under_90pct, meal_completion_by_type, weekly_calorie_trend, dow_avg_calories.
   avg_daily_macros: {protein_g, carbs_g, fat_g} vs avg_macro_targets for macro-logged days. macro_targets is the latest target in the period.
   macro_coverage_pct = % of days with macro data logged. days_hit_protein/carbs/fat_target = days ≥90% of target.
@@ -776,7 +788,7 @@ ${goalsSummary ? JSON.stringify(goalsSummary, null, 2) : 'Chưa có mục tiêu 
 
 HƯỚNG DẪN TRƯỜNG DỮ LIỆU:
 [GHI CHÚ] total_notes, good_pct/bad_pct, completion_rate_pct, avg_priority(1–5), weekly_breakdown, habits, recent_content_samples.
-[CÂN NẶNG] gain_per_week_kg (mục tiêu 0.25–0.5), progress_pct (% đến 75 kg), weekly_trend, logs_per_week.
+[CÂN NẶNG] lost_per_week_kg (mục tiêu 0.25–0.5), progress_pct (% đến ${WEIGHT_TARGET} kg), weekly_trend, logs_per_week.
 [DINH DƯỠNG] total_calorie_deficit_kcal(>0=thiếu), days_under_90pct, meal_completion_by_type, weekly_calorie_trend, dow_avg_calories.
   avg_daily_macros: {protein_g, carbs_g, fat_g} so với avg_macro_targets của các ngày đã ghi macro. macro_targets là target mới nhất trong kỳ.
   macro_coverage_pct = % ngày có ghi macro. days_hit_protein/carbs/fat_target = ngày đạt ≥90% mục tiêu.

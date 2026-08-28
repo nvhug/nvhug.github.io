@@ -1,4 +1,8 @@
-export const DEFAULT_MACRO_TARGETS = { protein: 118, carbs: 375, fat: 73 }
+// A 1800 kcal deficit split, protein-forward to protect muscle while losing:
+// 130*4 + 185*4 + 60*9 = 1800, matching CALORIE_TARGET in ../route.ts and the
+// default in src/lib/useCalorieGoal.ts. Was 118/375/73 = 2629 kcal, a lean-bulk
+// split left behind when the app's goal flipped from gain to loss.
+export const DEFAULT_MACRO_TARGETS = { protein: 130, carbs: 185, fat: 60 }
 
 export type MacroTargets = typeof DEFAULT_MACRO_TARGETS
 

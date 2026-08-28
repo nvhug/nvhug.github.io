@@ -4,7 +4,12 @@ import { useEffect, useState } from 'react'
 import { getSupabaseBrowserClient } from './supabase-browser'
 
 export function useCalorieGoal() {
-  const [goal, setGoal] = useState(2400)
+  // Default only — `user_profiles.daily_calorie_goal` overrides it per account,
+  // and the tracker lets the user edit it. 1800 is the deficit that matches the
+  // app's 70 -> 65 kg goal (5 kg over 2 months is ~0.6 kg/week, ~600 kcal/day
+  // below a sedentary 70 kg maintenance of ~2400) and is exactly what the
+  // default five-meal plan sums to. Was 2400, a lean-bulk surplus.
+  const [goal, setGoal] = useState(1800)
 
   useEffect(() => {
     async function load() {

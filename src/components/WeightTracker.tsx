@@ -7,13 +7,18 @@ import { supabase } from '@/lib/supabase'
 import { WeightLog } from '@/types'
 import { ConfirmModal } from '@/components/ui/confirm-modal'
 import { useLanguage } from '@/lib/i18n/language-context'
+import { weightProgress } from '@/lib/weight-progress'
 import { DatePicker } from '@/components/ui/date-picker'
 import { getIntlLocale } from '@/lib/i18n/locale'
 import type { Lang } from '@/lib/i18n/language-context'
 import { getTodayLocalISODate } from '@/lib/date'
 
-const TARGET_WEIGHT = 75
-const START_WEIGHT = 61
+// A weight-loss goal: START is above TARGET. This was 61 -> 75 (a gain goal)
+// until feature 009, which seeds every new account with a "lose 5kg" starter
+// goal — see docs/DECISIONS.md. Still one pair of constants for every account,
+// which is a known limitation, not a per-user setting.
+const START_WEIGHT = 70
+const TARGET_WEIGHT = 65
 
 function todayDate() {
   return getTodayLocalISODate()
@@ -31,8 +36,11 @@ function WeightChart({ logs }: { logs: WeightLog[] }) {
 
   const sorted = [...logs].sort((a, b) => a.date.localeCompare(b.date)).slice(-30)
   const weights = sorted.map((l) => l.weight)
-  const minW = Math.min(...weights, START_WEIGHT) - 1
-  const maxW = Math.max(...weights, TARGET_WEIGHT) + 1
+  // Both guide lines must be inside the domain regardless of which constant is
+  // the larger — START is now above TARGET (a loss goal), so pinning min to
+  // START and max to TARGET would push one line outside the viewBox.
+  const minW = Math.min(...weights, START_WEIGHT, TARGET_WEIGHT) - 1
+  const maxW = Math.max(...weights, START_WEIGHT, TARGET_WEIGHT) + 1
 
   const W = 600
   const H = 160
@@ -143,9 +151,11 @@ export function WeightTracker() {
       if (error) { toast.error(t('weightTracker.saveFailed')); setSaving(false); return }
       toast.success(t('weightTracker.updated'))
     } else {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { toast.error(t('weightTracker.saveFailed')); setSaving(false); return }
       const { error } = await supabase
         .from('weight_logs')
-        .upsert({ date, weight: w, notes: notes || null }, { onConflict: 'date' })
+        .upsert({ user_id: user.id, date, weight: w, notes: notes || null }, { onConflict: 'user_id,date' })
       if (error) { toast.error(t('weightTracker.saveFailed')); setSaving(false); return }
       toast.success(t('weightTracker.saved'))
     }
@@ -163,11 +173,7 @@ export function WeightTracker() {
   }
 
   const latest = logs[0]
-  const gained = latest ? (latest.weight - START_WEIGHT).toFixed(1) : null
-  const remaining = latest ? (TARGET_WEIGHT - latest.weight).toFixed(1) : null
-  const progressPct = latest
-    ? Math.min(100, ((latest.weight - START_WEIGHT) / (TARGET_WEIGHT - START_WEIGHT)) * 100)
-    : 0
+  const progress = latest ? weightProgress(latest.weight, START_WEIGHT, TARGET_WEIGHT) : null
 
   return (
     <div className="space-y-4">
@@ -180,12 +186,22 @@ export function WeightTracker() {
               <p className="text-3xl font-bold text-zinc-900">{latest.weight} <span className="text-lg font-normal text-zinc-500">kg</span></p>
             </div>
             <div>
-              <p className="text-xs text-zinc-500">{t('weightTracker.gained')}</p>
-              <p className="text-xl font-semibold text-emerald-600">+{gained} kg</p>
+              <p className="text-xs text-zinc-500">
+                {progress!.lost < 0 ? t('weightTracker.gainedBack') : t('weightTracker.lost')}
+              </p>
+              {/* A negative loss is a gain: it gets its own label and colour rather
+                  than "-2.0 kg" under "Lost" in the success colour. */}
+              <p
+                className={`text-xl font-semibold ${
+                  progress!.lost < 0 ? 'text-rose-500' : 'text-emerald-600'
+                }`}
+              >
+                {Math.abs(progress!.lost).toFixed(1)} kg
+              </p>
             </div>
             <div>
               <p className="text-xs text-zinc-500">{t('weightTracker.remaining')}</p>
-              <p className="text-xl font-semibold text-amber-600">{remaining} kg</p>
+              <p className="text-xl font-semibold text-amber-600">{progress!.remaining.toFixed(1)} kg</p>
             </div>
           </div>
           <div className="mt-3">
@@ -196,10 +212,10 @@ export function WeightTracker() {
             <div className="h-2 w-full rounded-full bg-zinc-200">
               <div
                 className="h-2 rounded-full bg-emerald-500 transition-all"
-                style={{ width: `${progressPct}%` }}
+                style={{ width: `${progress!.percent}%` }}
               />
             </div>
-            <p className="mt-1 text-right text-xs text-zinc-500">{progressPct.toFixed(0)}%</p>
+            <p className="mt-1 text-right text-xs text-zinc-500">{progress!.percent.toFixed(0)}%</p>
           </div>
           <WeightChart logs={logs} />
         </div>

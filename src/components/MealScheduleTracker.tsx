@@ -11,20 +11,24 @@ import { DatePicker } from '@/components/ui/date-picker'
 import { TimePicker } from '@/components/ui/time-picker'
 import { getTodayLocalISODate } from '@/lib/date'
 
+// The five-meal starter plan (feature 009, FR-008 / FR-010a). This is the app's
+// default day for ANY date an account has not filled in, so changing it also
+// changes what existing accounts get on future days — accepted deliberately
+// (FR-010b). Time slots and meal order are unchanged.
 const DEFAULT_MEALS_VI = [
-  { time: '07:00', name: 'Bữa sáng', target_calories: 520, foods: ['Cơm trắng: 150g', 'Trứng luộc: 2 quả', 'Sữa nóng: 150ml', 'Mật ong: 1.5 thìa'] },
-  { time: '09:30', name: 'Sáng muộn', target_calories: 380, foods: ['Bánh mì trắng: 2 lát', 'Bơ: 1 thìa', 'Chuối: 1 quả', 'Sữa chua plain: 100g'] },
-  { time: '12:00', name: 'Bữa trưa', target_calories: 680, foods: ['Cơm trắng: 250g', 'Gà nướng: 180g (không da)', 'Cháo gạo nhạt: 150ml', 'Dầu ô liu: 0.5 thìa'] },
-  { time: '15:00', name: 'Chiều', target_calories: 360, foods: ['Bánh mì trắng nướng: 2 lát', 'Bơ: 1 thìa', 'Mật ong pha sữa ấm: 250ml', 'Chuối: 0.5 quả'] },
-  { time: '17:00', name: 'Tối', target_calories: 460, foods: ['Sữa nóng: 300ml', 'Yến mạch: 40g', 'Trứng luộc: 1 quả', 'Mật ong: 1 thìa'] },
+  { time: '07:00', name: 'Bữa sáng', target_calories: 400, foods: ['Trứng: 2 quả', 'Bánh mì nguyên cám: 1 lát', 'Sữa tươi: 1 ly'] },
+  { time: '09:30', name: 'Bữa phụ', target_calories: 180, foods: ['Táo: 1 quả', 'Hạnh nhân: 10 hạt'] },
+  { time: '12:00', name: 'Bữa trưa', target_calories: 550, foods: ['Ức gà nướng: 150g', 'Rau xanh: 100g', 'Cơm gạo lứt: 1 chén'] },
+  { time: '15:00', name: 'Bữa phụ', target_calories: 170, foods: ['Sữa chua không đường: 1 hũ', 'Chuối: 1 quả'] },
+  { time: '17:00', name: 'Bữa tối', target_calories: 500, foods: ['Cá hồi hấp: 200g', 'Rau củ luộc: 100g', 'Cơm gạo lứt: 1 chén'] },
 ]
 
 const DEFAULT_MEALS_EN = [
-  { time: '07:00', name: 'Breakfast', target_calories: 520, foods: ['White rice: 150g', 'Boiled eggs: 2', 'Hot milk: 150ml', 'Honey: 1.5 tsp'] },
-  { time: '09:30', name: 'Mid-morning', target_calories: 380, foods: ['White bread: 2 slices', 'Butter: 1 tbsp', 'Banana: 1', 'Plain yogurt: 100g'] },
-  { time: '12:00', name: 'Lunch', target_calories: 680, foods: ['White rice: 250g', 'Grilled chicken: 180g (skinless)', 'Plain rice porridge: 150ml', 'Olive oil: 0.5 tsp'] },
-  { time: '15:00', name: 'Afternoon', target_calories: 360, foods: ['Toasted white bread: 2 slices', 'Butter: 1 tbsp', 'Honey milk: 250ml', 'Banana: 0.5'] },
-  { time: '17:00', name: 'Dinner', target_calories: 460, foods: ['Hot milk: 300ml', 'Oats: 40g', 'Boiled egg: 1', 'Honey: 1 tsp'] },
+  { time: '07:00', name: 'Breakfast', target_calories: 400, foods: ['Eggs: 2', 'Wholegrain bread: 1 slice', 'Fresh milk: 1 glass'] },
+  { time: '09:30', name: 'Snack', target_calories: 180, foods: ['Apple: 1', 'Almonds: 10'] },
+  { time: '12:00', name: 'Lunch', target_calories: 550, foods: ['Grilled chicken breast: 150g', 'Greens: 100g', 'Brown rice: 1 bowl'] },
+  { time: '15:00', name: 'Snack', target_calories: 170, foods: ['Plain yogurt: 1 cup', 'Banana: 1'] },
+  { time: '17:00', name: 'Dinner', target_calories: 500, foods: ['Steamed salmon: 200g', 'Boiled vegetables: 100g', 'Brown rice: 1 bowl'] },
 ]
 
 type EditForm = {

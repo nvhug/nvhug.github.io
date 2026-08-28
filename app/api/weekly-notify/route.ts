@@ -7,6 +7,11 @@ import {
   buildNotifyEmailHtml,
 } from '@/lib/notify'
 
+// Fallback only. `user_profiles.daily_calorie_goal` is per account, and this
+// email is sent per user, so each recipient's own goal is used when they have
+// set one. Keep the fallback in step with src/lib/useCalorieGoal.ts.
+const CALORIE_TARGET = 1800
+
 export const dynamic = 'force-dynamic'
 
 function vietnamNow() {
@@ -113,7 +118,7 @@ export async function GET(request: Request) {
       { name: '📝 Notes ghi', value: `${s.notesTotal} ghi chú (${s.activeDays}/7 ngày)` },
       { name: '✅ Hoàn thành', value: `${s.notesDone}/${s.notesTotal} notes · ${s.notesTotal > 0 ? Math.round((s.notesDone / s.notesTotal) * 100) : 0}%` },
       { name: '😊 Ngày tốt', value: `${s.notesGood}/${s.notesTotal} ghi chú` },
-      { name: '🔥 Calo trung bình', value: `${s.avgCalo} kcal/ngày (mục tiêu 2400)` },
+      { name: '🔥 Calo trung bình', value: `${s.avgCalo} kcal/ngày (mục tiêu ${profile.calorieGoal ?? CALORIE_TARGET})` },
       { name: '🍽️ Bữa ăn', value: `${s.mealsDone}/${s.mealsTotal} bữa hoàn thành (${s.mealPct}%)` },
       ...(s.latestWeight ? [{ name: '⚖️ Cân nặng', value: `${s.latestWeight} kg` }] : []),
     ]

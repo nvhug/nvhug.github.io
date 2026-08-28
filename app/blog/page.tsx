@@ -13,6 +13,12 @@ async function getPosts(): Promise<Post[]> {
       .from('posts')
       .select('*, post_tags(tags(id, name))')
       .eq('published', true)
+      // No owner filter here on purpose: the blog is private and RLS scopes the
+      // read to the signed-in account (sql/61 removed the anon grant, and
+      // `posts_authenticated_user` is USING (auth.uid() = user_id)). The route
+      // itself is gated in PROTECTED_PAGES, so there is no anonymous caller to
+      // serve. The seeded starter copies are *meant* to show up here — they are
+      // this account's own articles.
       .order('created_at', { ascending: false })
     const rows = (data || []) as PostRow[]
     return rows

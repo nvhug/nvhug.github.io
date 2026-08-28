@@ -9,6 +9,30 @@ export function getTodayLocalISODate(): string {
   return toLocalISODate(new Date())
 }
 
+/**
+ * The calendar day an instant falls on **in Vietnam**, as `YYYY-MM-DD`.
+ *
+ * Unlike `toLocalISODate`, this does not read the process timezone. Server code
+ * runs in UTC on Vercel, where a moment just after midnight in Vietnam still
+ * belongs to the previous UTC day — so any row dated from the process clock
+ * would be a day off for anyone acting late in the evening or early morning.
+ * Use this wherever a date is part of the product's meaning rather than of the
+ * viewer's own locale.
+ */
+export function toVietnamISODate(date: Date): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Ho_Chi_Minh',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date)
+
+  const get = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((part) => part.type === type)?.value ?? ''
+
+  return `${get('year')}-${get('month')}-${get('day')}`
+}
+
 // Year choices for a date picker's quick-jump dropdown: a generous window
 // around `currentYear` (100 back for a birth date, 10 forward for a future
 // plan date), always widened to include `includeYear` so a value outside the

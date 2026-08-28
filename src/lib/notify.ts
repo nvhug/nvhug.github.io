@@ -6,7 +6,12 @@ const TEAMS_WEBHOOK_URL = process.env.TEAMS_WEBHOOK_URL
 const RESEND_API_KEY = process.env.RESEND_API_KEY
 const RESEND_FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'Notifications <onboarding@resend.dev>'
 
-export type NotifyProfile = { role: UserRole; email: string | null }
+export type NotifyProfile = {
+  role: UserRole
+  email: string | null
+  /** The account's own daily calorie goal; null when it has never set one. */
+  calorieGoal: number | null
+}
 
 export function getServiceSupabaseClient() {
   return createClient(
@@ -63,22 +68,27 @@ export async function getProfilesByIds(
 
   const { data, error } = await supabase
     .from('user_profiles')
-    .select('id, role, email')
+    .select('id, role, email, daily_calorie_goal')
     .in('id', uniqueIds)
 
   if (error) {
     console.error('Error fetching profiles for notify:', error)
     return map
   }
-  for (const row of (data ?? []) as { id: string; role: UserRole; email: string | null }[]) {
-    map.set(row.id, { role: row.role, email: row.email })
+  for (const row of (data ?? []) as {
+    id: string
+    role: UserRole
+    email: string | null
+    daily_calorie_goal: number | null
+  }[]) {
+    map.set(row.id, { role: row.role, email: row.email, calorieGoal: row.daily_calorie_goal })
   }
   return map
 }
 
 export function resolveNotifyProfile(userId: string | null, profiles: Map<string, NotifyProfile>): NotifyProfile {
-  if (!userId) return { role: 'admin', email: null }
-  return profiles.get(userId) ?? { role: 'user', email: null }
+  if (!userId) return { role: 'admin', email: null, calorieGoal: null }
+  return profiles.get(userId) ?? { role: 'user', email: null, calorieGoal: null }
 }
 
 // admin -> Teams (existing behavior). paid/user -> email to their own account.
