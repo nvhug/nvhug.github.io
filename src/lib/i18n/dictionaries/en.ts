@@ -987,6 +987,9 @@ export const en: Dictionary = {
         selfRoleHint: 'You cannot change your own role',
         updateSuccess: 'Role updated.',
         updateError: 'Could not update role.',
+        deleteSuccess: 'User deleted.',
+        deleteError: 'Could not delete user.',
+        deleteTitle: 'Delete user',
         empty: 'No users yet.',
       },
       pages: {

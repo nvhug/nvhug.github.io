@@ -985,6 +985,9 @@ export const vi = {
         selfRoleHint: 'Không thể tự thay đổi vai trò của chính mình',
         updateSuccess: 'Đã cập nhật vai trò.',
         updateError: 'Không thể cập nhật vai trò.',
+        deleteSuccess: 'Đã xoá người dùng.',
+        deleteError: 'Không thể xoá người dùng.',
+        deleteTitle: 'Xoá người dùng',
         empty: 'Chưa có người dùng nào.',
       },
       pages: {

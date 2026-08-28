@@ -2,13 +2,15 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { Check, ChevronDown, ChevronLeft, ChevronRight, Users } from 'lucide-react'
+import { Check, ChevronDown, ChevronLeft, ChevronRight, Trash2, Users } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { getSupabaseBrowserClient } from '@/lib/supabase-browser'
 import { useLanguage } from '@/lib/i18n/language-context'
 import { getIntlLocale } from '@/lib/i18n/locale'
 import { APP_ROLES, type AppRole } from '@/lib/permissions'
+import { Button } from '@/components/ui/button'
+import { ConfirmModal } from '@/components/ui/confirm-modal'
 import type { UserProfile } from '@/types'
 
 const PAGE_SIZE = 10
@@ -122,6 +124,8 @@ export default function AdminUsersPage() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [page, setPage] = useState(1)
+  const [deleteTarget, setDeleteTarget] = useState<UserProfile | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -163,6 +167,23 @@ export default function AdminUsersPage() {
     }
   }
 
+  async function confirmDelete() {
+    if (!deleteTarget) return
+    setDeleting(true)
+    try {
+      const res = await fetch(`/api/admin/users/${deleteTarget.id}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error((await res.json()).error)
+      setProfiles((prev) => prev.filter((p) => p.id !== deleteTarget.id))
+      toast.success(t('admin.settings.users.deleteSuccess'))
+      setDeleteTarget(null)
+    } catch (err) {
+      console.error('Error deleting user:', err)
+      toast.error(t('admin.settings.users.deleteError'))
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   const roleLabels: Record<AppRole, string> = {
     admin: t('admin.settings.users.roleAdmin'),
     paid:  t('admin.settings.users.rolePaid'),
@@ -173,6 +194,7 @@ export default function AdminUsersPage() {
   const paged = profiles.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
   return (
+    <>
     <div className="space-y-4">
       {/* Scrolls itself rather than the page: four Vietnamese labels overflow a 375px
           content box, and a body that scrolls sideways is the one thing this page's
@@ -253,6 +275,7 @@ export default function AdminUsersPage() {
                     <th className="px-4 py-2.5">{t('admin.settings.users.colUser')}</th>
                     <th className="px-4 py-2.5">{t('admin.settings.users.colRole')}</th>
                     <th className="hidden px-4 py-2.5 md:table-cell">{t('admin.settings.users.colJoined')}</th>
+                    <th className="px-4 py-2.5" />
                   </tr>
                 </thead>
                 <tbody>
@@ -290,6 +313,18 @@ export default function AdminUsersPage() {
                             day: 'numeric',
                           }).format(new Date(profile.created_at))}
                         </td>
+                        <td className="px-4 py-2.5 text-right">
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            disabled={isSelf || busyId === profile.id}
+                            onClick={() => setDeleteTarget(profile)}
+                            title={t('admin.settings.users.deleteTitle')}
+                            className="text-rose-300 hover:bg-rose-500/15"
+                          >
+                            <Trash2 />
+                          </Button>
+                        </td>
                       </tr>
                     )
                   })}
@@ -310,5 +345,14 @@ export default function AdminUsersPage() {
         )}
       </div>
     </div>
+
+    <ConfirmModal
+      open={!!deleteTarget}
+      itemContent={deleteTarget?.full_name || deleteTarget?.email || undefined}
+      loading={deleting}
+      onConfirm={() => void confirmDelete()}
+      onCancel={() => setDeleteTarget(null)}
+    />
+    </>
   )
 }
