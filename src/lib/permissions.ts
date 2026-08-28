@@ -3,12 +3,14 @@ export type AppRole = (typeof APP_ROLES)[number]
 
 // Single source of truth for which route prefixes are gated by role.
 // Keep in sync with the seed rows in sql/47.phase4_roles_permissions.sql
-// (and sql/61.blog_private.sql for '/blog'). A key listed here without a
-// matching allowed row sends every user to /403.
+// (sql/61.blog_private.sql for '/blog', sql/63.finance_page_permission.sql
+// for '/finance'). A key listed here without a matching allowed row sends
+// every user to /403.
 export const PROTECTED_PAGES = [
   { key: '/admin' },
   { key: '/admin/settings' },
   { key: '/blog' },
+  { key: '/finance' },
   { key: '/notes' },
   { key: '/quotes' },
 ] as const
