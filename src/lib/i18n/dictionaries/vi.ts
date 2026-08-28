@@ -24,7 +24,7 @@ export const vi = {
   donate: {
     title: '☕ Ủng hộ tác giả',
     body: 'App miễn phí cho tất cả mọi người\nNếu thấy hữu ích, một khoản donate nhỏ để giúp mình duy trì và phát triển nó nhé!',
-    signoff: 'Cảm ơn trai xinh gái đẹp!',
+    signoff: 'Cảm ơn bạn!',
     confirm: 'Mình đã ủng hộ 🎉',
     confirming: 'Đang ghi nhận...',
     thanks: 'Cảm ơn bạn rất nhiều! 🙏',
