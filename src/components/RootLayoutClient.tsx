@@ -52,7 +52,7 @@ export function AccountMenu({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-full bg-emerald-500 text-sm font-semibold text-white select-none ring-2 ring-transparent transition-all hover:ring-white hover:ring-offset-1 sm:h-8 sm:w-8"
+        className="flex h-11 w-11 shrink-0 touch-manipulation cursor-pointer items-center justify-center rounded-full bg-emerald-500 text-sm font-semibold text-white select-none ring-2 ring-transparent transition-all hover:ring-white hover:ring-offset-1 active:ring-white active:ring-offset-1 sm:h-8 sm:w-8"
         aria-label={t('header.accountLabel')}
         aria-expanded={open}
       >
@@ -179,7 +179,7 @@ export function RootLayoutClient({ children }: { children: React.ReactNode }) {
               <div className="flex min-w-0 flex-1 items-center gap-1 sm:gap-2">
                 <Link
                   href="/"
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-zinc-700 transition-colors hover:bg-emerald-50 hover:text-emerald-700 sm:h-auto sm:w-auto sm:rounded-none sm:font-poppins sm:text-xl sm:font-semibold sm:tracking-tight sm:text-zinc-900"
+                  className="flex h-11 w-11 shrink-0 touch-manipulation items-center justify-center rounded-lg text-zinc-700 transition-colors hover:bg-emerald-50 hover:text-emerald-700 active:bg-emerald-50 active:text-emerald-700 sm:h-auto sm:w-auto sm:rounded-none sm:font-poppins sm:text-xl sm:font-semibold sm:tracking-tight sm:text-zinc-900"
                   aria-label="Home"
                 >
                   <Home className="h-5 w-5 sm:hidden" />
@@ -197,7 +197,7 @@ export function RootLayoutClient({ children }: { children: React.ReactNode }) {
                         className={`relative flex h-11 min-w-0 flex-1 touch-manipulation items-center justify-center transition-colors ${
                           isActive
                             ? 'bg-emerald-100 text-emerald-700'
-                            : 'text-zinc-500 hover:text-zinc-900'
+                            : 'text-zinc-500 hover:text-zinc-900 active:bg-emerald-50 active:text-zinc-900'
                         }`}
                       >
                         <item.icon className={`h-5 w-5 shrink-0 ${isActive ? 'text-emerald-600' : 'text-zinc-400'}`} />
@@ -249,7 +249,7 @@ export function RootLayoutClient({ children }: { children: React.ReactNode }) {
                   <button
                     type="button"
                     onClick={handleLogout}
-                    className="ml-1 flex h-10 w-10 items-center justify-center rounded-lg text-zinc-500 transition-colors hover:bg-emerald-50 hover:text-zinc-900 sm:h-auto sm:w-auto sm:p-1.5"
+                    className="ml-1 flex h-11 w-11 touch-manipulation items-center justify-center rounded-lg text-zinc-500 transition-colors hover:bg-emerald-50 hover:text-zinc-900 active:bg-emerald-50 active:text-zinc-900 sm:h-auto sm:w-auto sm:p-1.5"
                     aria-label={t('header.logout')}
                   >
                     <LogOut className="h-4 w-4" />
