@@ -46,7 +46,7 @@ export const vi = {
   },
 
   footer: {
-    copyright: '© 2026 Notez. Những điều đáng để ghi lại.',
+    copyright: '© 2026 Notez. Không gian riêng cho mọi điều bạn quan tâm.',
   },
 
   home: {

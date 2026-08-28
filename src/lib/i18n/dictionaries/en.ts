@@ -48,7 +48,7 @@ export const en: Dictionary = {
   },
 
   footer: {
-    copyright: '© 2026 Notez. Everything Worth Noting.',
+    copyright: '© 2026 Notez. A private space for everything you care about.',
   },
 
   home: {
