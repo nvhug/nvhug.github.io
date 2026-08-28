@@ -5,6 +5,7 @@ import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } fr
 import { toast } from 'sonner'
 
 import { supabase } from '@/lib/supabase'
+import { useRequireAuth } from '@/hooks/useRequireAuth'
 import { useCalorieGoal } from '@/lib/useCalorieGoal'
 import { Note, Todo, Goal, GoalItem, BuyPick } from '@/types'
 import { ConfirmModal } from '@/components/ui/confirm-modal'
@@ -84,6 +85,7 @@ const autoTextareaClass =
 
 export default function NotesPage() {
   const { t, lang } = useLanguage()
+  const { user, loading: authLoading } = useRequireAuth()
   const currentTab = useSyncExternalStore(
     subscribeToTabHash,
     getTabFromHash,
@@ -584,6 +586,14 @@ export default function NotesPage() {
       setNotes((prev) => prev.map((n) => (n.id === note.id ? { ...n, completion_percentage: note.completion_percentage } : n)))
       toast.error(t('notes.toasts.updateError'))
     }
+  }
+
+  if (authLoading || !user) {
+    return (
+      <main className="notes-page flex min-h-svh items-center justify-center px-4 pt-24 text-zinc-900 sm:pt-28">
+        <p className="text-sm text-zinc-500">{t('common.loading')}</p>
+      </main>
+    )
   }
 
   return (
