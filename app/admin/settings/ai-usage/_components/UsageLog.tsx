@@ -82,7 +82,10 @@ export function UsageLog({
                     <td className="sticky left-0 bg-white px-3 py-2 text-xs tabular-nums text-zinc-500">
                       {formatDateTime(row.created_at, lang)}
                     </td>
-                    <td className="max-w-[10rem] truncate px-3 py-2 text-xs text-zinc-600">
+                    {/* Wider than the model column and carrying a title: the label is
+                        "name - email" now, and a truncated one that hides the email is
+                        exactly the half an admin came here to read. */}
+                    <td className="max-w-[18rem] truncate px-3 py-2 text-xs text-zinc-600" title={userLabel(row)}>
                       {userLabel(row)}
                     </td>
                     <td className="px-3 py-2 text-xs text-zinc-600">

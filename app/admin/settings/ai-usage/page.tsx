@@ -12,7 +12,7 @@ import { UsageTiles } from './_components/UsageTiles'
 import { UsageTrend } from './_components/UsageTrend'
 import { UsageBreakdown, type BreakdownRow } from './_components/UsageBreakdown'
 import { LOG_PAGE_SIZE, UsageLog } from './_components/UsageLog'
-import { formatTokens } from './_lib/format'
+import { formatTokens, formatUserIdentity } from './_lib/format'
 import {
   actorScopeOf,
   EMPTY_SUMMARY,
@@ -68,7 +68,7 @@ export default function AiUsagePage() {
   const [days, setDays] = useState<PeriodDays>(30)
   const [scope, setScope] = useState<ActorScope | null>(null)
   const [report, setReport] = useState<UsageReport | null>(null)
-  const [names, setNames] = useState<Record<string, string>>({})
+  const [profiles, setProfiles] = useState<Record<string, { fullName: string | null; email: string | null }>>({})
   const [logRows, setLogRows] = useState<LogRow[]>([])
   const [logTotal, setLogTotal] = useState(0)
   const [logPage, setLogPage] = useState(1)
@@ -159,18 +159,27 @@ export default function AiUsagePage() {
         .from('user_profiles')
         .select('id, full_name, email')
         .in('id', ids)
-      const next: Record<string, string> = {}
-      for (const p of data ?? []) next[p.id as string] = (p.full_name as string) || (p.email as string)
-      setNames(next)
+      const next: Record<string, { fullName: string | null; email: string | null }> = {}
+      for (const p of data ?? []) {
+        next[p.id as string] = { fullName: p.full_name as string | null, email: p.email as string | null }
+      }
+      setProfiles(next)
     })()
   }, [report])
 
-  function labelForScope(s: ActorScope): string {
+  /**
+   * `full` spells the account out as "name - email". The raw log gets it, because a row
+   * there is evidence about one specific account; the breakdown and the filter chip keep
+   * the short form, where the email would crowd out the figures beside it.
+   */
+  function labelForScope(s: ActorScope, full = false): string {
     if (s.kind === 'deleted') return t('admin.settings.aiUsage.deletedUser')
     if (s.kind === 'system') return t('admin.settings.aiUsage.systemActor')
+    const p = profiles[s.userId]
+    const label = p ? (full ? formatUserIdentity(p.fullName, p.email) : p.fullName || p.email) : null
     // A missing profile is a data inconsistency, NOT a deleted account — those are
     // different states and must not share a label.
-    return names[s.userId] ?? `${t('admin.settings.aiUsage.unknownUser')} (${s.userId.slice(0, 8)})`
+    return label || `${t('admin.settings.aiUsage.unknownUser')} (${s.userId.slice(0, 8)})`
   }
 
   /** Every re-fetch the user triggers dims the current figures instead of clearing them. */
@@ -402,7 +411,7 @@ export default function AiUsagePage() {
             onPage={setLogPage}
             error={logError}
             onRetry={() => void loadLog()}
-            userLabel={(row) => labelForScope(actorScopeOf(row))}
+            userLabel={(row) => labelForScope(actorScopeOf(row), true)}
             surfaceLabel={(s) => SURFACE_LABELS[s] ?? s}
             emptyText={t('admin.settings.aiUsage.emptyPeriod', { period: periodLabel })}
           />

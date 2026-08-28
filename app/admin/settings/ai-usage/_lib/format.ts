@@ -53,6 +53,17 @@ export function formatDateTime(iso: string, locale: string): string {
   })
 }
 
+/**
+ * Who a log row belongs to: "Trọng Nghĩa Nguyễn - nvhug001@gmail.com".
+ *
+ * Both halves when both exist, because two accounts can share a display name and only the
+ * email tells them apart. Whichever half is present when the other is not — never a
+ * dangling separator, and never an email guessed from a name.
+ */
+export function formatUserIdentity(fullName: string | null, email: string | null): string {
+  return [fullName, email].map((v) => v?.trim()).filter(Boolean).join(' - ')
+}
+
 /** A row's share of a total, guarding the empty-period divide-by-zero. */
 export function share(value: number, total: number): number {
   return total > 0 ? value / total : 0

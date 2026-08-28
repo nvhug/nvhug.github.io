@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { formatDayShort, formatPercent, formatTokens, formatVnd, isLowerBound, share } from './format'
+import {
+  formatDayShort,
+  formatPercent,
+  formatTokens,
+  formatUserIdentity,
+  formatVnd,
+  isLowerBound,
+  share,
+} from './format'
 import { actorScopeOf, EMPTY_SUMMARY, sameScope, totalTokens } from './types'
 
 describe('formatTokens', () => {
@@ -24,6 +32,24 @@ describe('formatVnd', () => {
 
   it('renders a sub-dong cost as zero, which is why VND is aggregate-only', () => {
     expect(formatVnd(0.0000021)).toBe('0 ₫')
+  })
+})
+
+describe('formatUserIdentity', () => {
+  it('joins both halves when both exist', () => {
+    expect(formatUserIdentity('Trọng Nghĩa Nguyễn', 'nvhug001@gmail.com')).toBe(
+      'Trọng Nghĩa Nguyễn - nvhug001@gmail.com'
+    )
+  })
+
+  it('falls back to whichever half is present, with no dangling separator', () => {
+    expect(formatUserIdentity('Trọng Nghĩa Nguyễn', null)).toBe('Trọng Nghĩa Nguyễn')
+    expect(formatUserIdentity(null, 'nvhug001@gmail.com')).toBe('nvhug001@gmail.com')
+    expect(formatUserIdentity('  ', 'nvhug001@gmail.com')).toBe('nvhug001@gmail.com')
+  })
+
+  it('is empty when the profile carries neither, so the caller can show its unknown label', () => {
+    expect(formatUserIdentity(null, null)).toBe('')
   })
 })
 
