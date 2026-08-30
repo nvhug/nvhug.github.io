@@ -176,7 +176,7 @@ export const vi = {
     heading: 'Tạo tài khoản',
     submit: 'Đăng ký',
     loading: 'Đang đăng ký...',
-    success: 'Đăng ký thành công! Bạn có thể đăng nhập ngay.',
+    success: 'Đăng ký thành công! Vui lòng kiểm tra email để xác nhận tài khoản trước khi đăng nhập.',
     errorEmail: 'Email không hợp lệ.',
     errorPassword: 'Mật khẩu tối thiểu 6 ký tự.',
     errorConfirm: 'Mật khẩu nhập lại không khớp.',

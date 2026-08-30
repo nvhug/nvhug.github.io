@@ -178,7 +178,7 @@ export const en: Dictionary = {
     heading: 'Create account',
     submit: 'Sign up',
     loading: 'Signing up...',
-    success: 'Account created! You can now sign in.',
+    success: 'Account created! Please check your email to confirm your account before signing in.',
     errorEmail: 'Invalid email address.',
     errorPassword: 'Password must be at least 6 characters.',
     errorConfirm: 'Passwords do not match.',
