@@ -13,9 +13,13 @@ function serviceClient() {
 
 // user_id FKs on these tables lack ON DELETE CASCADE (see sql/62.fix_user_owned_tables_cascade_delete.sql),
 // so auth.admin.deleteUser() 500s with a foreign key violation unless their rows are cleared first.
+// posts/tags belong here too: seedCopiedContent (src/lib/seed-account.ts) writes a copy of the
+// starter articles into both for every new signup, and neither has ON DELETE CASCADE (sql/17.blog.sql)
+// — post_tags/comments/likes cascade from posts/tags themselves, so clearing these two is enough.
 const OWNED_TABLES = [
   'notes', 'todos', 'goals', 'goal_items', 'meals', 'daily_foods',
   'weight_logs', 'quotes', 'ai_analysis_history', 'buy_picks',
+  'posts', 'tags',
 ] as const
 
 async function requireAdmin() {
