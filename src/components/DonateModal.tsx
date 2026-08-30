@@ -4,7 +4,6 @@ import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 import { useLanguage } from '@/lib/i18n/language-context'
-import { getSupabaseBrowserClient } from '@/lib/supabase-browser'
 
 interface Props {
   open: boolean
@@ -36,13 +35,10 @@ export function DonateModal({ open, onClose }: Props) {
   async function handleConfirm() {
     setSending(true)
     try {
-      const { data: { user } } = await getSupabaseBrowserClient().auth.getUser()
       await fetch('/api/donate-notify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          userName:  user?.user_metadata?.full_name ?? user?.user_metadata?.name ?? '',
-          userEmail: user?.email ?? '',
           ts: new Date().toLocaleString('vi-VN'),
         }),
       })

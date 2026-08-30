@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Resend } from 'resend'
-import { sendTeamsCard } from '@/lib/notify'
+import { escapeHtml, sendTeamsCard } from '@/lib/notify'
 import { createSupabaseServerClient } from '@/lib/supabase-server'
 
 const RESEND_API_KEY    = process.env.RESEND_API_KEY
@@ -8,8 +8,10 @@ const TO_EMAIL          = process.env.BUG_REPORT_TO_EMAIL
 const FROM_EMAIL        = process.env.RESEND_FROM_EMAIL || 'Donate <onboarding@resend.dev>'
 
 function buildHtml(userName: string, userEmail: string, ts: string) {
-  const sender = userEmail
-    ? `${userName ? `<b>${userName}</b> — ` : ''}<a href="mailto:${userEmail}" style="color:#7c3aed;">${userEmail}</a>`
+  const safeName = escapeHtml(userName)
+  const safeEmail = escapeHtml(userEmail)
+  const sender = safeEmail
+    ? `${safeName ? `<b>${safeName}</b> — ` : ''}<a href="mailto:${safeEmail}" style="color:#7c3aed;">${safeEmail}</a>`
     : 'Khách (chưa đăng nhập)'
 
   return `
@@ -58,11 +60,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const { userName = '', userEmail = '', ts = '' } = await request.json().catch(() => ({})) as {
-    userName?: string
-    userEmail?: string
-    ts?: string
-  }
+  const { ts = '' } = await request.json().catch(() => ({})) as { ts?: string }
+
+  // Sourced from the verified session, not the request body — the caller
+  // could otherwise put arbitrary text (including a spoofed name/email) into
+  // the email sent to the operator.
+  const userName = user.user_metadata?.full_name ?? user.user_metadata?.name ?? ''
+  const userEmail = user.email ?? ''
 
   const resend = new Resend(RESEND_API_KEY)
   const { error } = await resend.emails.send({

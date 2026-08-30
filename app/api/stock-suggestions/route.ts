@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 import { logAiUsage, normalizeUsage, servedModel } from '@/lib/ai-usage'
+import { createSupabaseServerClient } from '@/lib/supabase-server'
 
 const suggestedTickerSchema = z.object({
   ticker: z.string().min(1),
@@ -125,6 +126,10 @@ function adminClient() {
 
 // GET: return latest cached suggestions
 export async function GET() {
+  const authed = await createSupabaseServerClient()
+  const { data: { user } } = await authed.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
   const supabase = adminClient()
   const { data, error } = await supabase
     .from('stock_suggestions_cache')
