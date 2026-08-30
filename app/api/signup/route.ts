@@ -57,15 +57,24 @@ export async function POST(request: Request) {
   // Sent through Resend with our own template, like every other transactional
   // mail in the app (see donate-notify, report-bug) rather than Supabase's
   // built-in sender.
+  const safeActionLink = escapeHtml(actionLink)
   const sent = await sendNotifyEmail(
     email.trim(),
-    'Xác nhận tài khoản của bạn',
+    'Xác nhận tài khoản Notez của bạn',
     buildNotifyEmailHtml({
       title: 'Xác nhận email',
       subtitle: 'Chỉ còn một bước nữa thôi',
       bodyHtml: `
-        <p style="margin:0 0 16px;font-size:14px;color:#3f3f46;">Nhấn nút bên dưới để xác nhận email và kích hoạt tài khoản.</p>
-        <a href="${escapeHtml(actionLink)}" style="display:inline-block;background:#059669;color:#fff;padding:10px 20px;border-radius:8px;text-decoration:none;font-size:14px;font-weight:600;">Xác nhận email</a>
+        <p style="margin:0 0 8px;font-size:15px;color:#18181b;">Chào mừng bạn đến với <strong>Notez</strong>! 👋</p>
+        <p style="margin:0 0 24px;font-size:14px;line-height:1.6;color:#52525b;">Nhấn nút bên dưới để xác nhận địa chỉ email này và kích hoạt tài khoản của bạn.</p>
+        <div style="text-align:center;margin:0 0 24px;">
+          <a href="${safeActionLink}" style="display:inline-block;background:#059669;color:#fff;padding:12px 32px;border-radius:10px;text-decoration:none;font-size:15px;font-weight:600;box-shadow:0 2px 4px rgba(5,150,105,0.25);">Xác nhận email</a>
+        </div>
+        <p style="margin:0 0 6px;font-size:12px;color:#a1a1aa;">Nếu nút phía trên không hoạt động, hãy copy đường dẫn sau vào trình duyệt:</p>
+        <p style="margin:0 0 24px;font-size:12px;color:#7c7c85;word-break:break-all;"><a href="${safeActionLink}" style="color:#059669;">${safeActionLink}</a></p>
+        <div style="border-top:1px solid #f0f0f0;padding-top:16px;">
+          <p style="margin:0;font-size:12px;color:#a1a1aa;">Đường dẫn này sẽ hết hạn sau 1 giờ. Nếu bạn không tạo tài khoản này, bạn có thể bỏ qua email này một cách an toàn.</p>
+        </div>
       `,
     })
   )
