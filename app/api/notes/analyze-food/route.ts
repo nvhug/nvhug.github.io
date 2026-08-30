@@ -378,7 +378,7 @@ export async function POST(request: Request) {
 
   // Increment trial usage counter (no-op for admin/paid since quota check returned unlimited)
   if (!access.unlimited) {
-    await incrementAITrialUsage(supabase, user.id, 'food_analyze')
+    await incrementAITrialUsage(supabase, 'food_analyze')
   }
 
   return NextResponse.json({

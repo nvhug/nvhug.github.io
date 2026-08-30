@@ -136,7 +136,7 @@ describe('POST /api/notes/analyze', () => {
     const response = await POST(makeRequest())
     expect(response.status).toBe(200)
     expect(mockIncrementAITrialUsage).toHaveBeenCalledTimes(1)
-    expect(mockIncrementAITrialUsage).toHaveBeenCalledWith(expect.anything(), 'user-1', 'notes_analyze')
+    expect(mockIncrementAITrialUsage).toHaveBeenCalledWith(expect.anything(), 'notes_analyze')
   })
 
   it('blocks the request and never calls incrementAITrialUsage when trial quota is exhausted', async () => {

@@ -412,7 +412,7 @@ export async function POST(request: Request) {
   }
 
   if (!quota.unlimited) {
-    await incrementAITrialUsage(supabase, user.id, 'stock_analyze')
+    await incrementAITrialUsage(supabase, 'stock_analyze')
   }
 
   return NextResponse.json({ analysis: finalResult, ...cooldownMetadata(analyzedAt, Date.now(), isAdmin) }, {

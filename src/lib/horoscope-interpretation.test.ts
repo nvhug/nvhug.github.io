@@ -392,7 +392,7 @@ describe('daily generation cap', () => {
     // The TS copy only feeds the "N left today" line; the SQL one is what holds
     // the cap. Drift between them would show the reader a number that is not the
     // one they are being held to.
-    const sql = readFileSync('sql/53.tuvi_daily_usage.sql', 'utf8')
+    const sql = readFileSync('sql/26.tuvi_daily_usage.sql', 'utf8')
     const limit = /v_limit\s+CONSTANT\s+INT\s*:=\s*(\d+)/.exec(sql)?.[1]
     expect(Number(limit)).toBe(TUVI_DAILY_LIMIT)
   })

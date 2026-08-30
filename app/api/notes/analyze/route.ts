@@ -934,7 +934,7 @@ Trả về JSON hợp lệ với đúng cấu trúc sau (không thêm/bỏ field
   // Increment trial usage counter for non-admin/paid users — skipped when AI
   // Free Mode made this request unlimited, so no allowance is consumed.
   if (role === 'user' && !quotaUnlimited) {
-    await incrementAITrialUsage(supabaseAuth, user.id, 'notes_analyze')
+    await incrementAITrialUsage(supabaseAuth, 'notes_analyze')
   }
 
   return NextResponse.json({

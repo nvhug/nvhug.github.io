@@ -108,11 +108,9 @@ export async function resolveAIAccess(
  */
 export async function incrementAITrialUsage(
   supabase: SupabaseClient,
-  userId: string,
   feature: AIFeature,
 ): Promise<void> {
   const { error } = await supabase.rpc('increment_ai_trial_usage', {
-    p_user_id: userId,
     p_feature: feature,
   })
   if (error) {
