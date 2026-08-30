@@ -639,6 +639,7 @@ export async function POST(request: Request) {
 
     supabaseAuth.from('bowel_logs')
       .select('date, stool_type')
+      .eq('user_id', user!.id)
       .gte('date', period.from).lte('date', period.to)
       .order('date', { ascending: true }),
 

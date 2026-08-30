@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Resend } from 'resend'
-import { sendTeamsCard, getServiceSupabaseClient } from '@/lib/notify'
+import { sendTeamsCard } from '@/lib/notify'
 import { createSupabaseServerClient } from '@/lib/supabase-server'
 
 const RESEND_API_KEY    = process.env.RESEND_API_KEY
@@ -88,11 +88,6 @@ export async function POST(request: NextRequest) {
       text: `Thời gian: ${ts}`,
     }],
   })
-
-  if (user.id) {
-    const supabase = getServiceSupabaseClient()
-    await supabase.from('user_profiles').update({ role: 'paid' }).eq('id', user.id)
-  }
 
   return NextResponse.json({ success: true })
 }

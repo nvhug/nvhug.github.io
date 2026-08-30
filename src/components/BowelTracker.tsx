@@ -113,9 +113,11 @@ export function BowelTracker() {
       if (error) { toast.error(t('bowelTracker.saveFailed')); setSaving(false); return }
       toast.success(t('bowelTracker.updated'))
     } else {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { toast.error(t('bowelTracker.saveFailed')); setSaving(false); return }
       const { error } = await supabase
         .from('bowel_logs')
-        .upsert(payload, { onConflict: 'date' })
+        .upsert({ user_id: user.id, ...payload }, { onConflict: 'user_id,date' })
       if (error) { toast.error(t('bowelTracker.saveFailed')); setSaving(false); return }
       toast.success(t('bowelTracker.saved'))
     }
