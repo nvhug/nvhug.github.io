@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase-server'
-import { logAiUsage, normalizeUsage, servedModel } from '@/lib/ai-usage'
+import { logAiUsage, normalizeUsage } from '@/lib/ai-usage'
 import { getServiceSupabaseClient } from '@/lib/supabase-admin'
 import { isAIFreeModeEnabled } from '@/lib/ai-free-mode'
+import { callGeminiWithDeepSeekFallback, isProviderConfigured } from '@/lib/ai-provider'
 import {
   buildInterpretationPrompt,
   INTERPRETATION_VERSION,
@@ -16,7 +17,6 @@ import {
   profileFingerprint,
   readCachedInterpretation,
   SECTIONS_MAX_TOKENS,
-  SECTIONS_TIMEOUT_MS,
   TUVI_DAILY_LIMIT,
   vietnamTodaySolar,
 } from '@/lib/horoscope-interpretation'
@@ -25,9 +25,20 @@ import { parseHoroscopeProfile } from '@/lib/horoscope-profile'
 
 export const dynamic = 'force-dynamic'
 // The completion itself runs ~20-33s, so the platform default would cut the
-// request off before the reading is written. Longer than SECTIONS_TIMEOUT_MS,
-// which is what should end a slow generation.
+// request off before the reading is written. Longer than the two attempt
+// timeouts below combined, which is what should end a slow generation.
 export const maxDuration = 60
+
+// The provider call is now up to two sequential attempts inside that one maxDuration, so
+// neither can be given the whole window. The fallback runs on DeepSeek, and this route's
+// own measured worst case (see `sections generation budget` in
+// horoscope-interpretation.test.ts: ~120 tokens/sec sustained, SECTIONS_MAX_TOKENS=4000)
+// needs at least ~33.3s to finish a genuinely long reading — sizing it any lower turns a
+// slow-but-healthy fallback completion into a timeout that refunds the user's daily slot
+// for nothing. 35s covers that with margin; the primary gets what's left, with 5s held
+// back for the DB work (cache read/write, usage logging) that follows either attempt.
+export const SECTIONS_PRIMARY_TIMEOUT_MS = 20_000
+export const SECTIONS_FALLBACK_TIMEOUT_MS = 35_000
 
 type StoredInterpretation = {
   sections: Record<string, ParsedSection>
@@ -122,8 +133,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ needsGeneration: true })
   }
 
-  const apiKey = process.env.DEEPSEEK_API_KEY
-  if (!apiKey) {
+  // Either key is enough: the router skips straight to whichever provider is
+  // configured. Only having neither leaves nothing to call.
+  if (!isProviderConfigured()) {
     return NextResponse.json({ error: 'interpretation_unavailable' }, { status: 503 })
   }
 
@@ -214,67 +226,43 @@ export async function POST(request: Request) {
 
   const prompt = buildInterpretationPrompt(buildReading(profile, today), profile, lang)
 
-  // Before the call. Peak windows begin and end on the hour and the model gets 50 seconds,
+  // Before the call. Peak windows begin and end on the hour and the two sequential
+  // attempts can together run up to SECTIONS_PRIMARY_TIMEOUT_MS + SECTIONS_FALLBACK_TIMEOUT_MS,
   // so pricing off the response time under-reports a call that straddles a boundary.
   const startedAt = new Date()
 
-  let res: Response
-  try {
-    res = await fetch('https://api.deepseek.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: 'deepseek-v4-flash',
-        messages: [{ role: 'user', content: prompt }],
-        response_format: { type: 'json_object' },
-        // See the note in tu-vi/palaces: reasoning tokens come out of max_tokens before
-        // any content, and SECTIONS_MAX_TOKENS was measured against a model that does not
-        // reason. Leaving this on truncates every reading to nothing.
-        thinking: { type: 'disabled' },
-        temperature: 0.6,
-        // Sized from measured completions — see SECTIONS_MAX_TOKENS. Covers the
-        // 11-section reading only; the twelve-palace block has its own route.
-        max_tokens: SECTIONS_MAX_TOKENS,
-      }),
-      // Without this the route can hang for as long as the upstream keeps the
-      // socket open, holding the request and the user's loading state with it.
-      signal: AbortSignal.timeout(SECTIONS_TIMEOUT_MS),
-    })
-  } catch {
+  const result = await callGeminiWithDeepSeekFallback({
+    geminiModel: 'gemini-3.1-flash-lite',
+    deepseekModel: 'deepseek-v4-flash',
+    prompt,
+    temperature: 0.6,
+    // Sized from measured completions — see SECTIONS_MAX_TOKENS. Covers the
+    // 11-section reading only; the twelve-palace block has its own route.
+    maxTokens: SECTIONS_MAX_TOKENS,
+    primaryTimeoutMs: SECTIONS_PRIMARY_TIMEOUT_MS,
+    fallbackTimeoutMs: SECTIONS_FALLBACK_TIMEOUT_MS,
+  })
+
+  // Neither provider produced a completion, so nothing was billed and there is no
+  // usage to record. 504 when nothing came back at all, 502 when both refused.
+  if (!result.ok) {
     await refundSlot()
-    return NextResponse.json({ error: 'interpretation_unavailable' }, { status: 504 })
+    return NextResponse.json(
+      { error: 'interpretation_unavailable' },
+      { status: result.network ? 504 : 502 },
+    )
   }
 
-  if (!res.ok) {
-    await refundSlot()
-    return NextResponse.json({ error: 'interpretation_unavailable' }, { status: 502 })
-  }
-
-  // A 200 with a non-JSON body (a proxy or captive portal) must read as an
+  // A 200 whose text is not the JSON object the prompt asked for must read as an
   // upstream failure, not throw out of the handler as an opaque 500.
   let sections: Record<string, ParsedSection> | null
-  let truncated = false
   // Enough to name the cause of a rejected completion without logging the whole
   // reading: which required keys were absent, how long the body was, and why the
   // model stopped.
-  let diagnosis = 'no body read'
-  let aborted = false
-  // Held until the outcome is known. This route already distinguishes a completion that
-  // never arrived from one that arrived and failed validation, which is exactly the
-  // distinction FR-005a needs — recording 'success' before that decision would file every
-  // billed-but-rejected reading as a success and hide the spend it wasted.
-  let usageBody: unknown = null
+  let diagnosis = `provider=${result.provider} truncated=${result.truncated} chars=${result.text.length}`
 
   try {
-    const data = await res.json()
-    usageBody = data
-    truncated = data.choices?.[0]?.finish_reason === 'length'
-    const content: string = data.choices?.[0]?.message?.content ?? ''
-    diagnosis = `finish_reason=${data.choices?.[0]?.finish_reason} chars=${content.length}`
-    const body = JSON.parse(content)
+    const body = JSON.parse(result.text)
     sections = parseInterpretationSections(body)
     if (!sections) {
       diagnosis += ` missing=[${missingRequiredSections(body).join(',')}] topLevel=[${Object.keys(
@@ -283,15 +271,14 @@ export async function POST(request: Request) {
     }
   } catch (error) {
     sections = null
-    aborted = error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError')
     diagnosis += ` threw=${error instanceof Error ? `${error.name}: ${error.message}` : String(error)}`
   }
   const recordUsage = (outcome: 'success' | 'error') =>
     logAiUsage({
       surface: 'tuvi_interpret',
-      provider: 'deepseek',
-      model: servedModel(usageBody, 'deepseek-v4-flash'),
-      usage: normalizeUsage((usageBody as { usage?: unknown } | null)?.usage, 'deepseek'),
+      provider: result.provider,
+      model: result.model,
+      usage: normalizeUsage(result.usage, result.provider),
       outcome,
       userId,
       actor: 'user',
@@ -306,19 +293,13 @@ export async function POST(request: Request) {
 
     // A completion cut short by max_tokens is a limit we set, not abuse, so the
     // slot goes back — otherwise a few retries would lock the user out of a
-    // reading they never received. A malformed body for any other reason was
-    // delivered and billed, so it keeps its slot.
-    // A completion cut short by max_tokens is a limit we set, and one cut short
-    // by the timeout produced nothing at all — neither is abuse, so the slot goes
-    // back. A complete body that simply failed validation WAS delivered and
-    // billed, so it keeps its slot: otherwise the retry button is a spend loop.
-    if (truncated || aborted) {
+    // reading they never received. A complete body that simply failed validation
+    // WAS delivered and billed, so it keeps its slot: otherwise the retry button
+    // is a spend loop.
+    if (result.truncated) {
       console.error('[tu-vi] completion incomplete:', diagnosis)
       await refundSlot()
-      return NextResponse.json(
-        { error: 'interpretation_unavailable' },
-        { status: aborted ? 504 : 502 },
-      )
+      return NextResponse.json({ error: 'interpretation_unavailable' }, { status: 502 })
     }
     console.error('[tu-vi] completion rejected by validation:', diagnosis)
     return NextResponse.json({ error: 'interpretation_unavailable' }, { status: 502 })

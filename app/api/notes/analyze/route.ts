@@ -4,7 +4,8 @@ import { createSupabaseServerClient } from '@/lib/supabase-server'
 import { DEFAULT_MACRO_TARGETS, getMacroTargets, resolveTargetsByDate } from './macroUtils'
 import type { MacroTargets, MacroTargetRow } from './macroUtils'
 import { checkAITrialQuota, incrementAITrialUsage, trialExhaustedBody, QUOTA_EXHAUSTED_STATUS } from '@/lib/ai-trial'
-import { logAiUsage, normalizeUsage, servedModel } from '@/lib/ai-usage'
+import { logAiUsage, normalizeUsage } from '@/lib/ai-usage'
+import { callGeminiWithDeepSeekFallback, isProviderConfigured } from '@/lib/ai-provider'
 
 import { weightProgress } from '@/lib/weight-progress'
 
@@ -17,6 +18,18 @@ const CALORIE_TARGET = 1800
 const WEIGHT_START   = 70
 const WEIGHT_TARGET  = 65
 const ANALYZE_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000
+// This route had no request timeout, and no declared maxDuration, at all — an untimed
+// hang could never reach the fallback, and an undeclared duration left the real ceiling
+// ambiguous. Both are now explicit: maxDuration below, and a per-attempt split sized the
+// same way as every other route this feature touches — the fallback runs on DeepSeek at
+// maxTokens=4000, which at this codebase's own measured ~120 tokens/sec sustained rate
+// (MEASURED_TOKENS_PER_SECOND in horoscope-interpretation.ts) needs at least ~33.3s to
+// finish a genuinely long analysis. 35s covers that with margin; the primary gets what's
+// left of maxDuration, with 5s held back for the DB work that follows.
+export const maxDuration = 60
+export const ANALYZE_PRIMARY_TIMEOUT_MS  = 20_000
+export const ANALYZE_FALLBACK_TIMEOUT_MS = 35_000
+export const ANALYZE_MAX_TOKENS = 4000
 type Lang = 'vi' | 'en'
 
 function buildUserProfile(lang: Lang, macroTargets: MacroTargets) {
@@ -502,9 +515,10 @@ function buildGoalsSummary(goals: GoalRow[]) {
 interface Period { label: string; from: string; to: string }
 
 export async function POST(request: Request) {
-  const apiKey = process.env.DEEPSEEK_API_KEY
-  if (!apiKey) {
-    return NextResponse.json({ error: 'DEEPSEEK_API_KEY not configured' }, { status: 500 })
+  // Either provider alone is enough: the router treats a missing Gemini key as an
+  // unavailable primary and goes straight to DeepSeek.
+  if (!isProviderConfigured()) {
+    return NextResponse.json({ error: 'AI provider not configured' }, { status: 500 })
   }
 
   let body: { notes: Note[]; habits: Note[]; period: Period; lang?: Lang }
@@ -848,70 +862,72 @@ Trả về JSON hợp lệ với đúng cấu trúc sau (không thêm/bỏ field
   // billed at rather than the rate in force when the answer came back.
   const startedAt = new Date()
 
-  const res = await fetch('https://api.deepseek.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: 'deepseek-v4-flash',
-      messages: [{ role: 'user', content: prompt }],
-      response_format: { type: 'json_object' },
-      // No max_tokens here, so this route does not truncate — but v4-flash still reasons
-      // by default, and reasoning tokens are billed as output. The prompt asks for JSON
-      // and gains nothing from chain-of-thought, so this is cost and latency for nothing.
-      thinking: { type: 'disabled' },
-      temperature: 0.3,
-    }),
+  const result = await callGeminiWithDeepSeekFallback({
+    geminiModel: 'gemini-3.7-flash',
+    deepseekModel: 'deepseek-v4-flash',
+    prompt,
+    temperature: 0.3,
+    // The response is one object with seven sections plus pattern and recommendation —
+    // the largest JSON shape of any surface here, and in Vietnamese, which costs more
+    // tokens per word. Sized above the 3500 the next-biggest surfaces use.
+    maxTokens: ANALYZE_MAX_TOKENS,
+    primaryTimeoutMs: ANALYZE_PRIMARY_TIMEOUT_MS,
+    fallbackTimeoutMs: ANALYZE_FALLBACK_TIMEOUT_MS,
   })
 
-  // Records one entry for this provider call whatever happens to it. A failure does NOT
-  // imply zero cost: a provider that refuses before generating anything reports no tokens
-  // and really was free, but a completion that arrived whole and was then rejected as
-  // unusable was billed, and that money has to show up somewhere (FR-005a).
-  const recordUsage = (outcome: 'success' | 'error', body: unknown) =>
+  // Nothing arrived from either provider, so nothing was billed and there is no usage row
+  // to file — the same answer the old non-2xx branch gave, now covering timeouts too.
+  if (!result.ok) {
+    return NextResponse.json(
+      { error: 'AI analysis unavailable' },
+      { status: result.network ? 504 : 502 },
+    )
+  }
+
+  // Normalized once, up front, so both usage logging and the token columns below read
+  // from the same value instead of re-deriving it — the raw field names differ between
+  // the two providers, so this is also what keeps those columns receiving real numbers
+  // whichever provider served the call.
+  const usage = normalizeUsage(result.usage, result.provider)
+
+  // Records one entry for this provider call whatever happens to it. Reaching here means a
+  // completion arrived whole, so even the rejected-as-unusable branches below were billed,
+  // and that money has to show up somewhere (FR-005a). Which provider served it is read off
+  // the result, not assumed: the fallback bills a different account at a different rate.
+  const recordUsage = (outcome: 'success' | 'error') =>
     logAiUsage({
       surface: 'notes_analyze',
-      provider: 'deepseek',
-      model: servedModel(body, 'deepseek-v4-flash'),
-      usage: normalizeUsage((body as { usage?: unknown } | null)?.usage, 'deepseek'),
+      provider: result.provider,
+      model: result.model,
+      usage,
       outcome,
       userId: user!.id,
       actor: 'user',
       at: startedAt,
     })
 
-  if (!res.ok) {
-    const err = await res.text()
-    // Refused upstream: no completion, no tokens, nothing billed.
-    await recordUsage('error', null)
-    return NextResponse.json({ error: `DeepSeek API error: ${err}` }, { status: 502 })
-  }
-
-  const data    = await res.json()
-  const content = data.choices?.[0]?.message?.content
-  if (!content) {
-    await recordUsage('error', data)
-    return NextResponse.json({ error: 'Empty response from DeepSeek' }, { status: 502 })
+  if (!result.text) {
+    await recordUsage('error')
+    return NextResponse.json({ error: 'Empty response from AI provider' }, { status: 502 })
   }
 
   let insights: Record<string, unknown>
   try {
-    insights = JSON.parse(content)
+    insights = JSON.parse(result.text)
   } catch {
     // Billed and unusable — the expensive kind of failure, and the one worth seeing.
-    await recordUsage('error', data)
-    return NextResponse.json({ error: 'DeepSeek returned invalid JSON', raw: content.slice(0, 200) }, { status: 502 })
+    await recordUsage('error')
+    return NextResponse.json({ error: 'AI provider returned invalid JSON', raw: result.text.slice(0, 200) }, { status: 502 })
   }
-  const promptTokens     = data.usage?.prompt_tokens     ?? 0
-  const completionTokens = data.usage?.completion_tokens ?? 0
-  const totalTokens      = data.usage?.total_tokens      ?? 0
+
+  const promptTokens     = usage.input_tokens
+  const completionTokens = usage.output_tokens
+  const totalTokens      = promptTokens + completionTokens
 
   // Recorded before the analysis row so its id can be stored alongside. Null is a real
   // outcome — telemetry is bounded and swallows its own failures — and the analysis must
   // save either way, which is why usage_log_id is nullable.
-  const usageLogId = await recordUsage('success', data)
+  const usageLogId = await recordUsage('success')
 
   const { data: saved, error: saveErr } = await supabaseAuth
     .from('ai_analysis_history')

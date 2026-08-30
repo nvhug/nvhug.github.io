@@ -11,7 +11,6 @@ import {
   isUnlimitedTuviRole,
   readCachedInterpretation,
   SECTIONS_MAX_TOKENS,
-  SECTIONS_TIMEOUT_MS,
   TUVI_DAILY_LIMIT,
   vietnamTodaySolar,
 } from './horoscope-interpretation'
@@ -367,23 +366,16 @@ describe('buildInterpretationPrompt language', () => {
 })
 
 describe('sections generation budget', () => {
-  // Slowest sustained output rate seen across five real completions on four
-  // different charts (2331-3026 output tokens, 18.7-24.8s each).
-  const MEASURED_TOKENS_PER_SECOND = 120
-  // The longest of those five completions.
+  // The longest of five real completions on four different charts (2331-3026
+  // output tokens, 18.7-24.8s each at the ~120 tokens/sec sustained rate
+  // exported as MEASURED_TOKENS_PER_SECOND, which the route's own provider-call
+  // timeouts are sized against — see app/api/tu-vi/interpret/route.test.ts.
   const MEASURED_CEILING_TOKENS = 3026
 
   it('allows more tokens than the longest completion actually measured', () => {
     // 2800 sat below this, so the longer half of the natural sampling spread
     // came back as truncated JSON and lost the whole reading after billing.
     expect(SECTIONS_MAX_TOKENS).toBeGreaterThan(MEASURED_CEILING_TOKENS)
-  })
-
-  it('waits longer than the completion it allows takes to produce', () => {
-    // Raising the token ceiling without raising this only turns a truncated
-    // reading into a timed-out one.
-    const worstCaseMs = (SECTIONS_MAX_TOKENS / MEASURED_TOKENS_PER_SECOND) * 1000
-    expect(SECTIONS_TIMEOUT_MS).toBeGreaterThan(worstCaseMs)
   })
 })
 

@@ -129,6 +129,18 @@ describe('computeCostUsd', () => {
     // Distinct from the unknown-model null above.
     expect(computeCostUsd({ input: 0, cached: 0, output: 0 }, 'deepseek-v4-flash', offPeak)).toBe(0)
   })
+
+  it.each(['gemini-3.7-flash', 'gemini-3.1-flash-lite'])(
+    'returns 0, not null, for the free-tier model %s at real token volume',
+    (model) => {
+      // The whole point of pricing these at zero rather than leaving them out of the
+      // table: a real, large call must show up as a priced $0, not as "unpriced" null —
+      // otherwise a dashboard reader can't tell "free tier" from "we forgot to price this".
+      const cost = computeCostUsd({ input: 1_000_000, cached: 500_000, output: 1_000_000 }, model, offPeak)
+      expect(cost).not.toBeNull()
+      expect(cost).toBe(0)
+    }
+  )
 })
 
 describe('resolvePriceKey — the served id is not always a price-table key', () => {
@@ -163,6 +175,8 @@ describe('price table covers every model the code can request', () => {
     'deepseek-v4-pro',
     'deepseek-v4-flash-vision-exp',
     'gemini-3.6-flash',
+    'gemini-3.7-flash',
+    'gemini-3.1-flash-lite',
   ]
 
   it.each(REQUESTABLE)('%s resolves to a price', (model) => {

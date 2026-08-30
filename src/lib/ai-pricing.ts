@@ -49,6 +49,15 @@ export const MODEL_PRICES: Record<string, ModelPrice> = {
   'deepseek-v4-pro': { cachedInput: 0.022, input: 0.66, output: 1.98, peakMultiplier: true },
   'deepseek-v4-flash-vision-exp': { cachedInput: 0.007, input: 0.22, output: 0.66, peakMultiplier: true },
   'gemini-3.6-flash': { cachedInput: null, input: 0.75, output: 3.75, peakMultiplier: false },
+  // Free tier (spec 010, FR-008/FR-010/FR-011): input/output/cache are all "Free of
+  // charge" on ai.google.dev today, verified 2026-08-30. When Google retires the free
+  // tier or this project moves to a billed Gemini tier, replace the zeros below with the
+  // real paid rate ($0.75 / $3.75 per 1M input/output, introductory through 2026-12-31,
+  // doubling after per the same note already on gemini-3.6-flash above) and bump
+  // PRICING_VERSION.
+  'gemini-3.7-flash': { cachedInput: 0, input: 0, output: 0, peakMultiplier: false },
+  // Same free-tier note as above. Paid rate to switch to: $0.30 / $2.50 per 1M input/output.
+  'gemini-3.1-flash-lite': { cachedInput: 0, input: 0, output: 0, peakMultiplier: false },
 }
 
 /**

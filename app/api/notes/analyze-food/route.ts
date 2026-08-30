@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createSupabaseServerClient } from '@/lib/supabase-server'
-import { requestVisionJSON, requestTextJSON, resolveVisionConfig, visionProviderNames } from '@/lib/ai-vision'
+import { requestVisionJSON, resolveVisionConfig, visionProviderNames } from '@/lib/ai-vision'
 import { ProviderCallError, type ProviderResult } from '@/lib/ai-vision'
+import { callGeminiWithDeepSeekFallback } from '@/lib/ai-provider'
 import { logAiUsage, normalizeUsage, servedModel } from '@/lib/ai-usage'
 import { normalizeItemsWithInternalTable } from './nutrition-normalizer'
 import { resolveAIAccess, incrementAITrialUsage, trialExhaustedBody, QUOTA_EXHAUSTED_STATUS } from '@/lib/ai-trial'
@@ -14,6 +15,23 @@ export const maxDuration = 60
 // decoded image below that. The client downscales to ~1024 px first.
 const MAX_IMAGE_BYTES = 3 * 1024 * 1024
 const ALLOWED_MIME = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif']
+
+// The vision stage may already have spent up to ai-vision.ts's 25s before the nutrition
+// stage starts, so its two attempts share what is left of the 60s maxDuration. The
+// fallback runs on DeepSeek at NUTRITION_MAX_TOKENS=2000, which at this codebase's own
+// measured ~120 tokens/sec sustained rate (MEASURED_TOKENS_PER_SECOND in
+// horoscope-interpretation.ts) needs at least ~16.7s to finish a genuinely long
+// completion — sizing it lower turns a slow-but-healthy fallback into a timeout instead.
+// 18s covers that with margin; the primary gets what's left of the worst case
+// (25 + 12 + 18 = 55s), leaving 5s of maxDuration unaccounted for. This budget covers
+// only the two provider-call stages — resolveAIAccess runs before either (not after),
+// and the vision stage's own logAiUsage insert runs between them, not after both — so the
+// real remaining margin for the telemetry insert and incrementAITrialUsage after the
+// nutrition stage is that 5s minus whatever those already spent.
+export const NUTRITION_PRIMARY_TIMEOUT_MS = 12_000
+export const NUTRITION_FALLBACK_TIMEOUT_MS = 18_000
+// requestTextJSON sent no ceiling; JSON_SHAPE with a handful of items fits well inside this.
+export const NUTRITION_MAX_TOKENS = 2000
 
 type Lang = 'vi' | 'en'
 
@@ -171,6 +189,27 @@ HARD RULES:
 14. Write "name", "portion", "questions", "notes" and "assumptions" in ${lang === 'en' ? 'English' : 'Vietnamese'}.`
 }
 
+/**
+ * Stage 2 transport: Gemini first, DeepSeek on a transport-level failure. The router never
+ * throws, so an unavailable pair is rethrown as a plain Error — not a ProviderCallError —
+ * which is what tells the caller's catch that nothing was billed and nothing to record.
+ */
+async function callNutrition(
+  prompt: string
+): Promise<Pick<ProviderResult, 'usage' | 'model' | 'provider'> & { text: string }> {
+  const result = await callGeminiWithDeepSeekFallback({
+    geminiModel: 'gemini-3.1-flash-lite',
+    deepseekModel: 'deepseek-v4-flash',
+    prompt,
+    temperature: 0.2,
+    maxTokens: NUTRITION_MAX_TOKENS,
+    primaryTimeoutMs: NUTRITION_PRIMARY_TIMEOUT_MS,
+    fallbackTimeoutMs: NUTRITION_FALLBACK_TIMEOUT_MS,
+  })
+  if (!result.ok) throw new Error('nutrition provider unavailable')
+  return { usage: result.usage, model: result.model, provider: result.provider, text: result.text }
+}
+
 function extractJSON(raw: string): unknown {
   const trimmed = raw.trim().replace(/^```(?:json)?/i, '').replace(/```$/, '').trim()
   try {
@@ -302,7 +341,7 @@ export async function POST(request: Request) {
   let focusBox: [number, number, number, number] | null = null
   try {
     if (mode === 'image' && image) {
-      // Stage 1: vision model describes the plate. Stage 2: DeepSeek does the nutrition maths.
+      // Stage 1: vision model describes the plate. Stage 2: the router does the nutrition maths.
       stageStart = new Date()
       const vision = await requestVisionJSON(buildVisionPrompt(lang, description), image)
       await record(vision, 'success', stageStart)
@@ -313,7 +352,7 @@ export async function POST(request: Request) {
       }
       nutritionStart = new Date()
       stageStart = nutritionStart
-      const nutrition = await requestTextJSON(
+      const nutrition = await callNutrition(
         buildNutritionPrompt(lang, { observation: vision.text, description })
       )
       nutritionCall = nutrition
@@ -321,7 +360,7 @@ export async function POST(request: Request) {
     } else {
       nutritionStart = new Date()
       stageStart = nutritionStart
-      const nutrition = await requestTextJSON(buildNutritionPrompt(lang, { description }))
+      const nutrition = await callNutrition(buildNutritionPrompt(lang, { description }))
       nutritionCall = nutrition
       raw = nutrition.text
     }

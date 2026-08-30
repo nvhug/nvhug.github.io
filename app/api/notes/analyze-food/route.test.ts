@@ -1,11 +1,10 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
 
 const {
   mockInsert,
   mockFrom,
   mockGetUser,
   mockCreateSupabaseServerClient,
-  mockRequestTextJSON,
 } = vi.hoisted(() => {
   const mockInsert = vi.fn(async () => ({ error: null }))
   // Support both .insert() and .select().eq().eq().maybeSingle() chains
@@ -23,16 +22,12 @@ const {
     from: mockFrom,
     rpc: vi.fn(async () => ({ error: null })),
   }))
-  const mockRequestTextJSON = vi.fn<(
-    prompt: string
-  ) => Promise<string>>()
 
   return {
     mockInsert,
     mockFrom,
     mockGetUser,
     mockCreateSupabaseServerClient,
-    mockRequestTextJSON,
   }
 })
 
@@ -40,17 +35,11 @@ vi.mock('@/lib/supabase-server', () => ({
   createSupabaseServerClient: mockCreateSupabaseServerClient,
 }))
 
-// ai-vision now returns { text, usage, model, provider } rather than a bare string, so the
-// food photo path can record what each of its two provider calls cost. Wrapping here keeps
-// every mockResolvedValueOnce below returning a plain JSON string.
+// Stage 1 (vision) still goes through ai-vision.ts and keeps its own provider chain; only
+// stage 2 (nutrition) moved to the shared router, and the router is exercised for real here
+// against a stubbed fetch so the Gemini -> DeepSeek fallback is actually covered.
 vi.mock('@/lib/ai-vision', () => ({
   requestVisionJSON: vi.fn(),
-  requestTextJSON: async (prompt: string) => ({
-    text: await mockRequestTextJSON(prompt),
-    usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
-    model: 'deepseek-v4-flash',
-    provider: 'deepseek' as const,
-  }),
   resolveVisionConfig: vi.fn(() => true),
   visionProviderNames: vi.fn(() => []),
 }))
@@ -82,43 +71,97 @@ vi.mock('@/lib/ai-trial', () => ({
   })),
 }))
 
-import { POST } from './route'
+import { NUTRITION_FALLBACK_TIMEOUT_MS, NUTRITION_MAX_TOKENS, POST } from './route'
+import { MEASURED_TOKENS_PER_SECOND } from '@/lib/horoscope-interpretation'
+import { requestVisionJSON } from '@/lib/ai-vision'
+import { logAiUsage } from '@/lib/ai-usage'
+import { resolveAIAccess, incrementAITrialUsage } from '@/lib/ai-trial'
+
+const NUTRITION_JSON = JSON.stringify({
+  is_food: true,
+  overall_confidence: 0.9,
+  needs_more_detail: false,
+  questions: [],
+  notes: 'ok',
+  items: [
+    {
+      name: 'Sua tuoi',
+      portion: '250ml',
+      calories: 90,
+      protein_g: 2,
+      carbs_g: 8,
+      fat_g: 3,
+      confidence: 0.8,
+      assumptions: '',
+    },
+  ],
+})
+
+const jsonResponse = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { 'content-type': 'application/json' },
+  })
+
+const geminiOk = (text: string) =>
+  jsonResponse({
+    candidates: [{ content: { parts: [{ text }] }, finishReason: 'STOP' }],
+    usageMetadata: { promptTokenCount: 1, candidatesTokenCount: 1, totalTokenCount: 2 },
+    modelVersion: 'gemini-3.1-flash-lite',
+  })
+
+const deepseekOk = (text: string) =>
+  jsonResponse({
+    choices: [{ message: { content: text }, finish_reason: 'stop' }],
+    usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+    model: 'deepseek-v4-flash',
+  })
+
+const mockFetch = vi.fn<typeof fetch>()
+
+const textRequest = (description: string) =>
+  new Request('http://localhost/api/notes/analyze-food', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ mode: 'text', description }),
+  })
+
+const imageRequest = () =>
+  new Request('http://localhost/api/notes/analyze-food', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      mode: 'image',
+      image: { data: 'aGVsbG8=', mimeType: 'image/jpeg' },
+      description: 'Sua tuoi 250ml',
+    }),
+  })
+
+/** The nutrition stage's log row, told apart from the vision stage's by its model. */
+const nutritionLogCall = () =>
+  vi.mocked(logAiUsage).mock.calls
+    .map(([entry]) => entry)
+    .find((entry) => entry.model !== 'gemini-3.6-flash')
 
 describe('POST /api/notes/analyze-food', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockInsert.mockResolvedValue({ error: null })
     mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
+    vi.stubEnv('GEMINI_API_KEY', 'gemini-test-key')
+    vi.stubEnv('DEEPSEEK_API_KEY', 'deepseek-test-key')
+    vi.stubGlobal('fetch', mockFetch)
+  })
+
+  afterEach(() => {
+    vi.unstubAllEnvs()
+    vi.unstubAllGlobals()
   })
 
   it('returns normalized metadata for explicit ml item and writes match-applied telemetry', async () => {
-    mockRequestTextJSON.mockResolvedValueOnce(JSON.stringify({
-      is_food: true,
-      overall_confidence: 0.9,
-      needs_more_detail: false,
-      questions: [],
-      notes: 'ok',
-      items: [
-        {
-          name: 'Sua tuoi',
-          portion: '250ml',
-          calories: 90,
-          protein_g: 2,
-          carbs_g: 8,
-          fat_g: 3,
-          confidence: 0.8,
-          assumptions: '',
-        },
-      ],
-    }))
+    mockFetch.mockResolvedValueOnce(geminiOk(NUTRITION_JSON))
 
-    const request = new Request('http://localhost/api/notes/analyze-food', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ mode: 'text', description: 'Sua tuoi 250ml' }),
-    })
-
-    const response = await POST(request)
+    const response = await POST(textRequest('Sua tuoi 250ml'))
     expect(response.status).toBe(200)
 
     const payload = await response.json()
@@ -140,7 +183,7 @@ describe('POST /api/notes/analyze-food', () => {
   })
 
   it('records no-match telemetry when an item is intentionally excluded from normalization', async () => {
-    mockRequestTextJSON.mockResolvedValueOnce(JSON.stringify({
+    mockFetch.mockResolvedValueOnce(geminiOk(JSON.stringify({
       is_food: true,
       overall_confidence: 0.8,
       needs_more_detail: false,
@@ -158,15 +201,9 @@ describe('POST /api/notes/analyze-food', () => {
           assumptions: '',
         },
       ],
-    }))
+    })))
 
-    const request = new Request('http://localhost/api/notes/analyze-food', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ mode: 'text', description: 'Milkshake 300ml' }),
-    })
-
-    const response = await POST(request)
+    const response = await POST(textRequest('Milkshake 300ml'))
     expect(response.status).toBe(200)
 
     const payload = await response.json()
@@ -186,7 +223,7 @@ describe('POST /api/notes/analyze-food', () => {
   })
 
   it('records ambiguous-match telemetry when matcher confidence is below normalize threshold', async () => {
-    mockRequestTextJSON.mockResolvedValueOnce(JSON.stringify({
+    mockFetch.mockResolvedValueOnce(geminiOk(JSON.stringify({
       is_food: true,
       overall_confidence: 0.8,
       needs_more_detail: false,
@@ -204,15 +241,9 @@ describe('POST /api/notes/analyze-food', () => {
           assumptions: '',
         },
       ],
-    }))
+    })))
 
-    const request = new Request('http://localhost/api/notes/analyze-food', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ mode: 'text', description: 'Tofu 100g' }),
-    })
-
-    const response = await POST(request)
+    const response = await POST(textRequest('Tofu 100g'))
     expect(response.status).toBe(200)
 
     const payload = await response.json()
@@ -232,5 +263,87 @@ describe('POST /api/notes/analyze-food', () => {
         normalization_confidence: 0.59,
       },
     ])
+  })
+
+  it('records the nutrition stage against gemini when the primary serves it', async () => {
+    mockFetch.mockResolvedValueOnce(geminiOk(NUTRITION_JSON))
+
+    const response = await POST(textRequest('Sua tuoi 250ml'))
+    expect(response.status).toBe(200)
+
+    expect(mockFetch).toHaveBeenCalledTimes(1)
+    expect(nutritionLogCall()).toMatchObject({
+      surface: 'food_analyze',
+      provider: 'gemini',
+      outcome: 'success',
+    })
+  })
+
+  it('falls back to deepseek for the nutrition stage when gemini returns 500, leaving the vision stage on its own provider', async () => {
+    vi.mocked(requestVisionJSON).mockResolvedValueOnce({
+      text: JSON.stringify({ is_food: true, focus_box: [10, 10, 900, 900], items: [] }),
+      usage: null,
+      model: 'gemini-3.6-flash',
+      provider: 'gemini',
+    })
+    mockFetch
+      .mockResolvedValueOnce(new Response('upstream error', { status: 500 }))
+      .mockResolvedValueOnce(deepseekOk(NUTRITION_JSON))
+
+    const response = await POST(imageRequest())
+    expect(response.status).toBe(200)
+
+    const payload = await response.json()
+    expect(payload.items).toHaveLength(1)
+    expect(payload.items[0].normalized_table_key).toBe('whole_milk')
+    expect(payload.focusBox).toEqual([10, 10, 900, 900])
+
+    expect(mockFetch).toHaveBeenCalledTimes(2)
+    expect(String(mockFetch.mock.calls[0][0])).toContain('generativelanguage.googleapis.com')
+    expect(String(mockFetch.mock.calls[1][0])).toContain('api.deepseek.com')
+
+    // Two rows: the vision stage on its own provider, the nutrition stage on the fallback.
+    expect(vi.mocked(logAiUsage)).toHaveBeenCalledTimes(2)
+    expect(vi.mocked(logAiUsage).mock.calls[0][0]).toMatchObject({ model: 'gemini-3.6-flash' })
+    expect(nutritionLogCall()).toMatchObject({
+      surface: 'food_analyze',
+      provider: 'deepseek',
+      model: 'deepseek-v4-flash',
+      outcome: 'success',
+    })
+  })
+
+  it.each([
+    ['gemini', () => mockFetch.mockResolvedValueOnce(geminiOk(NUTRITION_JSON))],
+    [
+      'deepseek',
+      () =>
+        mockFetch
+          .mockResolvedValueOnce(new Response('upstream error', { status: 500 }))
+          .mockResolvedValueOnce(deepseekOk(NUTRITION_JSON)),
+    ],
+  ])('checks and increments the food_analyze trial quota exactly once when %s serves', async (_provider, arrange) => {
+    vi.mocked(resolveAIAccess).mockResolvedValueOnce({
+      allowed: true,
+      used: 1,
+      limit: 270,
+      unlimited: false,
+    })
+    arrange()
+
+    const response = await POST(textRequest('Sua tuoi 250ml'))
+    expect(response.status).toBe(200)
+
+    expect(vi.mocked(resolveAIAccess)).toHaveBeenCalledTimes(1)
+    expect(vi.mocked(resolveAIAccess).mock.calls[0][2]).toBe('food_analyze')
+    expect(vi.mocked(incrementAITrialUsage)).toHaveBeenCalledTimes(1)
+    expect(vi.mocked(incrementAITrialUsage).mock.calls[0][1]).toBe('food_analyze')
+  })
+})
+
+describe('DeepSeek fallback timeout budget', () => {
+  it('waits longer than a genuinely long completion takes to produce', () => {
+    const worstCaseMs = (NUTRITION_MAX_TOKENS / MEASURED_TOKENS_PER_SECOND) * 1000
+    expect(NUTRITION_FALLBACK_TIMEOUT_MS).toBeGreaterThan(worstCaseMs)
   })
 })

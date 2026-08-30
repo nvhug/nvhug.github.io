@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
-import { logAiUsage, normalizeUsage, servedModel } from '@/lib/ai-usage'
+import { callGeminiWithDeepSeekFallback, isProviderConfigured } from '@/lib/ai-provider'
+import { logAiUsage, normalizeUsage } from '@/lib/ai-usage'
 import { createSupabaseServerClient } from '@/lib/supabase-server'
 
 const suggestedTickerSchema = z.object({
@@ -15,6 +16,10 @@ const suggestedTickerSchema = z.object({
 })
 
 export const runtime = 'nodejs'
+// The old single 50_000ms budget relied on an undeclared, ambiguous platform default —
+// made explicit now that a primary attempt plus a fallback attempt need more headroom
+// than that budget alone ever had to prove itself against.
+export const maxDuration = 60
 
 // Default VN large-cap universe. The UI can override this list per generation.
 export const DEFAULT_SCREENER_TICKERS = [
@@ -29,6 +34,19 @@ export const DEFAULT_SCREENER_TICKERS = [
 ]
 
 const MAX_SCREENER_TICKERS = 50
+
+// The fallback runs on DeepSeek at maxTokens=2000, which at this codebase's own measured
+// ~120 tokens/sec sustained rate (MEASURED_TOKENS_PER_SECOND in
+// horoscope-interpretation.ts) needs at least ~16.7s to finish a genuinely long response —
+// sizing it lower turns a slow-but-healthy fallback into a timeout instead. 18s covers
+// that with margin; the primary gets most of what's left of maxDuration. This budget
+// covers only the AI call itself — the ticker-stats fetch loop above (up to 50 tickers,
+// unbounded per-request) and the cache insert after both run outside it and are NOT
+// accounted for here; a slow Yahoo Finance response can still exceed maxDuration on top
+// of a healthy AI call.
+const SUGGESTIONS_PRIMARY_TIMEOUT_MS = 37_000
+export const SUGGESTIONS_FALLBACK_TIMEOUT_MS = 18_000
+export const SUGGESTIONS_MAX_TOKENS = 2000
 
 function normalizeTickers(value: unknown): string[] {
   if (!Array.isArray(value)) return [...DEFAULT_SCREENER_TICKERS]
@@ -216,8 +234,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Đã tạo quá nhiều lần trong 8 giờ qua. Thử lại sau.' }, { status: 429 })
   }
 
-  const apiKey = process.env.DEEPSEEK_API_KEY
-  if (!apiKey) return NextResponse.json({ error: 'DEEPSEEK_API_KEY not configured' }, { status: 500 })
+  if (!isProviderConfigured()) {
+    return NextResponse.json({ error: 'AI provider not configured' }, { status: 500 })
+  }
 
   // Fetch in batches of 15 to avoid IP-level rate limiting on Yahoo Finance
   const stats: TickerStats[] = []
@@ -277,42 +296,26 @@ Trả về CHỈ JSON hợp lệ (không markdown, không giải thích):
   ]
 }`
 
-  // Before the call. This one matters most of the six: the cron fires at 02:00 UTC, inside
-  // DeepSeek's 01:00-04:00 peak window, so pricing off the response time is the difference
-  // between reporting half the bill and reporting it.
+  // Before the call, so a request that straddles a peak-window boundary is priced at the
+  // rate it was actually billed at. Only matters when DeepSeek serves — Gemini has no peak
+  // multiplier — but the timestamp is captured unconditionally since which provider serves
+  // isn't known yet.
   const startedAt = new Date()
 
-  let aiRes: Response
-  try {
-    aiRes = await fetch('https://api.deepseek.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: 'deepseek-v4-flash',
-        messages: [{ role: 'user', content: prompt }],
-        response_format: { type: 'json_object' },
-        temperature: 0.1,
-        // v4-flash reasons by default and spends those tokens out of max_tokens before
-        // producing any content. This budget is the smallest in the codebase and predates
-        // the model switch, so leaving thinking on empties it before a single suggestion.
-        thinking: { type: 'disabled' },
-        max_tokens: 2000,
-      }),
-      signal: AbortSignal.timeout(50_000),
-    })
-  } catch {
-    return NextResponse.json({ error: 'AI không phản hồi. Vui lòng thử lại sau.' }, { status: 504 })
-  }
+  const result = await callGeminiWithDeepSeekFallback({
+    geminiModel: 'gemini-3.7-flash',
+    deepseekModel: 'deepseek-v4-flash',
+    prompt,
+    temperature: 0.1,
+    maxTokens: SUGGESTIONS_MAX_TOKENS,
+    primaryTimeoutMs: SUGGESTIONS_PRIMARY_TIMEOUT_MS,
+    fallbackTimeoutMs: SUGGESTIONS_FALLBACK_TIMEOUT_MS,
+  })
 
-  if (!aiRes.ok) {
-    const err = await aiRes.text()
-    return NextResponse.json({ error: `DeepSeek error: ${err}` }, { status: 502 })
+  // Nothing was served, so nothing was billed: no usage row on this path.
+  if (!result.ok) {
+    return NextResponse.json({ error: 'AI provider unavailable' }, { status: result.network ? 504 : 502 })
   }
-
-  const aiData = await aiRes.json() as { choices?: { message?: { content?: string } }[] }
 
   // Always a real admin now that the scheduled path is gone, so there is no 'system' actor
   // from this route. The outcome is decided by the validation below, not assumed here:
@@ -321,16 +324,16 @@ Trả về CHỈ JSON hợp lệ (không markdown, không giải thích):
   const recordUsage = (outcome: 'success' | 'error') =>
     logAiUsage({
       surface: 'stock_suggestions',
-      provider: 'deepseek',
-      model: servedModel(aiData, 'deepseek-v4-flash'),
-      usage: normalizeUsage((aiData as { usage?: unknown }).usage, 'deepseek'),
+      provider: result.provider,
+      model: result.model,
+      usage: normalizeUsage(result.usage, result.provider),
       outcome,
       userId: callerUserId,
       actor: 'user',
       at: startedAt,
     })
 
-  const content = aiData.choices?.[0]?.message?.content
+  const content = result.text
   if (!content) {
     await recordUsage('error')
     return NextResponse.json({ error: 'Empty AI response' }, { status: 502 })

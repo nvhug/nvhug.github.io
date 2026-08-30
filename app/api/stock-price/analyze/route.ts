@@ -8,9 +8,26 @@ import { gradeFromOverallScore, overallScoreFromScores } from './scoring'
 import { stockAnalysisSchema } from './schema'
 import { cooldownMetadata } from './cooldown'
 import { checkAITrialQuota, incrementAITrialUsage, trialExhaustedBody, QUOTA_EXHAUSTED_STATUS } from '@/lib/ai-trial'
-import { logAiUsage, normalizeUsage, servedModel } from '@/lib/ai-usage'
+import { logAiUsage, normalizeUsage } from '@/lib/ai-usage'
+import { callGeminiWithDeepSeekFallback, isProviderConfigured } from '@/lib/ai-provider'
 
 export const runtime = 'nodejs'
+// The old single 50_000ms budget relied on an undeclared, ambiguous platform default —
+// made explicit now that a primary attempt plus a fallback attempt need more headroom
+// than that budget alone ever had to prove itself against.
+export const maxDuration = 60
+
+// The fallback runs on DeepSeek at maxTokens=3500, which at this codebase's own measured
+// ~120 tokens/sec sustained rate (MEASURED_TOKENS_PER_SECOND in
+// horoscope-interpretation.ts) needs at least ~29.2s to finish a genuinely long analysis —
+// sizing it lower turns a slow-but-healthy fallback into a timeout instead. 31s covers
+// that with margin; the primary gets most of what's left of maxDuration. This budget
+// covers only the AI call itself — fetchCompanyContext/fetchFinancialSnapshot/
+// fetchGovernanceDisclosures above (external HTTP, no timeout of their own) and the DB
+// work after both run outside it and are NOT accounted for here.
+const ANALYZE_PRIMARY_TIMEOUT_MS = 24_000
+export const ANALYZE_FALLBACK_TIMEOUT_MS = 31_000
+export const ANALYZE_MAX_TOKENS = 3500
 
 type StoredAnalysis = {
   result: unknown
@@ -210,8 +227,9 @@ export async function POST(request: Request) {
     }
   }
 
-  const apiKey = process.env.DEEPSEEK_API_KEY
-  if (!apiKey) return NextResponse.json({ error: 'DEEPSEEK_API_KEY not configured' }, { status: 500 })
+  if (!isProviderConfigured()) {
+    return NextResponse.json({ error: 'AI provider not configured' }, { status: 500 })
+  }
 
   const [companyContext, fundamentals, governanceDisclosures] = await Promise.all([
     fetchCompanyContext(normalizedTicker),
@@ -324,37 +342,20 @@ export async function POST(request: Request) {
   // was actually billed at.
   const startedAt = new Date()
 
-  let res: Response
-  try {
-    res = await fetch('https://api.deepseek.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: 'deepseek-v4-flash',
-        messages: [{ role: 'user', content: prompt }],
-        response_format: { type: 'json_object' },
-        // v4-flash reasons by default and spends those tokens out of max_tokens before
-        // producing any content. This budget predates the model switch, so leaving
-        // thinking on returns finish_reason 'length' with an empty body.
-        thinking: { type: 'disabled' },
-        temperature: 0.3,
-        max_tokens: 3500,
-      }),
-      signal: AbortSignal.timeout(50_000),
-    })
-  } catch {
-    return NextResponse.json({ error: 'AI phân tích quá lâu hoặc không phản hồi. Vui lòng thử lại.' }, { status: 504 })
-  }
+  const providerResult = await callGeminiWithDeepSeekFallback({
+    geminiModel: 'gemini-3.7-flash',
+    deepseekModel: 'deepseek-v4-flash',
+    prompt,
+    temperature: 0.3,
+    maxTokens: ANALYZE_MAX_TOKENS,
+    primaryTimeoutMs: ANALYZE_PRIMARY_TIMEOUT_MS,
+    fallbackTimeoutMs: ANALYZE_FALLBACK_TIMEOUT_MS,
+  })
 
-  if (!res.ok) {
-    const err = await res.text()
-    return NextResponse.json({ error: `DeepSeek API error: ${err}` }, { status: 502 })
+  // No usage logged here: nothing was billed on a transport failure.
+  if (!providerResult.ok) {
+    return NextResponse.json({ error: 'AI analysis unavailable' }, { status: providerResult.network ? 504 : 502 })
   }
-
-  const data = await res.json()
 
   // Records this provider call whatever becomes of it. A failure does NOT imply zero cost:
   // every rejection below happens AFTER a completion arrived and was billed, so filing them
@@ -362,19 +363,19 @@ export async function POST(request: Request) {
   const recordUsage = (outcome: 'success' | 'error') =>
     logAiUsage({
       surface: 'stock_analyze',
-      provider: 'deepseek',
-      model: servedModel(data, 'deepseek-v4-flash'),
-      usage: normalizeUsage(data.usage, 'deepseek'),
+      provider: providerResult.provider,
+      model: providerResult.model,
+      usage: normalizeUsage(providerResult.usage, providerResult.provider),
       outcome,
       userId: user.id,
       actor: 'user',
       at: startedAt,
     })
 
-  const content = data.choices?.[0]?.message?.content
+  const content = providerResult.text
   if (!content) {
     await recordUsage('error')
-    return NextResponse.json({ error: 'Empty response from DeepSeek' }, { status: 502 })
+    return NextResponse.json({ error: 'Empty response from AI provider' }, { status: 502 })
   }
 
   let parsed: unknown
@@ -382,7 +383,7 @@ export async function POST(request: Request) {
     parsed = JSON.parse(content)
   } catch {
     await recordUsage('error')
-    return NextResponse.json({ error: 'DeepSeek returned invalid JSON' }, { status: 502 })
+    return NextResponse.json({ error: 'AI provider returned invalid JSON' }, { status: 502 })
   }
 
   const result = stockAnalysisSchema.safeParse(parsed)

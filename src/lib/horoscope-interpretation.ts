@@ -45,13 +45,15 @@ export const INTERPRETATION_VERSION = 4
 export const SECTIONS_MAX_TOKENS = 4000
 
 /**
- * How long the route waits for that completion. It has to exceed
- * SECTIONS_MAX_TOKENS at the observed output rate (~120 tokens/s, so ~33s),
- * or raising the token ceiling only turns the truncated readings into timed-out
- * ones. Kept under the route's maxDuration so the failure is a diagnosable 504
- * rather than the platform killing the request.
+ * The observed output rate this budget (and the route's own provider-call timeouts,
+ * `SECTIONS_PRIMARY_TIMEOUT_MS`/`SECTIONS_FALLBACK_TIMEOUT_MS` in
+ * `app/api/tu-vi/interpret/route.ts`) is sized against — ~120 tokens/sec sustained,
+ * measured from real completions (see the `sections generation budget` describe block in
+ * this file's test). A timeout below `SECTIONS_MAX_TOKENS / MEASURED_TOKENS_PER_SECOND`
+ * turns a slow-but-healthy completion into a timeout instead of raising the ceiling only
+ * turning it into a truncated one.
  */
-export const SECTIONS_TIMEOUT_MS = 50_000
+export const MEASURED_TOKENS_PER_SECOND = 120
 
 /** Versions the palace readings on their own, since they have their own prompt.
  *

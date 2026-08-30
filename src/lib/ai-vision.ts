@@ -1,11 +1,12 @@
-// Two-stage food analysis transport.
-//   Stage 1 (vision):    Gemini / OpenAI / OpenRouter reads the photo -> structured observation.
-//   Stage 2 (nutrition): DeepSeek turns that observation into kcal + macros.
-// Both stages are env-driven, so swapping providers needs no code change:
+// Food-photo vision stage: Gemini / OpenAI / OpenRouter reads the photo -> structured
+// observation. Env-driven, so swapping providers needs no code change:
 //   FOOD_VISION_PROVIDER=gemini|openai|openrouter   (optional, otherwise auto-detected)
 //   FOOD_VISION_MODEL=<model id>                    (optional, overrides the default)
 //   GEMINI_API_KEY | OPENAI_API_KEY | OPENROUTER_API_KEY
-//   DEEPSEEK_API_KEY, DEEPSEEK_MODEL
+//
+// The nutrition stage that used to live here (DeepSeek) now goes through the shared
+// Gemini-primary/DeepSeek-fallback router in `src/lib/ai-provider.ts` (spec 010) — this
+// file is vision-only.
 
 export type VisionProvider = 'gemini' | 'openai' | 'openrouter'
 
@@ -163,10 +164,6 @@ async function callOpenAICompatible(
       model,
       messages: [{ role: 'user', content: image ? content : prompt }],
       response_format: { type: 'json_object' },
-      // DeepSeek only — `thinking` is not an OpenAI/OpenRouter parameter and sending it
-      // there risks a 400. DeepSeek's v4 models reason by default and bill those tokens as
-      // output; this prompt wants JSON and gains nothing from chain-of-thought.
-      ...(provider === 'deepseek' ? { thinking: { type: 'disabled' } } : {}),
       temperature: 0.2,
     }),
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
@@ -213,34 +210,3 @@ export async function requestVisionJSON(prompt: string, image: ImageInput): Prom
   )
 }
 
-/** Stage 2 — nutrition reasoning on DeepSeek, falling back to the vision provider when no key is set. */
-export async function requestTextJSON(prompt: string): Promise<ProviderResult> {
-  const deepseekKey = process.env.DEEPSEEK_API_KEY
-  if (deepseekKey) {
-    return callOpenAICompatible(
-      'https://api.deepseek.com/v1',
-      'DeepSeek',
-      'deepseek',
-      deepseekKey,
-      process.env.DEEPSEEK_MODEL?.trim() || 'deepseek-v4-flash',
-      prompt
-    )
-  }
-
-  const config = resolveVisionConfig()
-  if (!config) {
-    throw new Error(
-      `No AI provider configured. Set DEEPSEEK_API_KEY or one of: ${visionProviderNames().join(', ')}`
-    )
-  }
-  if (config.provider === 'gemini') return callGemini(config, prompt)
-  const baseUrl = config.provider === 'openai' ? 'https://api.openai.com/v1' : 'https://openrouter.ai/api/v1'
-  return callOpenAICompatible(
-    baseUrl,
-    config.provider,
-    config.provider,
-    config.apiKey,
-    config.model,
-    prompt
-  )
-}

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase-server'
-import { logAiUsage, normalizeUsage, servedModel } from '@/lib/ai-usage'
+import { logAiUsage, normalizeUsage } from '@/lib/ai-usage'
+import { callGeminiWithDeepSeekFallback, isProviderConfigured } from '@/lib/ai-provider'
 import { getServiceSupabaseClient } from '@/lib/supabase-admin'
 import { isAIFreeModeEnabled } from '@/lib/ai-free-mode'
 import {
@@ -27,9 +28,19 @@ export const dynamic = 'force-dynamic'
 // batch, not both.
 export const maxDuration = 60
 
-// Comfortably under maxDuration, so the route answers with a diagnosable error
-// instead of being killed mid-flight by the platform.
-const DEEPSEEK_TIMEOUT_MS = 50_000
+// Per ATTEMPT, not a shared budget: the router may spend both back to back, so the two
+// together (plus the cache re-read) still have to sit comfortably under maxDuration —
+// which is why the old single 50s ceiling could not simply be reused for each. The
+// fallback runs on DeepSeek at maxTokens=3500, which at this codebase's own measured
+// ~120 tokens/sec sustained rate (see horoscope-interpretation.ts's
+// MEASURED_TOKENS_PER_SECOND) needs at least ~29.2s to finish a genuinely long batch —
+// sizing it lower turns a slow-but-healthy fallback into a timeout that discards a real,
+// billed completion. 31s covers that with margin; the primary gets what's left, with 5s
+// held back for the surrounding DB work (cache read/write, usage logging).
+export const PALACE_PRIMARY_TIMEOUT_MS = 24_000
+export const PALACE_FALLBACK_TIMEOUT_MS = 31_000
+/** Matches this route's own `max_tokens: 3500` in generateBatch's DeepSeek call below. */
+export const PALACE_MAX_TOKENS = 3500
 
 /**
  * Counted in its own bucket, not the sections one. The counter is keyed on an
@@ -110,8 +121,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ palaces: [], needsGeneration: true })
   }
 
-  const apiKey = process.env.DEEPSEEK_API_KEY
-  if (!apiKey) {
+  // Either key alone is enough: the router treats a missing Gemini key as an unavailable
+  // primary and goes straight to the fallback, so only having neither is unserviceable.
+  if (!isProviderConfigured()) {
     return NextResponse.json({ error: 'interpretation_unavailable' }, { status: 503 })
   }
 
@@ -159,94 +171,81 @@ export async function POST(request: Request) {
   async function generateBatch(
     indexes: readonly number[],
   ): Promise<{ palaces: Record<string, PalaceReading>; refundable: boolean }> {
-    let res: Response
     // Captured before the call, not after it. DeepSeek's peak windows begin and end on the
-    // hour and this route allows the model 50 seconds, so a batch starting at 09:59:40 and
-    // returning at 10:00:30 was billed at the peak rate while being priced off-peak — a
+    // hour and a batch may spend both attempts back to back, so one starting at 09:59:40
+    // and returning at 10:00:30 was billed at the peak rate while being priced off-peak — a
     // clean 50% under-report. It also keeps the row in the calendar day it belongs to.
     const startedAt = new Date()
 
-    try {
-      res = await fetch('https://api.deepseek.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-          model: 'deepseek-v4-flash',
-          messages: [{ role: 'user', content: buildPalacePrompt(reading, lang, indexes) }],
-          response_format: { type: 'json_object' },
-          // v4-flash is a reasoning model and its reasoning tokens are spent out of
-          // max_tokens BEFORE any content is produced. The budget below was measured
-          // against deepseek-chat, which reasons not at all, so leaving thinking on burns
-          // the whole allowance on reasoning and returns finish_reason 'length' with an
-          // empty body — every reading fails. Nothing here asks for chain-of-thought: the
-          // prompt wants JSON.
-          thinking: { type: 'disabled' },
-          temperature: 0.6,
-          // Six palaces measured ~2350 output tokens; this leaves real headroom
-          // without approaching what the request has time to receive.
-          max_tokens: 3500,
-        }),
-        signal: AbortSignal.timeout(DEEPSEEK_TIMEOUT_MS),
-      })
-    } catch (error) {
-      console.error('[tu-vi] palace batch never returned:', error)
-      return { palaces: {}, refundable: true }
-    }
+    const result = await callGeminiWithDeepSeekFallback({
+      geminiModel: 'gemini-3.1-flash-lite',
+      deepseekModel: 'deepseek-v4-flash',
+      prompt: buildPalacePrompt(reading, lang, indexes),
+      temperature: 0.6,
+      // Six palaces measured ~2350 output tokens; this leaves real headroom
+      // without approaching what the request has time to receive.
+      maxTokens: PALACE_MAX_TOKENS,
+      primaryTimeoutMs: PALACE_PRIMARY_TIMEOUT_MS,
+      fallbackTimeoutMs: PALACE_FALLBACK_TIMEOUT_MS,
+    })
 
-    if (!res.ok) {
-      console.error('[tu-vi] palace batch upstream returned', res.status)
+    // One branch, not two: a transport failure — from either provider — means nothing was
+    // billed for this batch, which is the same answer the separate timeout and non-2xx
+    // branches used to give.
+    if (!result.ok) {
+      console.error(
+        '[tu-vi] palace batch failed:',
+        result.network ? 'network/timeout' : 'upstream error',
+      )
       return { palaces: {}, refundable: true }
     }
 
     try {
-      const data = await res.json()
-
       // Inside generateBatch on purpose: the two batches are two provider calls and are
       // billed as two, so they are recorded as two (FR-001a). The insert is bounded at
-      // 1s, which is negligible against the 50s provider ceiling this route already sets.
+      // 1s, which is negligible against the provider ceilings this route already sets.
       //
       // The outcome is decided after parsing, not assumed here. A batch that comes back
       // whole and yields no usable palaces was still billed in full, and filing it as a
       // success is what would make that wasted spend invisible (FR-005a). Note this is a
       // different question from `refundable`, which is about the user's daily allowance.
+      //
+      // Which provider served it is read off the result, not assumed: the fallback bills a
+      // different account at a different rate, so recording the primary either way would
+      // attribute DeepSeek's spend to Gemini.
       const recordUsage = (outcome: 'success' | 'error') =>
         logAiUsage({
           surface: 'tuvi_palaces',
-          provider: 'deepseek',
-          model: servedModel(data, 'deepseek-v4-flash'),
-          usage: normalizeUsage(data.usage, 'deepseek'),
+          provider: result.provider,
+          model: result.model,
+          usage: normalizeUsage(result.usage, result.provider),
           outcome,
           userId,
           actor: 'user',
           at: startedAt,
         })
 
-      const content: string = data.choices?.[0]?.message?.content ?? ''
-      const truncated = data.choices?.[0]?.finish_reason === 'length'
+      const content = result.text
       const palaces = parsePalaceReadings(JSON.parse(content))
       if (Object.keys(palaces).length === 0) {
         await recordUsage('error')
         console.error(
-          `[tu-vi] palace batch empty: finish_reason=${data.choices?.[0]?.finish_reason} chars=${content.length}`,
+          `[tu-vi] palace batch empty: truncated=${result.truncated} chars=${content.length}`,
         )
         // Truncation is a ceiling we set, not abuse, so it stays refundable.
-        return { palaces: {}, refundable: truncated }
+        return { palaces: {}, refundable: result.truncated }
       }
       await recordUsage('success')
       return { palaces, refundable: false }
     } catch (error) {
-      // A timeout fires just as readily while the body is still streaming as it
-      // does on the request itself, and that is no answer at all rather than a
-      // malformed one.
-      const aborted =
-        error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError')
+      // Only JSON.parse and parsePalaceReadings run in here now — the router owns the
+      // transport, so a timeout can no longer surface at this point the way it did while
+      // the response body was still being streamed here. What is left is a completion that
+      // arrived whole and was billed, which is not refundable.
       console.error(
         `[tu-vi] palace batch unreadable: ${error instanceof Error ? `${error.name}: ${error.message}` : String(error)}`,
       )
-      return { palaces: {}, refundable: aborted }
+      return { palaces: {}, refundable: false }
     }
   }
 

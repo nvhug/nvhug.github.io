@@ -5,6 +5,7 @@ const {
   mockCreateSupabaseServerClient,
   mockCheckAITrialQuota,
   mockIncrementAITrialUsage,
+  mockLogAiUsage,
 } = vi.hoisted(() => {
   const mockGetUser = vi.fn(async () => ({ data: { user: { id: 'user-1' } } }))
 
@@ -56,12 +57,14 @@ const {
 
   const mockCheckAITrialQuota = vi.fn()
   const mockIncrementAITrialUsage = vi.fn(async () => {})
+  const mockLogAiUsage = vi.fn(async () => 'usage-log-id')
 
   return {
     mockGetUser,
     mockCreateSupabaseServerClient,
     mockCheckAITrialQuota,
     mockIncrementAITrialUsage,
+    mockLogAiUsage,
   }
 })
 
@@ -83,17 +86,21 @@ vi.mock('@/lib/ai-trial', () => ({
 }))
 
 vi.mock('@/lib/ai-usage', () => ({
-  logAiUsage: vi.fn(async () => 'usage-log-id'),
+  logAiUsage: mockLogAiUsage,
   normalizeUsage: vi.fn(() => ({
     input_tokens: 0,
     cached_input_tokens: 0,
     output_tokens: 0,
     reasoning_tokens: 0,
   })),
+  // Not called by route.ts directly any more — but ai-provider.ts (exercised for real by
+  // this file's fetch-level provider mocking) imports it from this same module, and
+  // vi.mock replaces the whole module for every importer, not just route.ts's own.
   servedModel: vi.fn((_raw: unknown, requested: string) => requested),
 }))
 
-import { POST } from './route'
+import { ANALYZE_FALLBACK_TIMEOUT_MS, ANALYZE_MAX_TOKENS, POST } from './route'
+import { MEASURED_TOKENS_PER_SECOND } from '@/lib/horoscope-interpretation'
 
 function makeRequest() {
   return new Request('http://localhost/api/notes/analyze', {
@@ -111,15 +118,38 @@ function makeRequest() {
   })
 }
 
+const ANALYSIS = JSON.stringify({ summary: 'ok' })
+
+function geminiResponse() {
+  return new Response(JSON.stringify({
+    candidates: [{ content: { parts: [{ text: ANALYSIS }] }, finishReason: 'STOP' }],
+    usageMetadata: { promptTokenCount: 1, candidatesTokenCount: 1 },
+  }), { status: 200 })
+}
+
+function deepseekResponse() {
+  return new Response(JSON.stringify({
+    choices: [{ message: { content: ANALYSIS }, finish_reason: 'stop' }],
+    usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+  }), { status: 200 })
+}
+
+/** Routes each provider URL to its own reply, so tests only state what differs. */
+function mockProviders(gemini: () => Response, deepseek: () => Response = deepseekResponse) {
+  const fetchMock = vi.fn(async (url: string | URL | Request) =>
+    String(url).includes('googleapis.com') ? gemini() : deepseek()
+  )
+  global.fetch = fetchMock as unknown as typeof fetch
+  return fetchMock
+}
+
 describe('POST /api/notes/analyze', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
+    process.env.GEMINI_API_KEY = 'test-gemini-key'
     process.env.DEEPSEEK_API_KEY = 'test-key'
-    global.fetch = vi.fn(async () => new Response(JSON.stringify({
-      choices: [{ message: { content: JSON.stringify({ summary: 'ok' }) } }],
-      usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
-    }), { status: 200 })) as unknown as typeof fetch
+    mockProviders(geminiResponse)
   })
 
   it('does not consume trial usage when AI Free Mode is on', async () => {
@@ -145,5 +175,50 @@ describe('POST /api/notes/analyze', () => {
     const response = await POST(makeRequest())
     expect(response.status).toBe(429)
     expect(mockIncrementAITrialUsage).not.toHaveBeenCalled()
+  })
+
+  it('falls back to DeepSeek when Gemini fails, and logs the provider that served it', async () => {
+    mockCheckAITrialQuota.mockResolvedValue({ allowed: true, used: 1, limit: 12, remaining: 11 })
+    mockProviders(() => new Response('upstream boom', { status: 500 }))
+
+    const response = await POST(makeRequest())
+    expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject({ summary: 'ok' })
+    expect(mockLogAiUsage).toHaveBeenCalledWith(
+      expect.objectContaining({ provider: 'deepseek', model: 'deepseek-v4-flash', outcome: 'success' }),
+    )
+  })
+
+  it('returns 502 without logging usage when neither provider serves the request', async () => {
+    mockCheckAITrialQuota.mockResolvedValue({ allowed: true, used: 1, limit: 12, remaining: 11 })
+    mockProviders(
+      () => new Response('boom', { status: 500 }),
+      () => new Response('boom', { status: 500 }),
+    )
+
+    const response = await POST(makeRequest())
+    expect(response.status).toBe(502)
+    expect(mockLogAiUsage).not.toHaveBeenCalled()
+  })
+
+  // T015 — quota parity: which provider served the call must not change what it costs.
+  it.each([
+    ['Gemini', geminiResponse],
+    ['DeepSeek', () => new Response('boom', { status: 500 })],
+  ])('counts trial usage exactly once when %s serves the request', async (_name, gemini) => {
+    mockCheckAITrialQuota.mockResolvedValue({ allowed: true, used: 1, limit: 12, remaining: 11 })
+    mockProviders(gemini)
+
+    const response = await POST(makeRequest())
+    expect(response.status).toBe(200)
+    expect(mockCheckAITrialQuota).toHaveBeenCalledTimes(1)
+    expect(mockIncrementAITrialUsage).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('DeepSeek fallback timeout budget', () => {
+  it('waits longer than a genuinely long analysis takes to produce', () => {
+    const worstCaseMs = (ANALYZE_MAX_TOKENS / MEASURED_TOKENS_PER_SECOND) * 1000
+    expect(ANALYZE_FALLBACK_TIMEOUT_MS).toBeGreaterThan(worstCaseMs)
   })
 })
