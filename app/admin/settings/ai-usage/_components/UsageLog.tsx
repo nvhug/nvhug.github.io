@@ -1,5 +1,6 @@
 'use client'
 
+import { Trash2 } from 'lucide-react'
 import { formatUsd } from '@/lib/ai-pricing'
 import { useLanguage } from '@/lib/i18n/language-context'
 import { formatDateTime, formatTokens } from '../_lib/format'
@@ -18,6 +19,8 @@ export function UsageLog({
   surfaceLabel,
   error,
   onRetry,
+  onDelete,
+  deletingId,
   emptyText,
 }: {
   rows: LogRow[]
@@ -28,6 +31,9 @@ export function UsageLog({
   surfaceLabel: (s: LogRow['surface']) => string
   error: boolean
   onRetry: () => void
+  onDelete: (row: LogRow) => void
+  /** The row whose delete is in flight, so only its own button goes quiet. */
+  deletingId: string | null
   emptyText: string
 }) {
   const { t, lang } = useLanguage()
@@ -63,7 +69,7 @@ export function UsageLog({
               container so the page body never does, and the timestamp column stays put:
               scroll right without it and a row loses the only thing identifying it. */}
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px] text-left text-sm">
+            <table className="w-full min-w-170 text-left text-sm">
               <thead>
                 <tr className="border-b border-zinc-100 bg-zinc-50/80 text-[11px] font-semibold uppercase tracking-wider text-zinc-400">
                   <th scope="col" className="sticky left-0 bg-zinc-50 px-3 py-2">
@@ -74,6 +80,11 @@ export function UsageLog({
                   <th scope="col" className="px-3 py-2">{t('admin.settings.aiUsage.colModel')}</th>
                   <th scope="col" className="px-3 py-2 text-right">{t('admin.settings.aiUsage.colTokens')}</th>
                   <th scope="col" className="px-3 py-2 text-right">{t('admin.settings.aiUsage.colCost')}</th>
+                  {/* Labelled for screen readers only: the column is one icon wide and a
+                      visible header would be wider than the control it names. */}
+                  <th scope="col" className="w-10 px-3 py-2">
+                    <span className="sr-only">{t('admin.settings.aiUsage.colActions')}</span>
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -120,6 +131,18 @@ export function UsageLog({
                           {formatUsd(row.cost_usd)}
                         </span>
                       )}
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      <button
+                        type="button"
+                        onClick={() => onDelete(row)}
+                        disabled={deletingId === row.id}
+                        aria-label={t('admin.settings.aiUsage.deleteRow')}
+                        title={t('admin.settings.aiUsage.deleteRow')}
+                        className="rounded p-1.5 text-zinc-400 transition-colors hover:bg-rose-50 hover:text-rose-500 disabled:cursor-not-allowed disabled:opacity-40 sm:p-1"
+                      >
+                        <Trash2 className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
+                      </button>
                     </td>
                   </tr>
                 ))}

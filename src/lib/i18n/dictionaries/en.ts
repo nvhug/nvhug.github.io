@@ -1061,6 +1061,12 @@ export const en: Dictionary = {
         colSurface: 'Feature',
         colModel: 'Model',
         colOutcome: 'Outcome',
+        colActions: 'Actions',
+
+        deleteRow: 'Delete this call',
+        deleteRowHint: 'Permanent — the totals for this period drop with it.',
+        deleteRowSuccess: 'Call deleted.',
+        deleteRowError: 'Could not delete the call.',
 
         outcomeError: 'Failed',
         outcomeErrorHint: 'The provider returned a result and billed for it, but the app could not use it.',

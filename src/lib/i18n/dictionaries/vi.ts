@@ -1061,6 +1061,14 @@ export const vi = {
         colSurface: 'Tính năng',
         colModel: 'Model',
         colOutcome: 'Kết quả',
+        colActions: 'Thao tác',
+
+        deleteRow: 'Xoá lượt gọi này',
+        // Says what is lost, because the tiles and biểu đồ above are recomputed from the
+        // same rows: xoá một dòng làm chi phí của kỳ đó giảm theo, và không khôi phục được.
+        deleteRowHint: 'Xoá vĩnh viễn — số liệu tổng của kỳ này sẽ giảm theo.',
+        deleteRowSuccess: 'Đã xoá lượt gọi.',
+        deleteRowError: 'Không xoá được lượt gọi.',
 
         outcomeError: 'Lỗi',
         // The whole of FR-005a, said in one sentence where the admin will meet it.

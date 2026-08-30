@@ -6,13 +6,14 @@ import { usePathname } from 'next/navigation'
 import { Coins, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { getSupabaseBrowserClient } from '@/lib/supabase-browser'
+import { ConfirmModal } from '@/components/ui/confirm-modal'
 import { useLanguage } from '@/lib/i18n/language-context'
 import { useUserRole } from '@/lib/useUserRole'
 import { UsageTiles } from './_components/UsageTiles'
 import { UsageTrend } from './_components/UsageTrend'
 import { UsageBreakdown, type BreakdownRow } from './_components/UsageBreakdown'
 import { LOG_PAGE_SIZE, UsageLog } from './_components/UsageLog'
-import { formatTokens, formatUserIdentity } from './_lib/format'
+import { formatDateTime, formatTokens, formatUserIdentity } from './_lib/format'
 import {
   actorScopeOf,
   EMPTY_SUMMARY,
@@ -61,7 +62,7 @@ function periodBounds(days: PeriodDays): { from: string; to: string } {
 }
 
 export default function AiUsagePage() {
-  const { t } = useLanguage()
+  const { t, lang } = useLanguage()
   const pathname = usePathname()
   const { role, loading: roleLoading } = useUserRole()
 
@@ -79,6 +80,8 @@ export default function AiUsagePage() {
   // comparing against, and comparing periods is the main interaction here.
   const [firstLoad, setFirstLoad] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<LogRow | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
   const bounds = useMemo(() => periodBounds(days), [days])
 
@@ -193,6 +196,35 @@ export default function AiUsagePage() {
       setScope((cur) => (cur && sameScope(cur, next) ? null : next))
       setLogPage(1)
     })
+  }
+
+  /**
+   * Removes one row from the log, through the admin route rather than the browser client:
+   * the RLS policy on ai_usage_log denies every write, and it stays that way.
+   *
+   * Both queries are re-run afterwards. The tiles and the chart are computed from these
+   * same rows, so refreshing only the table would leave the page disagreeing with itself.
+   */
+  async function confirmDelete() {
+    const row = deleteTarget
+    if (!row) return
+    setDeletingId(row.id)
+    try {
+      const res = await fetch(`/api/admin/ai-usage/${row.id}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      setDeleteTarget(null)
+      toast.success(t('admin.settings.aiUsage.deleteRowSuccess'))
+      // Deleting the last row of a page other than the first would otherwise leave the
+      // admin on an empty page they have to click their own way out of.
+      if (logRows.length === 1 && logPage > 1) setLogPage(logPage - 1)
+      else await loadLog()
+      await loadReport()
+    } catch (err) {
+      console.error('[ai-usage] delete failed:', err)
+      toast.error(t('admin.settings.aiUsage.deleteRowError'))
+    } finally {
+      setDeletingId(null)
+    }
   }
 
   // Role must finish loading before anything role-dependent renders, or a genuine admin
@@ -411,6 +443,8 @@ export default function AiUsagePage() {
             onPage={setLogPage}
             error={logError}
             onRetry={() => void loadLog()}
+            onDelete={setDeleteTarget}
+            deletingId={deletingId}
             userLabel={(row) => labelForScope(actorScopeOf(row), true)}
             surfaceLabel={(s) => SURFACE_LABELS[s] ?? s}
             emptyText={t('admin.settings.aiUsage.emptyPeriod', { period: periodLabel })}
@@ -421,6 +455,23 @@ export default function AiUsagePage() {
           </p>
         </>
       )}
+
+      <ConfirmModal
+        open={!!deleteTarget}
+        itemContent={
+          deleteTarget
+            ? `${SURFACE_LABELS[deleteTarget.surface] ?? deleteTarget.surface} · ${deleteTarget.model}`
+            : undefined
+        }
+        itemMeta={
+          deleteTarget
+            ? `${formatDateTime(deleteTarget.created_at, lang)} · ${labelForScope(actorScopeOf(deleteTarget), true)} — ${t('admin.settings.aiUsage.deleteRowHint')}`
+            : undefined
+        }
+        loading={!!deletingId}
+        onConfirm={() => void confirmDelete()}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   )
 }
