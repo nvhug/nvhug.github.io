@@ -1,7 +1,7 @@
 'use client'
 
-import { useMemo, useState } from 'react'
-import { ChevronDown } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Check, ChevronDown, LoaderCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { getSupabaseBrowserClient } from '@/lib/supabase-browser'
 import { useLanguage } from '@/lib/i18n/language-context'
@@ -25,6 +25,12 @@ const GENDER_LABEL_KEY: Record<Gender, string> = {
 }
 
 type Calendar = 'solar' | 'lunar'
+
+// Fake steps over the same simulated ticker — the backend is one blocking completion with
+// no real step signal, so this narrates plausible phases of it rather than claiming to know
+// the model's actual progress. Thresholds must stay below the ticker's 88% cap.
+const GENERATION_STEP_KEYS = ['tuVi.genStep1', 'tuVi.genStep2', 'tuVi.genStep3', 'tuVi.genStep4'] as const
+const GENERATION_STEP_THRESHOLDS = [0, 30, 55, 80]
 
 function parseSolarISO(iso: string): SolarDate {
   const [year, month, day] = iso.split('-').map(Number)
@@ -168,6 +174,37 @@ export function HoroscopeOnboardingForm({
   // itself takes milliseconds; the reading takes half a minute, and a reader watching a
   // button that still says "Đang lưu" after twenty seconds assumes it has hung.
   const [generating, setGenerating] = useState(false)
+  // No real progress signal from the server (a single ~20-33s blocking call), so this is a
+  // simulated ticker like FoodPhotoAnalyzer's — it decelerates and caps below 100 until the
+  // call actually resolves, so it never lies about being done.
+  const [generationProgress, setGenerationProgress] = useState(0)
+  const progressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (progressTimerRef.current) clearInterval(progressTimerRef.current)
+    }
+  }, [])
+
+  function startProgressTicker() {
+    if (progressTimerRef.current) clearInterval(progressTimerRef.current)
+    setGenerationProgress(6)
+    progressTimerRef.current = setInterval(() => {
+      setGenerationProgress((prev) => {
+        if (prev >= 88) return prev
+        const step = prev < 35 ? 8 : prev < 65 ? 5 : 2
+        return Math.min(88, prev + step)
+      })
+    }, 400)
+  }
+
+  function stopProgressTicker(finalPercent = 100) {
+    if (progressTimerRef.current) {
+      clearInterval(progressTimerRef.current)
+      progressTimerRef.current = null
+    }
+    setGenerationProgress(finalPercent)
+  }
 
   const solar = parseSolarISO(birthDateSolar)
 
@@ -251,6 +288,7 @@ export function HoroscopeOnboardingForm({
       // reading screen offers its own generate button, so a provider hiccup must not turn a
       // successful save into an error the reader has to act on.
       setGenerating(true)
+      startProgressTicker()
       try {
         await Promise.all([
           fetch('/api/tu-vi/interpret', {
@@ -264,8 +302,10 @@ export function HoroscopeOnboardingForm({
             body: JSON.stringify({ lang }),
           }),
         ])
+        stopProgressTicker(100)
       } catch {
         // Nothing to tell the reader: the screen they land on can generate on demand.
+        stopProgressTicker(0)
       } finally {
         setGenerating(false)
       }
@@ -438,10 +478,51 @@ export function HoroscopeOnboardingForm({
         type="button"
         onClick={() => void handleSubmit()}
         disabled={busy}
-        className="relative mt-6 w-full rounded-xl bg-[#047857] px-4 py-3 font-tuvi-sans text-sm font-medium text-white shadow-[0_10px_24px_-14px_rgba(4,120,87,0.9)] transition-all hover:bg-[#065f46] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#047857] active:scale-[0.99] disabled:opacity-60"
+        className="relative mt-6 w-full overflow-hidden rounded-xl bg-[#047857] px-4 py-3 font-tuvi-sans text-sm font-medium text-white shadow-[0_10px_24px_-14px_rgba(4,120,87,0.9)] transition-all hover:bg-[#065f46] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#047857] active:scale-[0.99] disabled:opacity-60"
       >
-        {generating ? t('tuVi.submitGenerating') : saving ? t('tuVi.submitSaving') : t('tuVi.submit')}
+        {generating && (
+          <span
+            aria-hidden="true"
+            className="absolute inset-y-0 left-0 bg-white/15 transition-all duration-300"
+            style={{ width: `${generationProgress}%` }}
+          />
+        )}
+        <span className="relative">
+          {generating
+            ? t('tuVi.submitGenerating', { percent: generationProgress })
+            : saving
+              ? t('tuVi.submitSaving')
+              : t('tuVi.submit')}
+        </span>
       </button>
+
+      {generating && (
+        <ul className="relative mt-3 space-y-1.5" aria-live="polite">
+          {GENERATION_STEP_KEYS.map((key, index) => {
+            const reached = generationProgress >= GENERATION_STEP_THRESHOLDS[index]
+            const current =
+              reached &&
+              (index === GENERATION_STEP_KEYS.length - 1 ||
+                generationProgress < GENERATION_STEP_THRESHOLDS[index + 1])
+            if (!reached) return null
+            return (
+              <li
+                key={key}
+                className={`flex items-center gap-2 font-tuvi-sans text-xs transition-colors ${
+                  current ? 'text-[#047857]' : 'text-[#a1a1aa]'
+                }`}
+              >
+                {current ? (
+                  <LoaderCircle className="h-3.5 w-3.5 shrink-0 animate-spin" />
+                ) : (
+                  <Check className="h-3.5 w-3.5 shrink-0" />
+                )}
+                {t(key)}
+              </li>
+            )
+          })}
+        </ul>
+      )}
 
       <p className="relative mt-5 border-t border-emerald-100/80 pt-4 font-tuvi-sans text-xs leading-relaxed text-[#52525b]">
         {t('tuVi.disclaimer')}
