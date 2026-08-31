@@ -431,7 +431,7 @@ describe('streamGeminiWithDeepSeekFallback', () => {
     mockFetchSequence([geminiStream('{"from":', '"gemini"}')])
 
     const deltas: string[] = []
-    const result = await streamGeminiWithDeepSeekFallback(OPTS, d => deltas.push(d))
+    const result = await streamGeminiWithDeepSeekFallback(OPTS, { onDelta: d => deltas.push(d) })
 
     expect(deltas).toEqual(['{"from":', '"gemini"}'])
     expect(result).toMatchObject({ ok: true, provider: 'gemini', text: '{"from":"gemini"}' })
@@ -440,7 +440,7 @@ describe('streamGeminiWithDeepSeekFallback', () => {
   it('asks Gemini for its SSE endpoint', async () => {
     const fetchMock = mockFetchSequence([sseResponse(geminiFrame('{}'))])
 
-    await streamGeminiWithDeepSeekFallback(OPTS, () => {})
+    await streamGeminiWithDeepSeekFallback(OPTS, { onDelta: () => {} })
 
     expect(urlOf(fetchMock.mock.calls[0])).toContain(':streamGenerateContent?alt=sse')
   })
@@ -451,7 +451,7 @@ describe('streamGeminiWithDeepSeekFallback', () => {
       deepseekStream('{"from":"deepseek"}'),
     ])
 
-    const result = await streamGeminiWithDeepSeekFallback(OPTS, () => {})
+    const result = await streamGeminiWithDeepSeekFallback(OPTS, { onDelta: () => {} })
 
     expect(result).toMatchObject({ ok: true, provider: 'deepseek', text: '{"from":"deepseek"}' })
   })
@@ -462,7 +462,7 @@ describe('streamGeminiWithDeepSeekFallback', () => {
       sseResponse(deepseekFrame('{}'), '[DONE]'),
     ])
 
-    await streamGeminiWithDeepSeekFallback(OPTS, () => {})
+    await streamGeminiWithDeepSeekFallback(OPTS, { onDelta: () => {} })
 
     expect(bodyOf(fetchMock.mock.calls[1])).toMatchObject({
       stream: true,
@@ -475,7 +475,7 @@ describe('streamGeminiWithDeepSeekFallback', () => {
     const fetchMock = mockFetchSequence([sseThenBreaks(geminiFrame('{"from":'))])
 
     const deltas: string[] = []
-    const result = await streamGeminiWithDeepSeekFallback(OPTS, d => deltas.push(d))
+    const result = await streamGeminiWithDeepSeekFallback(OPTS, { onDelta: d => deltas.push(d) })
 
     expect(deltas).toEqual(['{"from":'])
     expect(fetchMock).toHaveBeenCalledTimes(1)
@@ -488,7 +488,7 @@ describe('streamGeminiWithDeepSeekFallback', () => {
       deepseekStream('{"from":"deepseek"}'),
     ])
 
-    const result = await streamGeminiWithDeepSeekFallback(OPTS, () => {})
+    const result = await streamGeminiWithDeepSeekFallback(OPTS, { onDelta: () => {} })
 
     expect(fetchMock).toHaveBeenCalledTimes(2)
     expect(result).toMatchObject({ ok: true, provider: 'deepseek' })
@@ -509,7 +509,7 @@ describe('streamGeminiWithDeepSeekFallback', () => {
     )])
 
     const deltas: string[] = []
-    const result = await streamGeminiWithDeepSeekFallback(OPTS, d => deltas.push(d))
+    const result = await streamGeminiWithDeepSeekFallback(OPTS, { onDelta: d => deltas.push(d) })
 
     expect(deltas).toEqual(['{"from":', '"gemini"}'])
     expect(result).toMatchObject({ ok: true, text: '{"from":"gemini"}' })
@@ -518,7 +518,7 @@ describe('streamGeminiWithDeepSeekFallback', () => {
   it('reports a truncated completion from the provider stop reason', async () => {
     mockFetchSequence([sseResponse(geminiFrame('cut off', { candidates: [{ finishReason: 'MAX_TOKENS' }] }))])
 
-    const result = await streamGeminiWithDeepSeekFallback(OPTS, () => {})
+    const result = await streamGeminiWithDeepSeekFallback(OPTS, { onDelta: () => {} })
 
     expect(result).toMatchObject({ ok: true, truncated: true })
   })
@@ -535,7 +535,7 @@ describe('streamGeminiWithDeepSeekFallback — a stream that ends without finish
     // attempt, and nothing has been emitted, so the fallback can still rescue it.
     mockFetchSequence([sseResponse(), deepseekStream('{"from":"deepseek"}')])
 
-    const result = await streamGeminiWithDeepSeekFallback(OPTS, () => {})
+    const result = await streamGeminiWithDeepSeekFallback(OPTS, { onDelta: () => {} })
 
     expect(result).toMatchObject({ ok: true, provider: 'deepseek' })
   })
@@ -544,7 +544,7 @@ describe('streamGeminiWithDeepSeekFallback — a stream that ends without finish
     const fetchMock = mockFetchSequence([sseResponse(geminiFrame('{"grade":"C",'))])
 
     const deltas: string[] = []
-    const result = await streamGeminiWithDeepSeekFallback(OPTS, d => deltas.push(d))
+    const result = await streamGeminiWithDeepSeekFallback(OPTS, { onDelta: d => deltas.push(d) })
 
     expect(deltas).toEqual(['{"grade":"C",'])
     expect(fetchMock).toHaveBeenCalledTimes(1)
@@ -557,7 +557,7 @@ describe('streamGeminiWithDeepSeekFallback — a stream that ends without finish
       geminiFrame('', { candidates: [{ finishReason: 'STOP' }] }),
     )])
 
-    expect(await streamGeminiWithDeepSeekFallback(OPTS, () => {}))
+    expect(await streamGeminiWithDeepSeekFallback(OPTS, { onDelta: () => {} }))
       .toMatchObject({ ok: true, provider: 'gemini', text: '{"ok":true}' })
   })
 
@@ -566,7 +566,65 @@ describe('streamGeminiWithDeepSeekFallback — a stream that ends without finish
       geminiFrame('{"cut":', { candidates: [{ finishReason: 'MAX_TOKENS' }] }),
     )])
 
-    expect(await streamGeminiWithDeepSeekFallback(OPTS, () => {}))
+    expect(await streamGeminiWithDeepSeekFallback(OPTS, { onDelta: () => {} }))
       .toMatchObject({ ok: true, truncated: true })
+  })
+})
+
+describe('streamGeminiWithDeepSeekFallback — onRestart', () => {
+  /** Gemini emits, then the stream ends without a stop reason: the real observed failure. */
+  function geminiDiesAfterEmitting() {
+    return sseResponse(geminiFrame('{"grade":"C",'))
+  }
+
+  it('without onRestart, emitted output is stranded and the fallback never runs', async () => {
+    const fetchMock = mockFetchSequence([geminiDiesAfterEmitting()])
+
+    const result = await streamGeminiWithDeepSeekFallback(OPTS, { onDelta: () => {} })
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(result).toEqual({ ok: false, network: true })
+  })
+
+  it('with onRestart, the fallback runs and the caller is told to discard first', async () => {
+    mockFetchSequence([geminiDiesAfterEmitting(), deepseekStream('{"from":"deepseek"}')])
+
+    const events: string[] = []
+    const result = await streamGeminiWithDeepSeekFallback(OPTS, {
+      onDelta: d => events.push(`delta:${d}`),
+      onRestart: () => events.push('restart'),
+    })
+
+    // The order is the whole contract: the abandoned answer is cleared BEFORE the
+    // replacement starts arriving, so the two are never concatenated.
+    expect(events).toEqual(['delta:{"grade":"C",', 'restart', 'delta:{"from":"deepseek"}'])
+    expect(result).toMatchObject({ ok: true, provider: 'deepseek', text: '{"from":"deepseek"}' })
+  })
+
+  it('does not call onRestart when the primary failed before emitting anything', async () => {
+    mockFetchSequence([httpResponse(429, { error: 'rate limited' }), deepseekStream('{"ok":1}')])
+
+    const onRestart = vi.fn()
+    await streamGeminiWithDeepSeekFallback(OPTS, { onDelta: () => {}, onRestart })
+
+    expect(onRestart).not.toHaveBeenCalled()
+  })
+
+  it('does not call onRestart when the primary succeeds', async () => {
+    mockFetchSequence([geminiStream('{"ok":1}')])
+
+    const onRestart = vi.fn()
+    await streamGeminiWithDeepSeekFallback(OPTS, { onDelta: () => {}, onRestart })
+
+    expect(onRestart).not.toHaveBeenCalled()
+  })
+
+  it('still refuses a non-retryable failure, onRestart or not', async () => {
+    const fetchMock = mockFetchSequence([httpResponse(400, { error: 'bad request' })])
+
+    const result = await streamGeminiWithDeepSeekFallback(OPTS, { onDelta: () => {}, onRestart: () => {} })
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(result).toEqual({ ok: false, network: false })
   })
 })

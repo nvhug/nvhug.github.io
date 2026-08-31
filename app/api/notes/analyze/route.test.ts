@@ -290,3 +290,40 @@ describe('DeepSeek fallback timeout budget', () => {
     expect(ANALYZE_FALLBACK_TIMEOUT_MS).toBeGreaterThan(worstCaseMs)
   })
 })
+
+describe('POST /api/notes/analyze — provider restart mid-stream', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
+    process.env.GEMINI_API_KEY = 'test-gemini-key'
+    process.env.DEEPSEEK_API_KEY = 'test-key'
+    mockCheckAITrialQuota.mockResolvedValue({ allowed: true, used: 1, limit: 12, remaining: 11 })
+  })
+
+  // Gemini emits, then its stream dies without a stop reason — observed live against the
+  // free tier. The abandoned sections must be withdrawn from the client before DeepSeek's
+  // arrive, or the reader ends up holding a mixture of two different analyses.
+  it('tells the client to drop the abandoned sections before the replacement arrives', async () => {
+    mockProviders(
+      () => new Response(sse(JSON.stringify({
+        candidates: [{ content: { parts: [{ text: '{"summary": "from gemini",' }] } }],
+      }))),
+    )
+
+    const response = await POST(makeRequest())
+    const { events, sections, done } = await readStream(response)
+
+    const names = events.map(e => e.event)
+    expect(names).toContain('reset')
+    // Order is the contract: abandoned section, then reset, then the replacement's.
+    expect(names.indexOf('section')).toBeLessThan(names.indexOf('reset'))
+    expect(names.indexOf('reset')).toBeLessThan(names.lastIndexOf('section'))
+
+    expect(sections.at(0)).toEqual({ key: 'summary', value: 'from gemini' })
+    expect(sections.at(-1)).toEqual({ key: 'summary', value: 'ok' })
+    expect(done).toMatchObject({ summary: 'ok' })
+    expect(mockLogAiUsage).toHaveBeenCalledWith(
+      expect.objectContaining({ provider: 'deepseek', outcome: 'success' }),
+    )
+  })
+})

@@ -905,22 +905,33 @@ Trả về JSON hợp lệ với đúng cấu trúc sau (không thêm/bỏ field
             primaryTimeoutMs: ANALYZE_PRIMARY_TIMEOUT_MS,
             fallbackTimeoutMs: ANALYZE_FALLBACK_TIMEOUT_MS,
           },
-          (delta) => {
-            buffer += delta
-            const complete = parseCompleteSections(buffer)
-            if (!complete) return
-            let added = false
-            for (const [key, value] of Object.entries(complete)) {
-              if (sentKeys.has(key)) continue
-              sentKeys.add(key)
-              added = true
-              send('section', { key, value })
-            }
-            // Only when a section actually closed: progress that ticks on every delta
-            // would be a byte counter wearing a percentage's clothes.
-            if (added) {
-              send('progress', { percent: sectionProgressPercent(sentKeys.size, ANALYZE_SECTION_KEYS.length) })
-            }
+          {
+            // Sections already sent belong to an answer that was abandoned. The client
+            // renders them as a preview, so it can drop them — but it has to be told,
+            // or the replacement's sections would land among the old ones.
+            onRestart: () => {
+              buffer = ''
+              sentKeys.clear()
+              send('reset', {})
+              send('progress', { percent: 0 })
+            },
+            onDelta: (delta) => {
+              buffer += delta
+              const complete = parseCompleteSections(buffer)
+              if (!complete) return
+              let added = false
+              for (const [key, value] of Object.entries(complete)) {
+                if (sentKeys.has(key)) continue
+                sentKeys.add(key)
+                added = true
+                send('section', { key, value })
+              }
+              // Only when a section actually closed: progress that ticks on every delta
+              // would be a byte counter wearing a percentage's clothes.
+              if (added) {
+                send('progress', { percent: sectionProgressPercent(sentKeys.size, ANALYZE_SECTION_KEYS.length) })
+              }
+            },
           },
         )
 

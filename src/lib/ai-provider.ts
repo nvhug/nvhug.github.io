@@ -347,6 +347,23 @@ export async function callGeminiWithDeepSeekFallback(
 /** Receives each text delta, in order, as it arrives from whichever provider served it. */
 export type ProviderDeltaHandler = (delta: string) => void
 
+export interface ProviderStreamHandlers {
+  onDelta: ProviderDeltaHandler
+
+  /**
+   * Called before the fallback's first delta, when the primary had already emitted.
+   * Everything handed to `onDelta` so far belongs to an answer that was abandoned and
+   * must be discarded — the fallback starts the document again from the beginning.
+   *
+   * Providing this is a claim about the CALLER, not a preference: that whatever it did
+   * with those deltas can be taken back. A route that only moved a progress bar can.
+   * One that has already handed text to a reader as final cannot, and must omit it —
+   * without it the router keeps the stricter rule and gives up instead of splicing two
+   * different answers together.
+   */
+  onRestart?: () => void
+}
+
 interface StreamAttemptSuccess extends AttemptSuccess { emitted: boolean }
 interface StreamAttemptFailure extends AttemptFailure {
   /**
@@ -540,16 +557,17 @@ async function streamDeepSeek(
 /**
  * Streaming twin of callGeminiWithDeepSeekFallback. Same providers, same retry
  * classification, same result shape — `text` is the whole completion, so a caller that
- * ignores `onDelta` gets exactly what the buffered call returns.
+ * ignores the deltas gets exactly what the buffered call returns.
  *
- * One rule differs, and it is why this is a separate function: the fallback runs only
- * while nothing has been emitted. Once a delta has left for the client, a Gemini failure
- * is final — switching providers mid-document would splice two different answers
- * together, and no caller can un-render what it already showed.
+ * One rule differs, and it is why this is a separate function: emitted output can block
+ * the fallback. Splicing half a Gemini answer onto half a DeepSeek one produces a
+ * document neither model wrote, so by default a failure after the first delta is final.
+ * A caller that can discard what it was given says so with `onRestart`, and then the
+ * fallback runs after all — see ProviderStreamHandlers.
  */
 export async function streamGeminiWithDeepSeekFallback(
   opts: ProviderCallOptions,
-  onDelta: ProviderDeltaHandler
+  handlers: ProviderStreamHandlers
 ): Promise<ProviderCallResult> {
   const geminiKey = process.env.GEMINI_API_KEY
   const deepseekKey = process.env.DEEPSEEK_API_KEY
@@ -557,7 +575,7 @@ export async function streamGeminiWithDeepSeekFallback(
   let primaryFailure: StreamAttemptFailure | null = null
 
   if (geminiKey) {
-    const primary = await streamGemini(geminiKey, opts, onDelta)
+    const primary = await streamGemini(geminiKey, opts, handlers.onDelta)
     if (primary.ok) {
       return {
         ok: true,
@@ -569,7 +587,8 @@ export async function streamGeminiWithDeepSeekFallback(
       }
     }
     logAttemptFailure('gemini', primary)
-    if (primary.emitted || !isRetryable(primary)) {
+    const strandedOutput = primary.emitted && !handlers.onRestart
+    if (strandedOutput || !isRetryable(primary)) {
       return { ok: false, network: primary.emitted && primary.status === null }
     }
     primaryFailure = primary
@@ -577,7 +596,11 @@ export async function streamGeminiWithDeepSeekFallback(
 
   if (!deepseekKey) return { ok: false, network: primaryFailure?.status === null }
 
-  const fallback = await streamDeepSeek(deepseekKey, opts, onDelta)
+  // Before the fallback's first delta, never after: the caller has to be clear of the
+  // abandoned answer before the replacement starts arriving.
+  if (primaryFailure?.emitted) handlers.onRestart?.()
+
+  const fallback = await streamDeepSeek(deepseekKey, opts, handlers.onDelta)
   if (fallback.ok) {
     return {
       ok: true,

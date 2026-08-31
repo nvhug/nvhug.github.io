@@ -384,27 +384,37 @@ export async function POST(request: Request) {
             primaryTimeoutMs: ANALYZE_PRIMARY_TIMEOUT_MS,
             fallbackTimeoutMs: ANALYZE_FALLBACK_TIMEOUT_MS,
           },
-          (delta) => {
-            buffer += delta
-            const complete = parseCompleteSections(buffer)
-            if (!complete) return
-            let added = false
-            for (const key of Object.keys(complete)) {
-              if (sentKeys.has(key)) continue
-              sentKeys.add(key)
-              added = true
-            }
-            // Only the key name travels, never the value: the panel renders the
-            // normalized report from `done`, so a half-written section would be a
-            // preview of something the reader never ends up seeing.
-            if (added) {
-              send('progress', {
-                percent: sectionProgressPercent(sentKeys.size, ANALYZE_SECTION_KEYS.length),
-                done: sentKeys.size,
-                total: ANALYZE_SECTION_KEYS.length,
-                section: [...sentKeys].at(-1),
-              })
-            }
+          {
+            // Only the progress bar was ever driven from these deltas, so abandoning a
+            // half-written answer costs the reader nothing but a bar that goes back to
+            // zero. That is what makes the fallback safe here after the primary emitted.
+            onRestart: () => {
+              buffer = ''
+              sentKeys.clear()
+              send('progress', { percent: 0, done: 0, total: ANALYZE_SECTION_KEYS.length })
+            },
+            onDelta: (delta) => {
+              buffer += delta
+              const complete = parseCompleteSections(buffer)
+              if (!complete) return
+              let added = false
+              for (const key of Object.keys(complete)) {
+                if (sentKeys.has(key)) continue
+                sentKeys.add(key)
+                added = true
+              }
+              // Only the key name travels, never the value: the panel renders the
+              // normalized report from `done`, so a half-written section would be a
+              // preview of something the reader never ends up seeing.
+              if (added) {
+                send('progress', {
+                  percent: sectionProgressPercent(sentKeys.size, ANALYZE_SECTION_KEYS.length),
+                  done: sentKeys.size,
+                  total: ANALYZE_SECTION_KEYS.length,
+                  section: [...sentKeys].at(-1),
+                })
+              }
+            },
           },
         )
 

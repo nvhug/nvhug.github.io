@@ -216,6 +216,8 @@ async function readAnalysisStream(
   handlers: {
     onSection: (key: string, value: unknown) => void
     onProgress: (percent: number) => void
+    /** The route abandoned one provider's answer for another's: drop what arrived so far. */
+    onReset: () => void
   },
 ): Promise<{ insights: AIInsights | null; error: string | null }> {
   if (!res.body) return { insights: null, error: null }
@@ -240,6 +242,8 @@ async function readAnalysisStream(
         handlers.onSection(key, section)
       } else if (frame.event === 'progress') {
         handlers.onProgress((frame.data as { percent: number }).percent)
+      } else if (frame.event === 'reset') {
+        handlers.onReset()
       } else if (frame.event === 'done') {
         insights = frame.data as AIInsights
       } else if (frame.event === 'error') {
@@ -391,6 +395,7 @@ export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note
       const result = await readAnalysisStream(res, {
         onSection: (key, value) => setStreamed(prev => ({ ...prev, [key]: value })),
         onProgress: setAnalysisProgress,
+        onReset: () => setStreamed({}),
       })
       if (result.error) throw new Error(result.error)
       if (!result.insights) throw new Error(t('notesAIInsights.analyzeError'))
