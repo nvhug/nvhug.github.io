@@ -242,6 +242,12 @@ const MSG = {
     en: 'Image AI is not configured on the server.',
   },
   aiFailed: { vi: 'AI không phân tích được, vui lòng thử lại.', en: 'AI analysis failed, please try again.' },
+  // A completion cut off at the token ceiling is a different problem from one that came
+  // back whole and malformed: this one is worth retrying as-is, the other never is.
+  aiTruncated: {
+    vi: 'AI bị cắt giữa chừng do vượt giới hạn độ dài. Vui lòng chụp lại hoặc thử lại.',
+    en: 'The AI response was cut off at the length limit. Please retake the photo or try again.',
+  },
 } as const
 
 const observationSchema = z.object({
@@ -397,7 +403,7 @@ export async function POST(request: Request) {
     // a billed completion that will not parse is otherwise indistinguishable from a
     // provider outage in anything the browser can show.
     return NextResponse.json({
-      error: MSG.aiFailed[lang],
+      error: nutritionCall?.truncated ? MSG.aiTruncated[lang] : MSG.aiFailed[lang],
       truncated: nutritionCall?.truncated ?? null,
       provider: nutritionCall?.provider ?? null,
       raw: raw.slice(0, 200),

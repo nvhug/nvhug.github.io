@@ -982,7 +982,11 @@ Trả về JSON hợp lệ với đúng cấu trúc sau (không thêm/bỏ field
           // then fails to parse gives no other clue what the provider actually sent.
           await recordUsage('error')
           send('error', {
-            error: 'AI provider returned invalid JSON',
+            error: result.truncated
+              ? (activeLang === 'en'
+                  ? 'The AI response was cut off at the length limit. Please try again.'
+                  : 'AI bị cắt giữa chừng do vượt giới hạn độ dài. Vui lòng thử lại.')
+              : 'AI provider returned invalid JSON',
             // Distinguishes the two ways a finished completion can be unusable:
             // cut off at our own token ceiling, or malformed at full length.
             truncated: result.truncated,

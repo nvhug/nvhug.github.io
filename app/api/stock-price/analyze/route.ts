@@ -454,7 +454,9 @@ export async function POST(request: Request) {
         } catch {
           await recordUsage('error')
           send('error', {
-            error: 'AI provider returned invalid JSON',
+            error: providerResult.truncated
+              ? 'AI bị cắt giữa chừng do vượt giới hạn độ dài. Vui lòng phân tích lại.'
+              : 'AI provider returned invalid JSON',
             // Distinguishes the two ways a finished completion can be unusable:
             // cut off at our own token ceiling, or malformed at full length.
             truncated: providerResult.truncated,

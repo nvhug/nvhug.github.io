@@ -351,7 +351,13 @@ Trả về CHỈ JSON hợp lệ (không markdown, không giải thích):
       `[stock-suggestions] invalid JSON: provider=${result.provider} model=${result.model} truncated=${result.truncated} chars=${content.length}`,
     )
     return NextResponse.json({
-      error: 'AI returned invalid JSON',
+      // Truncation and malformation both land here, but they are different problems and
+      // need different words: one is retryable as-is, the other never will be. The
+      // provider already told us which; until now both said the same thing, which is
+      // what made this take a day to find.
+      error: result.truncated
+        ? 'AI bị cắt giữa chừng do vượt giới hạn độ dài. Vui lòng thử lại.'
+        : 'AI returned invalid JSON',
       truncated: result.truncated,
       provider: result.provider,
       raw: content.slice(0, 200),
