@@ -278,7 +278,12 @@ export async function POST(request: Request) {
   const fmt = (v: number | null) => v !== null ? `${v.toFixed(1)}%` : 'N/A'
 
   const dataLines = stats
-    .map((s) => `${s.ticker}: giá=${s.currentPrice.toLocaleString('vi-VN')}đ | 1T=${fmt(s.change1MPct)} | 3T=${fmt(s.change3MPct)} | 6T=${fmt(s.change6MPct)} | pos52w=${fmt(s.pos52WPct)} | volTrend=${fmt(s.volumeTrendPct)}`)
+    // high52W is here because the TARGET PRICE rule below tells the model to compute
+    // `high52W × 0.92`, and until now the data block never sent it — the model was asked to
+    // multiply a number it had never been given, so it guessed. Measured 2026-08-31:
+    // 4 of 6 target prices came back off the formula. It was computed all along
+    // (fetchWeeklyStats) and carried in TickerStats; only this line was missing it.
+    .map((s) => `${s.ticker}: giá=${s.currentPrice.toLocaleString('vi-VN')}đ | đỉnh52w=${s.high52W !== null ? `${Math.round(s.high52W).toLocaleString('vi-VN')}đ` : 'N/A'} | 1T=${fmt(s.change1MPct)} | 3T=${fmt(s.change3MPct)} | 6T=${fmt(s.change6MPct)} | pos52w=${fmt(s.pos52WPct)} | volTrend=${fmt(s.volumeTrendPct)}`)
     .join('\n')
 
   const prompt = `Bạn là chuyên gia quản lý danh mục top 1% thị trường chứng khoán Việt Nam, chuyên phân tích kỹ thuật định lượng và momentum investing. Mọi nhận định PHẢI dựa trực tiếp vào số liệu đầu vào — không cảm tính.
@@ -286,7 +291,7 @@ export async function POST(request: Request) {
 === DỮ LIỆU KỸ THUẬT ${today} (${stats.length} mã) ===
 ${dataLines}
 
-Chú thích: pos52w = vị trí giá trong dải 52 tuần (0%=đáy, 100%=đỉnh) | volTrend = xu hướng khối lượng gần đây vs trước | 1T/3T/6T = biến động 1/3/6 tháng
+Chú thích: đỉnh52w = giá đỉnh 52 tuần (dùng cho công thức giá mục tiêu bên dưới) | pos52w = vị trí giá trong dải 52 tuần (0%=đáy, 100%=đỉnh) | volTrend = xu hướng khối lượng gần đây vs trước | 1T/3T/6T = biến động 1/3/6 tháng
 
 NHIỆM VỤ: Chọn chính xác 6 mã có tiềm năng risk-adjusted return tốt nhất, đảm bảo đa dạng ngành (tối đa 2 mã/ngành).
 
