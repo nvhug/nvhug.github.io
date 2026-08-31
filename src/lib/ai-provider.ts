@@ -169,6 +169,14 @@ async function attemptGemini(apiKey: string, opts: ProviderCallOptions): Promise
             temperature: opts.temperature,
             maxOutputTokens: opts.maxTokens,
             responseMimeType: 'application/json',
+            // gemini-3.x flash models spend tokens on an internal "thinking" pass before
+            // any output — measured at 300+ tokens for a one-sentence answer — which adds
+            // real wall-clock latency on top of what's already a slow endpoint (15-25s
+            // observed even trivial prompts) and can alone push a call past a primary
+            // timeout designed around a non-reasoning completion. DeepSeek's own attempt
+            // already disables its equivalent (`thinking: { type: 'disabled' }` below);
+            // this makes Gemini's the same trade for the same reason.
+            thinkingConfig: { thinkingBudget: 0 },
           },
         }),
         signal: AbortSignal.timeout(opts.primaryTimeoutMs),

@@ -251,6 +251,21 @@ describe('callGeminiWithDeepSeekFallback', () => {
       })
     })
 
+    it('disables Gemini\'s internal reasoning tokens, matching the DeepSeek attempt already disabling its own', async () => {
+      // Root cause of frequent real-world fallbacks (2026-08-30 investigation): gemini-3.7-flash
+      // spends hundreds of tokens "thinking" before any output, which alone can push a call
+      // past a 20s primary timeout even for a trivial prompt. thinkingBudget: 0 removes that
+      // pass entirely — the same latency/cost tradeoff the DeepSeek attempt already makes via
+      // `thinking: { type: 'disabled' }`.
+      const fetchMock = mockFetchSequence([httpResponse(200, GEMINI_BODY)])
+
+      await callGeminiWithDeepSeekFallback(OPTS)
+
+      expect(bodyOf(fetchMock.mock.calls[0])).toMatchObject({
+        generationConfig: { thinkingConfig: { thinkingBudget: 0 } },
+      })
+    })
+
     it('reports truncated:true when the provider stopped at the token ceiling', async () => {
       const truncatedBody = {
         candidates: [{ content: { parts: [{ text: '{"partial":' }] }, finishReason: 'MAX_TOKENS' }],
