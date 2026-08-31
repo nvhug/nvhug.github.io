@@ -967,8 +967,10 @@ Trả về JSON hợp lệ với đúng cấu trúc sau (không thêm/bỏ field
           insights = JSON.parse(result.text)
         } catch {
           // Billed and unusable — the expensive kind of failure, and the one worth seeing.
+          // `raw` is what makes it diagnosable at all: a stream that yields no sections and
+          // then fails to parse gives no other clue what the provider actually sent.
           await recordUsage('error')
-          send('error', { error: 'AI provider returned invalid JSON' })
+          send('error', { error: 'AI provider returned invalid JSON', raw: result.text.slice(0, 200) })
           controller.close()
           return
         }

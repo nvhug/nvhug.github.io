@@ -353,12 +353,22 @@ describe('callGeminiWithDeepSeekFallback', () => {
 
 // ─── Streaming ───────────────────────────────────────────────────────────────
 
-/** A 200 whose body is a real SSE stream over the given frames. */
+/**
+ * A 200 whose body is a real SSE stream over the given frames.
+ *
+ * `eol` is not a detail: Gemini terminates frames with CRLF CRLF and DeepSeek with LF LF.
+ * The first version of this fixture hardcoded LF, which passed while the live Gemini
+ * stream yielded zero deltas — so the default here is the stricter one.
+ */
 function sseResponse(...frames: string[]): Response {
+  return sseResponseWith('\r\n\r\n', ...frames)
+}
+
+function sseResponseWith(eol: string, ...frames: string[]): Response {
   const body = new ReadableStream<Uint8Array>({
     start(controller) {
       const encoder = new TextEncoder()
-      for (const frame of frames) controller.enqueue(encoder.encode(`data: ${frame}\n\n`))
+      for (const frame of frames) controller.enqueue(encoder.encode(`data: ${frame}${eol}`))
       controller.close()
     },
   })
@@ -465,6 +475,22 @@ describe('streamGeminiWithDeepSeekFallback', () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(2)
     expect(result).toMatchObject({ ok: true, provider: 'deepseek' })
+  })
+
+  // Regression: the first cut split frames on LF LF only. Against live Gemini that
+  // produced zero deltas and an empty-but-successful result — a silent failure, not an
+  // error — which surfaced downstream as "invalid JSON". Both terminators, both providers.
+  it.each([
+    ['CRLF CRLF, as Gemini sends', '\r\n\r\n'],
+    ['LF LF, as DeepSeek sends', '\n\n'],
+  ])('reads a stream terminated with %s', async (_label, eol) => {
+    mockFetchSequence([sseResponseWith(eol, geminiFrame('{"from":'), geminiFrame('"gemini"}'))])
+
+    const deltas: string[] = []
+    const result = await streamGeminiWithDeepSeekFallback(OPTS, d => deltas.push(d))
+
+    expect(deltas).toEqual(['{"from":', '"gemini"}'])
+    expect(result).toMatchObject({ ok: true, text: '{"from":"gemini"}' })
   })
 
   it('reports a truncated completion from the provider stop reason', async () => {

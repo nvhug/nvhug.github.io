@@ -45,3 +45,31 @@ describe('parseSseFrame', () => {
     expect(parseSseFrame('event: x\ndata: {not json')).toBeNull()
   })
 })
+
+// Gemini terminates its SSE frames with CRLF CRLF, DeepSeek with LF LF — both are valid
+// per the spec, and a splitter that only knows one of them silently yields no frames at
+// all rather than failing loudly. Verified against both live endpoints, 2026-08-31.
+describe('splitSseFrames — line endings in the wild', () => {
+  it('splits CRLF-terminated frames, the format Gemini actually sends', () => {
+    const { frames, rest } = splitSseFrames('data: {"a":1}\r\n\r\ndata: {"b":2}\r\n\r\n')
+    expect(frames).toEqual(['data: {"a":1}', 'data: {"b":2}'])
+    expect(rest).toBe('')
+  })
+
+  it('keeps a CRLF tail that has not been terminated yet', () => {
+    const { frames, rest } = splitSseFrames('data: {"a":1}\r\n\r\ndata: {"b"')
+    expect(frames).toEqual(['data: {"a":1}'])
+    expect(rest).toBe('data: {"b"')
+  })
+
+  it('splits bare-CR frames too', () => {
+    expect(splitSseFrames('data: 1\r\rdata: 2\r\r').frames).toEqual(['data: 1', 'data: 2'])
+  })
+})
+
+describe('parseSseFrame — line endings in the wild', () => {
+  it('reads a frame whose lines end in CRLF', () => {
+    expect(parseSseFrame('event: section\r\ndata: {"key":"weight"}'))
+      .toEqual({ event: 'section', data: { key: 'weight' } })
+  })
+})
