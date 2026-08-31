@@ -583,6 +583,8 @@ export const vi = {
     byQuarter: 'Theo quý',
     notesCount: '{n} mục dữ liệu',
     analyzing: 'Đang phân tích...',
+    analyzingPercent: 'Đang phân tích... {percent}%',
+    streamProgress: 'AI đang viết — đã xong {done}/{total} mục',
     analyzeAI: 'Phân tích AI',
     lastAnalyzed: 'Đã phân tích gần nhất lúc {time}. Có thể phân tích lại sau {cooldown}.',
     noDataForPeriod: 'Không có dữ liệu ghi chú cho {period}.',

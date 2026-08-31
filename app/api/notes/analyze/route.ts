@@ -5,7 +5,9 @@ import { DEFAULT_MACRO_TARGETS, getMacroTargets, resolveTargetsByDate } from './
 import type { MacroTargets, MacroTargetRow } from './macroUtils'
 import { checkAITrialQuota, incrementAITrialUsage, trialExhaustedBody, QUOTA_EXHAUSTED_STATUS } from '@/lib/ai-trial'
 import { logAiUsage, normalizeUsage } from '@/lib/ai-usage'
-import { callGeminiWithDeepSeekFallback, isProviderConfigured } from '@/lib/ai-provider'
+import { streamGeminiWithDeepSeekFallback, isProviderConfigured } from '@/lib/ai-provider'
+import { parseCompleteSections, sectionProgressPercent } from '@/lib/json-stream'
+import { sseMessage } from '@/lib/sse'
 
 import { weightProgress } from '@/lib/weight-progress'
 
@@ -30,6 +32,14 @@ export const maxDuration = 60
 export const ANALYZE_PRIMARY_TIMEOUT_MS  = 20_000
 export const ANALYZE_FALLBACK_TIMEOUT_MS = 35_000
 export const ANALYZE_MAX_TOKENS = 4000
+// The top-level keys of the JSON the prompt asks for — the denominator of the progress
+// the client shows. Progress is a count of keys that have fully arrived, so this list only
+// has to match the template's SIZE, not its order; the model is free to emit in any order.
+// Add a section to the prompt without adding it here and the bar stops short of full.
+export const ANALYZE_SECTION_KEYS = [
+  'summary', 'weight', 'nutrition', 'gym', 'calendar',
+  'digestive', 'goals', 'notes_habits', 'pattern', 'recommendation',
+] as const
 type Lang = 'vi' | 'en'
 
 function buildUserProfile(lang: Lang, macroTargets: MacroTargets) {
@@ -858,110 +868,177 @@ Trả về JSON hợp lệ với đúng cấu trúc sau (không thêm/bỏ field
   "recommendation": "3 hành động ưu tiên cho kỳ tới, mỗi hành động có con số mục tiêu rõ. Format: '1. ... 2. ... 3. ...'"
 }`
 
-  // Before the call, so a request that crosses a peak boundary is priced at the rate it was
-  // billed at rather than the rate in force when the answer came back.
-  const startedAt = new Date()
+  // From here the response is an SSE stream, not JSON. Every gate above still answers with
+  // an ordinary status code — 401/402/403/429/400 — because a status can only be set before
+  // the first byte, and the client reads those to open the upgrade modal and the cooldown
+  // hint. Only failures that happen after generation starts travel as an `error` event.
+  const encoder = new TextEncoder()
 
-  const result = await callGeminiWithDeepSeekFallback({
-    geminiModel: 'gemini-3.7-flash',
-    deepseekModel: 'deepseek-v4-flash',
-    prompt,
-    temperature: 0.3,
-    // The response is one object with seven sections plus pattern and recommendation —
-    // the largest JSON shape of any surface here, and in Vietnamese, which costs more
-    // tokens per word. Sized above the 3500 the next-biggest surfaces use.
-    maxTokens: ANALYZE_MAX_TOKENS,
-    primaryTimeoutMs: ANALYZE_PRIMARY_TIMEOUT_MS,
-    fallbackTimeoutMs: ANALYZE_FALLBACK_TIMEOUT_MS,
+  const stream = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      const send = (event: string, data: unknown) =>
+        controller.enqueue(encoder.encode(sseMessage(event, data)))
+
+      try {
+        // Text accumulated so far, and the sections already handed to the client. The
+        // completion is one JSON object, so a section is "done" the moment its value
+        // closes — see parseCompleteSections.
+        let buffer = ''
+        const sentKeys = new Set<string>()
+
+        send('progress', { percent: 0 })
+
+        // Before the call, so a request that crosses a peak boundary is priced at the rate it was
+        // billed at rather than the rate in force when the answer came back.
+        const startedAt = new Date()
+
+        const result = await streamGeminiWithDeepSeekFallback(
+          {
+            geminiModel: 'gemini-3.7-flash',
+            deepseekModel: 'deepseek-v4-flash',
+            prompt,
+            temperature: 0.3,
+            // The response is one object with seven sections plus pattern and recommendation —
+            // the largest JSON shape of any surface here, and in Vietnamese, which costs more
+            // tokens per word. Sized above the 3500 the next-biggest surfaces use.
+            maxTokens: ANALYZE_MAX_TOKENS,
+            primaryTimeoutMs: ANALYZE_PRIMARY_TIMEOUT_MS,
+            fallbackTimeoutMs: ANALYZE_FALLBACK_TIMEOUT_MS,
+          },
+          (delta) => {
+            buffer += delta
+            const complete = parseCompleteSections(buffer)
+            if (!complete) return
+            let added = false
+            for (const [key, value] of Object.entries(complete)) {
+              if (sentKeys.has(key)) continue
+              sentKeys.add(key)
+              added = true
+              send('section', { key, value })
+            }
+            // Only when a section actually closed: progress that ticks on every delta
+            // would be a byte counter wearing a percentage's clothes.
+            if (added) {
+              send('progress', { percent: sectionProgressPercent(sentKeys.size, ANALYZE_SECTION_KEYS.length) })
+            }
+          },
+        )
+
+        // Nothing usable arrived from either provider, so nothing was billed and there is
+        // no usage row to file. The message matches what the buffered route returned, so
+        // the client shows the same text it always did.
+        if (!result.ok) {
+          send('error', { error: 'AI analysis unavailable' })
+          controller.close()
+          return
+        }
+
+        // Normalized once, up front, so both usage logging and the token columns below read
+        // from the same value instead of re-deriving it — the raw field names differ between
+        // the two providers, so this is also what keeps those columns receiving real numbers
+        // whichever provider served the call.
+        const usage = normalizeUsage(result.usage, result.provider)
+
+        // Records one entry for this provider call whatever happens to it. Reaching here means a
+        // completion arrived whole, so even the rejected-as-unusable branches below were billed,
+        // and that money has to show up somewhere (FR-005a). Which provider served it is read off
+        // the result, not assumed: the fallback bills a different account at a different rate.
+        const recordUsage = (outcome: 'success' | 'error') =>
+          logAiUsage({
+            surface: 'notes_analyze',
+            provider: result.provider,
+            model: result.model,
+            usage,
+            outcome,
+            userId: user!.id,
+            actor: 'user',
+            at: startedAt,
+          })
+
+        if (!result.text) {
+          await recordUsage('error')
+          send('error', { error: 'Empty response from AI provider' })
+          controller.close()
+          return
+        }
+
+        let insights: Record<string, unknown>
+        try {
+          insights = JSON.parse(result.text)
+        } catch {
+          // Billed and unusable — the expensive kind of failure, and the one worth seeing.
+          await recordUsage('error')
+          send('error', { error: 'AI provider returned invalid JSON' })
+          controller.close()
+          return
+        }
+
+        const promptTokens     = usage.input_tokens
+        const completionTokens = usage.output_tokens
+        const totalTokens      = promptTokens + completionTokens
+
+        // Recorded before the analysis row so its id can be stored alongside. Null is a real
+        // outcome — telemetry is bounded and swallows its own failures — and the analysis must
+        // save either way, which is why usage_log_id is nullable.
+        const usageLogId = await recordUsage('success')
+
+        const { data: saved, error: saveErr } = await supabaseAuth
+          .from('ai_analysis_history')
+          .insert({
+            user_id:           user!.id,
+            result:            insights,
+            prompt_tokens:     promptTokens,
+            completion_tokens: completionTokens,
+            total_tokens:      totalTokens,
+            usage_log_id:      usageLogId,
+            period_label:      period.label,
+            period_from:       period.from,
+            period_to:         period.to,
+          })
+          .select('id, created_at')
+          .single()
+
+        if (saveErr) console.error('[analyze] DB save failed:', saveErr.message)
+
+        // Increment trial usage counter for non-admin/paid users — skipped when AI
+        // Free Mode made this request unlimited, so no allowance is consumed.
+        if (role === 'user' && !quotaUnlimited) {
+          await incrementAITrialUsage(supabaseAuth, 'notes_analyze')
+        }
+
+        // Carries the whole object, not just what the section events already sent: this is
+        // the authoritative parse, and it is what the client stores in its history. The
+        // progressive sections are a preview of it, never a substitute.
+        send('done', {
+          ...insights,
+          id:         saved?.id ?? null,
+          analyzedAt: saved?.created_at ?? new Date().toISOString(),
+          period,
+          tokenUsage: {
+            prompt:     promptTokens,
+            completion: completionTokens,
+            total:      totalTokens,
+          },
+        })
+        controller.close()
+      } catch (err) {
+        // The stream is already open, so a throw here cannot become a 500 — without this
+        // the connection would hang until the client gave up.
+        console.error('[analyze] stream failed:', err instanceof Error ? err.message : err)
+        send('error', { error: 'AI analysis unavailable' })
+        controller.close()
+      }
+    },
   })
 
-  // Nothing arrived from either provider, so nothing was billed and there is no usage row
-  // to file — the same answer the old non-2xx branch gave, now covering timeouts too.
-  if (!result.ok) {
-    return NextResponse.json(
-      { error: 'AI analysis unavailable' },
-      { status: result.network ? 504 : 502 },
-    )
-  }
-
-  // Normalized once, up front, so both usage logging and the token columns below read
-  // from the same value instead of re-deriving it — the raw field names differ between
-  // the two providers, so this is also what keeps those columns receiving real numbers
-  // whichever provider served the call.
-  const usage = normalizeUsage(result.usage, result.provider)
-
-  // Records one entry for this provider call whatever happens to it. Reaching here means a
-  // completion arrived whole, so even the rejected-as-unusable branches below were billed,
-  // and that money has to show up somewhere (FR-005a). Which provider served it is read off
-  // the result, not assumed: the fallback bills a different account at a different rate.
-  const recordUsage = (outcome: 'success' | 'error') =>
-    logAiUsage({
-      surface: 'notes_analyze',
-      provider: result.provider,
-      model: result.model,
-      usage,
-      outcome,
-      userId: user!.id,
-      actor: 'user',
-      at: startedAt,
-    })
-
-  if (!result.text) {
-    await recordUsage('error')
-    return NextResponse.json({ error: 'Empty response from AI provider' }, { status: 502 })
-  }
-
-  let insights: Record<string, unknown>
-  try {
-    insights = JSON.parse(result.text)
-  } catch {
-    // Billed and unusable — the expensive kind of failure, and the one worth seeing.
-    await recordUsage('error')
-    return NextResponse.json({ error: 'AI provider returned invalid JSON', raw: result.text.slice(0, 200) }, { status: 502 })
-  }
-
-  const promptTokens     = usage.input_tokens
-  const completionTokens = usage.output_tokens
-  const totalTokens      = promptTokens + completionTokens
-
-  // Recorded before the analysis row so its id can be stored alongside. Null is a real
-  // outcome — telemetry is bounded and swallows its own failures — and the analysis must
-  // save either way, which is why usage_log_id is nullable.
-  const usageLogId = await recordUsage('success')
-
-  const { data: saved, error: saveErr } = await supabaseAuth
-    .from('ai_analysis_history')
-    .insert({
-      user_id:           user!.id,
-      result:            insights,
-      prompt_tokens:     promptTokens,
-      completion_tokens: completionTokens,
-      total_tokens:      totalTokens,
-      usage_log_id:      usageLogId,
-      period_label:      period.label,
-      period_from:       period.from,
-      period_to:         period.to,
-    })
-    .select('id, created_at')
-    .single()
-
-  if (saveErr) console.error('[analyze] DB save failed:', saveErr.message)
-
-  // Increment trial usage counter for non-admin/paid users — skipped when AI
-  // Free Mode made this request unlimited, so no allowance is consumed.
-  if (role === 'user' && !quotaUnlimited) {
-    await incrementAITrialUsage(supabaseAuth, 'notes_analyze')
-  }
-
-  return NextResponse.json({
-    ...insights,
-    id:         saved?.id ?? null,
-    analyzedAt: saved?.created_at ?? new Date().toISOString(),
-    period,
-    tokenUsage: {
-      prompt:     promptTokens,
-      completion: completionTokens,
-      total:      totalTokens,
+  return new Response(stream, {
+    headers: {
+      'Content-Type':  'text/event-stream; charset=utf-8',
+      'Cache-Control': 'no-cache, no-transform',
+      // Tells a proxy that buffers by default (nginx, and Vercel's own edge) to pass bytes
+      // through as they arrive — without it the whole point of streaming is undone by the
+      // hop in front of the function.
+      'X-Accel-Buffering': 'no',
     },
   })
 }

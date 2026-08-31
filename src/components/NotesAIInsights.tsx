@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import {
-  Sparkles, RefreshCw, ChevronRight,
+  Sparkles, RefreshCw, ChevronRight, LoaderCircle,
   AlertCircle, Info, Lightbulb, History, ChevronDown, ChevronUp,
   Scale, Utensils, BookOpen, Coffee, Dumbbell, CalendarDays, Activity, Target,
 } from 'lucide-react'
@@ -16,7 +16,13 @@ import { useUserRole } from '@/lib/useUserRole'
 import { AITrialExhaustedModal, type AITrialExhaustedInfo } from '@/components/ui/ai-trial-exhausted-modal'
 import { DonateModal } from '@/components/DonateModal'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { parseSseFrame, splitSseFrames } from '@/lib/sse'
 import { cn } from '@/lib/utils'
+
+// The denominator of the streamed progress the reader sees. Mirrors ANALYZE_SECTION_KEYS
+// in the analyze route — importing a route module into a client component would drag the
+// server-only Supabase client into the bundle, so the count is restated here instead.
+const ANALYZE_SECTION_COUNT = 10
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -198,6 +204,53 @@ function verdictBadge(verdict: string) {
   return 'bg-zinc-100 text-zinc-500'
 }
 
+/**
+ * Drains the analyze route's SSE response, reporting each finished section as it lands.
+ *
+ * The `done` event carries the authoritative parse of the whole completion — the sections
+ * streamed before it are a preview, so the caller stores what `done` returns, never the
+ * accumulated preview.
+ */
+async function readAnalysisStream(
+  res: Response,
+  handlers: {
+    onSection: (key: string, value: unknown) => void
+    onProgress: (percent: number) => void
+  },
+): Promise<{ insights: AIInsights | null; error: string | null }> {
+  if (!res.body) return { insights: null, error: null }
+
+  const reader = res.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  let insights: AIInsights | null = null
+  let error: string | null = null
+
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+    const { frames, rest } = splitSseFrames(buffer)
+    buffer = rest
+    for (const raw of frames) {
+      const frame = parseSseFrame(raw)
+      if (!frame) continue
+      if (frame.event === 'section') {
+        const { key, value: section } = frame.data as { key: string; value: unknown }
+        handlers.onSection(key, section)
+      } else if (frame.event === 'progress') {
+        handlers.onProgress((frame.data as { percent: number }).percent)
+      } else if (frame.event === 'done') {
+        insights = frame.data as AIInsights
+      } else if (frame.event === 'error') {
+        error = (frame.data as { error?: string }).error ?? null
+      }
+    }
+  }
+
+  return { insights, error }
+}
+
 function rowToInsight(row: {
   id: string
   result: Omit<AIInsights, 'id' | 'analyzedAt' | 'tokenUsage' | 'period'>
@@ -245,6 +298,10 @@ export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note
   const [cooldownInfo,     setCooldownInfo]     = useState<string | null>(null)
   const [trialExhausted,   setTrialExhausted]   = useState<AITrialExhaustedInfo | null>(null)
   const [showDonateModal,  setShowDonateModal]  = useState(false)
+  // Real progress, not a ticker: the route streams one `progress` event per section of the
+  // completion that has actually finished generating, and one `section` event carrying it.
+  const [analysisProgress, setAnalysisProgress] = useState(0)
+  const [streamed, setStreamed] = useState<Partial<AIInsights> | null>(null)
 
   useEffect(() => {
     async function load() {
@@ -263,6 +320,10 @@ export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note
   }, [])
 
   const viewed          = history[viewIndex] ?? null
+  // While a run is in flight the cards come from the stream, so each one appears the
+  // moment the model finishes writing it instead of all of them at the end.
+  const shown           = loading ? streamed : viewed
+  const streamedCount   = streamed ? Object.keys(streamed).length : 0
   const selectedPeriod  = periodOptions[selectedIdx]
   const latestAnalysis  = history[0] ?? null
   const cooldown        = getCooldownInfo(latestAnalysis?.analyzedAt)
@@ -301,6 +362,8 @@ export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note
     setLoading(true)
     setError(null)
     setCooldownInfo(null)
+    setAnalysisProgress(0)
+    setStreamed({})
     try {
       const res = await fetch('/api/notes/analyze', {
         method: 'POST',
@@ -312,24 +375,35 @@ export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note
           lang,
         }),
       })
-      const data = await res.json()
+
+      // Every gate the route applies still answers with a status code and a JSON body —
+      // only the generation itself streams, so this branch is unchanged.
       if (!res.ok) {
+        const data = await res.json().catch(() => null)
         // 402 when plans are on sale, 429 when the cap is just a rate limit — see QUOTA_EXHAUSTED_STATUS
         if ((res.status === 402 || res.status === 429) && data?.trialExhausted) {
           setTrialExhausted({ feature: data.feature, used: data.used, limit: data.limit })
           return
         }
-        throw new Error(data.error ?? t('notesAIInsights.analyzeFailed'))
+        throw new Error(data?.error ?? t('notesAIInsights.analyzeFailed'))
       }
 
-      const result: AIInsights = data
-      setHistory(prev => [result, ...prev].slice(0, 10))
+      const result = await readAnalysisStream(res, {
+        onSection: (key, value) => setStreamed(prev => ({ ...prev, [key]: value })),
+        onProgress: setAnalysisProgress,
+      })
+      if (result.error) throw new Error(result.error)
+      if (!result.insights) throw new Error(t('notesAIInsights.analyzeError'))
+
+      setAnalysisProgress(100)
+      setHistory(prev => [result.insights!, ...prev].slice(0, 10))
       setViewIndex(0)
       setShowHistory(false)
     } catch (e) {
       setError(e instanceof Error ? e.message : t('notesAIInsights.analyzeError'))
     } finally {
       setLoading(false)
+      setStreamed(null)
     }
   }
 
@@ -397,14 +471,25 @@ export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note
                 disabled={loading || fetching}
                 aria-disabled={notEnoughData}
                 className={cn(
-                  'flex items-center gap-1.5 rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-violet-700 disabled:opacity-60',
+                  'relative flex items-center gap-1.5 overflow-hidden rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-violet-700 disabled:opacity-60',
                   notEnoughData && 'cursor-not-allowed opacity-60 hover:bg-violet-600'
                 )}
               >
+                {loading && (
+                  <span
+                    aria-hidden="true"
+                    className="absolute inset-y-0 left-0 bg-white/25 transition-all duration-300"
+                    style={{ width: `${analysisProgress}%` }}
+                  />
+                )}
                 {loading
-                  ? <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                  : <Sparkles className="h-3.5 w-3.5" />}
-                {loading ? t('notesAIInsights.analyzing') : t('notesAIInsights.analyzeAI')}
+                  ? <RefreshCw className="relative h-3.5 w-3.5 animate-spin" />
+                  : <Sparkles className="relative h-3.5 w-3.5" />}
+                <span className="relative">
+                  {loading
+                    ? t('notesAIInsights.analyzingPercent', { percent: analysisProgress })
+                    : t('notesAIInsights.analyzeAI')}
+                </span>
                 {/* No crown badge: a missing permission is an admin setting, not a
                     premium tier, and nothing here is for sale. See ADR-017. */}
               </button>
@@ -416,6 +501,22 @@ export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note
       </div>
 
       <DonateModal open={showDonateModal} onClose={() => setShowDonateModal(false)} />
+
+      {/* Progress — one step per section the model has actually finished writing */}
+      {loading && (
+        <div className="space-y-1.5 rounded-xl border border-violet-100 bg-violet-50/60 p-3">
+          <div className="h-2 overflow-hidden rounded-full border border-violet-200 bg-white">
+            <div
+              className="h-full bg-violet-500 transition-all duration-300"
+              style={{ width: `${analysisProgress}%` }}
+            />
+          </div>
+          <p className="flex items-center gap-2 text-xs text-violet-700" aria-live="polite">
+            <LoaderCircle className="h-3.5 w-3.5 shrink-0 animate-spin" />
+            {t('notesAIInsights.streamProgress', { done: streamedCount, total: ANALYZE_SECTION_COUNT })}
+          </p>
+        </div>
+      )}
 
       {/* Empty / insufficient notes warning */}
       {!loading && !fetching && totalItems === 0 && (
@@ -446,7 +547,8 @@ export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note
       )}
 
       {/* Loading skeleton — matches 2 rows of 3 cards + notes row */}
-      {(fetching || (loading && !viewed)) && (
+      {/* Skeleton only until the first section lands — after that the real cards fill in */}
+      {(fetching || (loading && streamedCount === 0)) && (
         <div className="animate-pulse space-y-3">
           <div className="h-16 rounded-xl bg-violet-50" />
           <div className="grid gap-3 sm:grid-cols-3">
@@ -465,87 +567,89 @@ export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note
       )}
 
       {/* Result */}
-      {viewed && !loading && !fetching && (
+      {shown && !fetching && (
         <div className="space-y-2.5">
           {/* Period badge */}
-          {viewed.period && (
+          {shown.period && (
             <div className="flex items-center gap-1.5">
               <span className="rounded-full bg-violet-100 px-2.5 py-0.5 text-xs font-semibold text-violet-700">
-                {viewed.period.label}
+                {shown.period.label}
               </span>
               <span className="text-xs text-zinc-400">
-                {fmtDate(viewed.period.from)} → {fmtDate(viewed.period.to)}
+                {fmtDate(shown.period.from)} → {fmtDate(shown.period.to)}
               </span>
             </div>
           )}
 
-          {/* Summary */}
-          <div className="rounded-xl border border-violet-100 bg-violet-50 p-3">
-            <p className="text-sm leading-relaxed text-violet-900">{viewed.summary}</p>
-          </div>
+          {/* Summary — absent until the stream delivers it */}
+          {shown.summary && (
+            <div className="rounded-xl border border-violet-100 bg-violet-50 p-3">
+              <p className="text-sm leading-relaxed text-violet-900">{shown.summary}</p>
+            </div>
+          )}
 
           {/* Domain cards — row 1: body metrics */}
           <div className="grid gap-2 sm:grid-cols-3">
             {/* Weight */}
-            {viewed.weight && (
+            {shown.weight && (
               <div className="rounded-xl border border-indigo-100 bg-indigo-50 p-2.5">
                 <div className="mb-1.5 flex items-center justify-between gap-1">
                   <div className="flex items-center gap-1.5">
                     <Scale className="h-3.5 w-3.5 text-indigo-600" />
                     <h4 className="text-xs font-semibold text-indigo-600">{t('notesAIInsights.weightCard')}</h4>
                   </div>
-                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium leading-tight ${verdictBadge(viewed.weight.verdict)}`}>
-                    {viewed.weight.verdict}
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium leading-tight ${verdictBadge(shown.weight.verdict)}`}>
+                    {shown.weight.verdict}
                   </span>
                 </div>
                 <ul className="mb-2 space-y-1">
-                  {viewed.weight.points.map((p, i) => (
+                  {shown.weight.points.map((p, i) => (
                     <li key={i} className="flex items-start gap-1 text-xs text-indigo-800">
                       <ChevronRight className="mt-0.5 h-3 w-3 shrink-0 text-indigo-400" />{p}
                     </li>
                   ))}
                 </ul>
-                {viewed.weight.next_target && (
+                {shown.weight.next_target && (
                   <div className="rounded-lg bg-indigo-100/70 px-2 py-1 text-xs text-indigo-700">
-                    <span className="font-medium">{t('notesAIInsights.targetLabel')}</span>{viewed.weight.next_target}
+                    <span className="font-medium">{t('notesAIInsights.targetLabel')}</span>{shown.weight.next_target}
                   </div>
                 )}
               </div>
             )}
 
             {/* Nutrition */}
-            {viewed.nutrition && (
+            {shown.nutrition && (
               <div className="rounded-xl border border-amber-100 bg-amber-50 p-2.5">
                 <div className="mb-1.5 flex items-center justify-between gap-1">
                   <div className="flex items-center gap-1.5">
                     <Utensils className="h-3.5 w-3.5 text-amber-600" />
                     <h4 className="text-xs font-semibold text-amber-600">{t('notesAIInsights.nutritionCard')}</h4>
                   </div>
-                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium leading-tight ${verdictBadge(viewed.nutrition.verdict)}`}>
-                    {viewed.nutrition.verdict}
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium leading-tight ${verdictBadge(shown.nutrition.verdict)}`}>
+                    {shown.nutrition.verdict}
                   </span>
                 </div>
                 <ul className="mb-2 space-y-1">
-                  {viewed.nutrition.points.map((p, i) => (
+                  {shown.nutrition.points.map((p, i) => (
                     <li key={i} className="flex items-start gap-1 text-xs text-amber-800">
                       <ChevronRight className="mt-0.5 h-3 w-3 shrink-0 text-amber-400" />{p}
                     </li>
                   ))}
                 </ul>
                 <div className="space-y-1">
-                  {viewed.nutrition.macro_avg && (
+                  {shown.nutrition.macro_avg && (
                     <div className="rounded-lg bg-amber-100/70 px-2 py-1 text-xs text-amber-700">
-                      <span className="font-medium">{t('notesAIInsights.macroAverageLabel')}</span>{viewed.nutrition.macro_avg}
+                      <span className="font-medium">{t('notesAIInsights.macroAverageLabel')}</span>{shown.nutrition.macro_avg}
                     </div>
                   )}
-                  {viewed.nutrition.worst_day && (
+                  {shown.nutrition.worst_day && (
                     <p className="text-xs text-amber-700">
-                      <span className="font-medium">{t('notesAIInsights.worstDayLabel')}</span>{viewed.nutrition.worst_day}
+                      <span className="font-medium">{t('notesAIInsights.worstDayLabel')}</span>{shown.nutrition.worst_day}
                     </p>
                   )}
-                  {viewed.nutrition.skip_habit && (
+                  {shown.nutrition.skip_habit && (
                     <p className="text-xs text-amber-700">
-                      <span className="font-medium">{t('notesAIInsights.skipHabitLabel')}</span>{viewed.nutrition.skip_habit}
+                      <span className="font-medium">{t('notesAIInsights.skipHabitLabel')}</span>{shown.nutrition.skip_habit}
                     </p>
                   )}
                 </div>
@@ -553,27 +657,27 @@ export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note
             )}
 
             {/* Digestive */}
-            {viewed.digestive && (
+            {shown.digestive && (
               <div className="rounded-xl border border-teal-100 bg-teal-50 p-2.5">
                 <div className="mb-1.5 flex items-center justify-between gap-1">
                   <div className="flex items-center gap-1.5">
                     <Activity className="h-3.5 w-3.5 text-teal-600" />
                     <h4 className="text-xs font-semibold text-teal-600">Tiêu hóa</h4>
                   </div>
-                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium leading-tight ${verdictBadge(viewed.digestive.verdict)}`}>
-                    {viewed.digestive.verdict}
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium leading-tight ${verdictBadge(shown.digestive.verdict)}`}>
+                    {shown.digestive.verdict}
                   </span>
                 </div>
                 <ul className="mb-2 space-y-1">
-                  {viewed.digestive.points.map((p, i) => (
+                  {shown.digestive.points.map((p, i) => (
                     <li key={i} className="flex items-start gap-1 text-xs text-teal-800">
                       <ChevronRight className="mt-0.5 h-3 w-3 shrink-0 text-teal-400" />{p}
                     </li>
                   ))}
                 </ul>
-                {viewed.digestive.tip && (
+                {shown.digestive.tip && (
                   <div className="rounded-lg bg-teal-100/70 px-2 py-1 text-xs text-teal-700">
-                    <span className="font-medium">Gợi ý: </span>{viewed.digestive.tip}
+                    <span className="font-medium">Gợi ý: </span>{shown.digestive.tip}
                   </div>
                 )}
               </div>
@@ -583,33 +687,33 @@ export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note
           {/* Domain cards — row 2: training & planning */}
           <div className="grid gap-2 sm:grid-cols-3">
             {/* Gym */}
-            {viewed.gym && (
+            {shown.gym && (
               <div className="rounded-xl border border-orange-100 bg-orange-50 p-2.5">
                 <div className="mb-1.5 flex items-center justify-between gap-1">
                   <div className="flex items-center gap-1.5">
                     <Dumbbell className="h-3.5 w-3.5 text-orange-600" />
                     <h4 className="text-xs font-semibold text-orange-600">Gym</h4>
                   </div>
-                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium leading-tight ${verdictBadge(viewed.gym.verdict)}`}>
-                    {viewed.gym.verdict}
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium leading-tight ${verdictBadge(shown.gym.verdict)}`}>
+                    {shown.gym.verdict}
                   </span>
                 </div>
                 <ul className="mb-2 space-y-1">
-                  {viewed.gym.points.map((p, i) => (
+                  {shown.gym.points.map((p, i) => (
                     <li key={i} className="flex items-start gap-1 text-xs text-orange-800">
                       <ChevronRight className="mt-0.5 h-3 w-3 shrink-0 text-orange-400" />{p}
                     </li>
                   ))}
                 </ul>
                 <div className="space-y-1">
-                  {viewed.gym.strongest_muscle && (
+                  {shown.gym.strongest_muscle && (
                     <p className="text-xs text-orange-700">
-                      <span className="font-medium">Cơ chủ đạo: </span>{viewed.gym.strongest_muscle}
+                      <span className="font-medium">Cơ chủ đạo: </span>{shown.gym.strongest_muscle}
                     </p>
                   )}
-                  {viewed.gym.next_challenge && (
+                  {shown.gym.next_challenge && (
                     <div className="rounded-lg bg-orange-100/70 px-2 py-1 text-xs text-orange-700">
-                      <span className="font-medium">Thử thách tới: </span>{viewed.gym.next_challenge}
+                      <span className="font-medium">Thử thách tới: </span>{shown.gym.next_challenge}
                     </div>
                   )}
                 </div>
@@ -617,33 +721,33 @@ export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note
             )}
 
             {/* Calendar */}
-            {viewed.calendar && (
+            {shown.calendar && (
               <div className="rounded-xl border border-violet-100 bg-violet-50 p-2.5">
                 <div className="mb-1.5 flex items-center justify-between gap-1">
                   <div className="flex items-center gap-1.5">
                     <CalendarDays className="h-3.5 w-3.5 text-violet-600" />
                     <h4 className="text-xs font-semibold text-violet-600">Lịch trình</h4>
                   </div>
-                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium leading-tight ${verdictBadge(viewed.calendar.verdict)}`}>
-                    {viewed.calendar.verdict}
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium leading-tight ${verdictBadge(shown.calendar.verdict)}`}>
+                    {shown.calendar.verdict}
                   </span>
                 </div>
                 <ul className="mb-2 space-y-1">
-                  {viewed.calendar.points.map((p, i) => (
+                  {shown.calendar.points.map((p, i) => (
                     <li key={i} className="flex items-start gap-1 text-xs text-violet-800">
                       <ChevronRight className="mt-0.5 h-3 w-3 shrink-0 text-violet-400" />{p}
                     </li>
                   ))}
                 </ul>
                 <div className="space-y-1">
-                  {viewed.calendar.busiest_day && (
+                  {shown.calendar.busiest_day && (
                     <p className="text-xs text-violet-700">
-                      <span className="font-medium">Ngày bận nhất: </span>{viewed.calendar.busiest_day}
+                      <span className="font-medium">Ngày bận nhất: </span>{shown.calendar.busiest_day}
                     </p>
                   )}
-                  {viewed.calendar.tip && (
+                  {shown.calendar.tip && (
                     <div className="rounded-lg bg-violet-100/70 px-2 py-1 text-xs text-violet-700">
-                      <span className="font-medium">Gợi ý: </span>{viewed.calendar.tip}
+                      <span className="font-medium">Gợi ý: </span>{shown.calendar.tip}
                     </div>
                   )}
                 </div>
@@ -651,27 +755,27 @@ export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note
             )}
 
             {/* Goals */}
-            {viewed.goals && (
+            {shown.goals && (
               <div className="rounded-xl border border-rose-100 bg-rose-50 p-2.5">
                 <div className="mb-1.5 flex items-center justify-between gap-1">
                   <div className="flex items-center gap-1.5">
                     <Target className="h-3.5 w-3.5 text-rose-600" />
                     <h4 className="text-xs font-semibold text-rose-600">Mục tiêu</h4>
                   </div>
-                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium leading-tight ${verdictBadge(viewed.goals.verdict)}`}>
-                    {viewed.goals.verdict}
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium leading-tight ${verdictBadge(shown.goals.verdict)}`}>
+                    {shown.goals.verdict}
                   </span>
                 </div>
                 <ul className="mb-2 space-y-1">
-                  {viewed.goals.points.map((p, i) => (
+                  {shown.goals.points.map((p, i) => (
                     <li key={i} className="flex items-start gap-1 text-xs text-rose-800">
                       <ChevronRight className="mt-0.5 h-3 w-3 shrink-0 text-rose-400" />{p}
                     </li>
                   ))}
                 </ul>
-                {viewed.goals.focus && (
+                {shown.goals.focus && (
                   <div className="rounded-lg bg-rose-100/70 px-2 py-1 text-xs text-rose-700">
-                    <span className="font-medium">Ưu tiên: </span>{viewed.goals.focus}
+                    <span className="font-medium">Ưu tiên: </span>{shown.goals.focus}
                   </div>
                 )}
               </div>
@@ -681,67 +785,74 @@ export function NotesAIInsights({ notes, habits }: { notes: Note[]; habits: Note
           {/* Domain cards — row 3: notes & habits */}
           <div className="grid gap-2 sm:grid-cols-1">
             {/* Notes & Habits */}
-            {viewed.notes_habits && (
+            {shown.notes_habits && (
               <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-2.5">
                 <div className="mb-1.5 flex items-center gap-1.5">
                   <BookOpen className="h-3.5 w-3.5 text-emerald-600" />
                   <h4 className="text-xs font-semibold text-emerald-600">{t('notesAIInsights.notesHabitsCard')}</h4>
                 </div>
                 <ul className="mb-2 grid gap-1 sm:grid-cols-2">
-                  {viewed.notes_habits.points.map((p, i) => (
+                  {shown.notes_habits.points.map((p, i) => (
                     <li key={i} className="flex items-start gap-1 text-xs text-emerald-800">
                       <ChevronRight className="mt-0.5 h-3 w-3 shrink-0 text-emerald-400" />{p}
                     </li>
                   ))}
                 </ul>
-                {viewed.notes_habits.habit_gap && (
+                {shown.notes_habits.habit_gap && (
                   <div className="rounded-lg bg-emerald-100/70 px-2 py-1 text-xs text-emerald-700">
-                    <span className="font-medium">{t('notesAIInsights.habitGapLabel')}</span>{viewed.notes_habits.habit_gap}
+                    <span className="font-medium">{t('notesAIInsights.habitGapLabel')}</span>{shown.notes_habits.habit_gap}
                   </div>
                 )}
               </div>
             )}
           </div>
 
-          {/* Pattern + Recommendation */}
-          <div className="space-y-2 rounded-xl border border-blue-100 bg-blue-50 p-3">
-            <div>
-              <div className="mb-1 flex items-center gap-1.5">
-                <Lightbulb className="h-3.5 w-3.5 text-blue-600" />
-                <h4 className="text-xs font-semibold text-blue-600">Tương quan nổi bật</h4>
-              </div>
-              <p className="text-xs leading-relaxed text-blue-900">{viewed.pattern}</p>
+          {/* Pattern + Recommendation — the last two the model writes, so the last to appear */}
+          {(shown.pattern || shown.recommendation) && (
+            <div className="space-y-2 rounded-xl border border-blue-100 bg-blue-50 p-3">
+              {shown.pattern && (
+                <div>
+                  <div className="mb-1 flex items-center gap-1.5">
+                    <Lightbulb className="h-3.5 w-3.5 text-blue-600" />
+                    <h4 className="text-xs font-semibold text-blue-600">Tương quan nổi bật</h4>
+                  </div>
+                  <p className="text-xs leading-relaxed text-blue-900">{shown.pattern}</p>
+                </div>
+              )}
+              {shown.recommendation && (
+                <div className="border-t border-blue-100 pt-2.5">
+                  <p className="mb-1.5 text-xs font-semibold text-blue-600">{t('notesAIInsights.recommendationCard')}</p>
+                  <ol className="space-y-1">
+                    {shown.recommendation
+                      .split(/(?=\d+\.\s)/)
+                      .map(s => s.replace(/^\d+\.\s*/, '').trim())
+                      .filter(Boolean)
+                      .map((item, i) => (
+                        <li key={i} className="flex items-start gap-1.5 text-xs text-blue-800">
+                          <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-blue-200 text-[10px] font-bold text-blue-700">
+                            {i + 1}
+                          </span>
+                          {item}
+                        </li>
+                      ))}
+                  </ol>
+                </div>
+              )}
             </div>
-            <div className="border-t border-blue-100 pt-2.5">
-              <p className="mb-1.5 text-xs font-semibold text-blue-600">{t('notesAIInsights.recommendationCard')}</p>
-              <ol className="space-y-1">
-                {viewed.recommendation
-                  .split(/(?=\d+\.\s)/)
-                  .map(s => s.replace(/^\d+\.\s*/, '').trim())
-                  .filter(Boolean)
-                  .map((item, i) => (
-                    <li key={i} className="flex items-start gap-1.5 text-xs text-blue-800">
-                      <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-blue-200 text-[10px] font-bold text-blue-700">
-                        {i + 1}
-                      </span>
-                      {item}
-                    </li>
-                  ))}
-              </ol>
-            </div>
-          </div>
+          )}
 
-          {/* Token + timestamp footer — only shown when token data is available */}
-          {viewed.tokenUsage && viewed.tokenUsage.total > 0 && (
+          {/* Token + timestamp footer — only shown when token data is available, which is
+              never mid-stream: the counts arrive with the done event. */}
+          {shown.tokenUsage && shown.tokenUsage.total > 0 && shown.analyzedAt && (
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-zinc-100 bg-zinc-50 px-2.5 py-1.5 text-xs text-zinc-500">
               <span className="font-semibold text-zinc-700">
-                {t('notesAIInsights.tokensLabel', { n: fmtN(viewed.tokenUsage.total, lang) })}
+                {t('notesAIInsights.tokensLabel', { n: fmtN(shown.tokenUsage.total, lang) })}
               </span>
               <span className="text-zinc-300">|</span>
-              <span>{t('notesAIInsights.inputTokens', { n: fmtN(viewed.tokenUsage.prompt, lang) })}</span>
+              <span>{t('notesAIInsights.inputTokens', { n: fmtN(shown.tokenUsage.prompt, lang) })}</span>
               <span>·</span>
-              <span>{t('notesAIInsights.outputTokens', { n: fmtN(viewed.tokenUsage.completion, lang) })}</span>
-              <span className="text-zinc-400 sm:ml-auto">{formatDateTime(viewed.analyzedAt, lang)}</span>
+              <span>{t('notesAIInsights.outputTokens', { n: fmtN(shown.tokenUsage.completion, lang) })}</span>
+              <span className="text-zinc-400 sm:ml-auto">{formatDateTime(shown.analyzedAt, lang)}</span>
             </div>
           )}
         </div>

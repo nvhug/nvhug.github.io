@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { callGeminiWithDeepSeekFallback, isProviderConfigured, type ProviderCallOptions } from './ai-provider'
+import {
+  callGeminiWithDeepSeekFallback,
+  isProviderConfigured,
+  streamGeminiWithDeepSeekFallback,
+  type ProviderCallOptions,
+} from './ai-provider'
 
 const OPTS: ProviderCallOptions = {
   geminiModel: 'gemini-3.7-flash',
@@ -343,5 +348,130 @@ describe('callGeminiWithDeepSeekFallback', () => {
 
       expect(await callGeminiWithDeepSeekFallback(OPTS)).toEqual({ ok: false, network: false })
     })
+  })
+})
+
+// ─── Streaming ───────────────────────────────────────────────────────────────
+
+/** A 200 whose body is a real SSE stream over the given frames. */
+function sseResponse(...frames: string[]): Response {
+  const body = new ReadableStream<Uint8Array>({
+    start(controller) {
+      const encoder = new TextEncoder()
+      for (const frame of frames) controller.enqueue(encoder.encode(`data: ${frame}\n\n`))
+      controller.close()
+    },
+  })
+  return { ok: true, status: 200, body } as unknown as Response
+}
+
+/**
+ * A 200 that streams `frames`, then breaks — the mid-stream failure the fallback cannot fix.
+ * Delivered one frame per pull: erroring the controller from `start` would discard the
+ * queue, and the whole point of the fixture is that the reader HAS already seen them.
+ */
+function sseThenBreaks(...frames: string[]): Response {
+  let next = 0
+  const body = new ReadableStream<Uint8Array>({
+    pull(controller) {
+      if (next < frames.length) {
+        controller.enqueue(new TextEncoder().encode(`data: ${frames[next++]}\n\n`))
+        return
+      }
+      controller.error(timeoutError())
+    },
+  })
+  return { ok: true, status: 200, body } as unknown as Response
+}
+
+function geminiFrame(text: string, extra: Record<string, unknown> = {}) {
+  return JSON.stringify({ candidates: [{ content: { parts: [{ text }] } }], ...extra })
+}
+
+function deepseekFrame(content: string, extra: Record<string, unknown> = {}) {
+  return JSON.stringify({ choices: [{ delta: { content } }], ...extra })
+}
+
+describe('streamGeminiWithDeepSeekFallback', () => {
+  it('hands over each delta in order and returns the whole completion', async () => {
+    mockFetchSequence([sseResponse(
+      geminiFrame('{"from":'),
+      geminiFrame('"gemini"}', { usageMetadata: { promptTokenCount: 10, candidatesTokenCount: 4 } }),
+    )])
+
+    const deltas: string[] = []
+    const result = await streamGeminiWithDeepSeekFallback(OPTS, d => deltas.push(d))
+
+    expect(deltas).toEqual(['{"from":', '"gemini"}'])
+    expect(result).toMatchObject({ ok: true, provider: 'gemini', text: '{"from":"gemini"}' })
+  })
+
+  it('asks Gemini for its SSE endpoint', async () => {
+    const fetchMock = mockFetchSequence([sseResponse(geminiFrame('{}'))])
+
+    await streamGeminiWithDeepSeekFallback(OPTS, () => {})
+
+    expect(urlOf(fetchMock.mock.calls[0])).toContain(':streamGenerateContent?alt=sse')
+  })
+
+  it('falls back to DeepSeek when Gemini fails before any delta', async () => {
+    mockFetchSequence([
+      httpResponse(500, { error: 'boom' }),
+      sseResponse(
+        deepseekFrame('{"from":"deepseek"}'),
+        JSON.stringify({ choices: [], usage: { prompt_tokens: 10, completion_tokens: 4 } }),
+        '[DONE]',
+      ),
+    ])
+
+    const result = await streamGeminiWithDeepSeekFallback(OPTS, () => {})
+
+    expect(result).toMatchObject({ ok: true, provider: 'deepseek', text: '{"from":"deepseek"}' })
+  })
+
+  it('asks DeepSeek to stream, and to include usage — a billed call with no counts to file', async () => {
+    const fetchMock = mockFetchSequence([
+      httpResponse(500, { error: 'boom' }),
+      sseResponse(deepseekFrame('{}'), '[DONE]'),
+    ])
+
+    await streamGeminiWithDeepSeekFallback(OPTS, () => {})
+
+    expect(bodyOf(fetchMock.mock.calls[1])).toMatchObject({
+      stream: true,
+      stream_options: { include_usage: true },
+    })
+  })
+
+  // The rule that makes this a separate function from the buffered call.
+  it('does NOT fall back once Gemini has already emitted — half of two answers is neither', async () => {
+    const fetchMock = mockFetchSequence([sseThenBreaks(geminiFrame('{"from":'))])
+
+    const deltas: string[] = []
+    const result = await streamGeminiWithDeepSeekFallback(OPTS, d => deltas.push(d))
+
+    expect(deltas).toEqual(['{"from":'])
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(result).toEqual({ ok: false, network: true })
+  })
+
+  it('still falls back when the stream breaks before a single delta', async () => {
+    const fetchMock = mockFetchSequence([
+      sseThenBreaks(),
+      sseResponse(deepseekFrame('{"from":"deepseek"}'), '[DONE]'),
+    ])
+
+    const result = await streamGeminiWithDeepSeekFallback(OPTS, () => {})
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(result).toMatchObject({ ok: true, provider: 'deepseek' })
+  })
+
+  it('reports a truncated completion from the provider stop reason', async () => {
+    mockFetchSequence([sseResponse(geminiFrame('cut off', { candidates: [{ finishReason: 'MAX_TOKENS' }] }))])
+
+    const result = await streamGeminiWithDeepSeekFallback(OPTS, () => {})
+
+    expect(result).toMatchObject({ ok: true, truncated: true })
   })
 })

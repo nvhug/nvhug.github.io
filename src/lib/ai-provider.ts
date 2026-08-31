@@ -7,6 +7,7 @@
 // that decision here would change five routes' refund semantics for no requirement.
 
 import { servedModel } from '@/lib/ai-usage'
+import { parseSseFrame, splitSseFrames, type SseFrame } from '@/lib/sse'
 
 export type ProviderName = 'gemini' | 'deepseek'
 
@@ -320,6 +321,256 @@ export async function callGeminiWithDeepSeekFallback(
   if (!deepseekKey) return { ok: false, network: primaryFailure?.status === null }
 
   const fallback = await attemptDeepSeek(deepseekKey, opts)
+  if (fallback.ok) {
+    return {
+      ok: true,
+      provider: 'deepseek',
+      model: fallback.model,
+      text: fallback.text,
+      usage: fallback.usage,
+      truncated: fallback.truncated,
+    }
+  }
+  logAttemptFailure('deepseek', fallback)
+  return { ok: false, network: fallback.status === null }
+}
+
+// ─── Streaming ───────────────────────────────────────────────────────────────
+//
+// The same Gemini-then-DeepSeek router, reading the completion as it is generated instead
+// of waiting for the whole body. Total time is unchanged — the model writes at the rate it
+// writes — but the caller can act on the first sections while the rest is still coming,
+// which is the entire point. Kept beside the buffered call rather than replacing it: the
+// other five features have no use for partial output and must not inherit the extra
+// failure mode below.
+
+/** Receives each text delta, in order, as it arrives from whichever provider served it. */
+export type ProviderDeltaHandler = (delta: string) => void
+
+interface StreamAttemptSuccess extends AttemptSuccess { emitted: boolean }
+interface StreamAttemptFailure extends AttemptFailure {
+  /**
+   * True when the stream broke AFTER some text had already been handed to the caller.
+   * The fallback cannot rescue that: the caller has half a Gemini answer, and appending
+   * half a DeepSeek one produces a document neither model wrote.
+   */
+  emitted: boolean
+}
+
+type StreamAttemptResult = StreamAttemptSuccess | StreamAttemptFailure
+
+/**
+ * Feeds every SSE frame in the response body to `onFrame`. Returns false when the read
+ * itself failed — a network drop or a timeout firing mid-stream — which is a transport
+ * failure, told apart here from a stream that simply ended.
+ */
+async function readSseBody(res: Response, onFrame: (frame: SseFrame) => void): Promise<boolean> {
+  if (!res.body) return false
+  const reader = res.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  try {
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+      const { frames, rest } = splitSseFrames(buffer)
+      buffer = rest
+      for (const raw of frames) {
+        const frame = parseSseFrame(raw)
+        if (frame) onFrame(frame)
+      }
+    }
+  } catch {
+    return false
+  }
+  // A final frame with no trailing blank line is still a frame.
+  const trailing = parseSseFrame(buffer)
+  if (trailing) onFrame(trailing)
+  return true
+}
+
+interface GeminiStreamChunk {
+  candidates?: { content?: { parts?: { text?: string }[] }; finishReason?: string }[]
+  usageMetadata?: unknown
+  modelVersion?: string
+}
+
+interface DeepSeekStreamChunk {
+  choices?: { delta?: { content?: string }; finish_reason?: string }[]
+  usage?: unknown
+  model?: string
+}
+
+async function streamGemini(
+  apiKey: string,
+  opts: ProviderCallOptions,
+  onDelta: ProviderDeltaHandler
+): Promise<StreamAttemptResult> {
+  let res: Response
+  try {
+    res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(opts.geminiModel)}:streamGenerateContent?alt=sse`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts: [{ text: opts.prompt }] }],
+          generationConfig: {
+            temperature: opts.temperature,
+            maxOutputTokens: opts.maxTokens,
+            responseMimeType: 'application/json',
+            // Same trade as the buffered attempt: a thinking pass costs tokens and wall
+            // clock before a single character is streamed, which is precisely what this
+            // path exists to avoid.
+            thinkingConfig: { thinkingBudget: 0 },
+          },
+        }),
+        signal: AbortSignal.timeout(opts.primaryTimeoutMs),
+      }
+    )
+  } catch {
+    return { ok: false, status: null, apiKeyInvalid: false, detail: null, emitted: false }
+  }
+
+  if (!res.ok) {
+    const parsed = await readJson(res)
+    const errorBody = parsed.ok ? parsed.data : null
+    return {
+      ok: false,
+      status: res.status,
+      apiKeyInvalid: res.status === 400 && isGeminiApiKeyInvalid(errorBody),
+      detail: errorDetail(errorBody),
+      emitted: false,
+    }
+  }
+
+  let text = ''
+  let usage: unknown = null
+  let model = opts.geminiModel
+  let finishReason: string | undefined
+
+  const complete = await readSseBody(res, (frame) => {
+    const chunk = frame.data as GeminiStreamChunk | null
+    if (!chunk || typeof chunk !== 'object') return
+    const candidate = chunk.candidates?.[0]
+    const delta = candidate?.content?.parts?.map((p) => p?.text ?? '').join('') ?? ''
+    if (delta) { text += delta; onDelta(delta) }
+    if (candidate?.finishReason) finishReason = candidate.finishReason
+    // Every chunk may restate usage; the last one carries the final counts.
+    if (chunk.usageMetadata) usage = chunk.usageMetadata
+    if (chunk.modelVersion) model = servedModel(chunk, opts.geminiModel)
+  })
+
+  if (!complete) {
+    return { ok: false, status: null, apiKeyInvalid: false, detail: null, emitted: text.length > 0 }
+  }
+  return { ok: true, model, text, usage, truncated: finishReason === 'MAX_TOKENS', emitted: text.length > 0 }
+}
+
+async function streamDeepSeek(
+  apiKey: string,
+  opts: ProviderCallOptions,
+  onDelta: ProviderDeltaHandler
+): Promise<StreamAttemptResult> {
+  let res: Response
+  try {
+    res = await fetch('https://api.deepseek.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        model: opts.deepseekModel,
+        messages: [{ role: 'user', content: opts.prompt }],
+        response_format: { type: 'json_object' },
+        thinking: { type: 'disabled' },
+        temperature: opts.temperature,
+        max_tokens: opts.maxTokens,
+        stream: true,
+        // Without this the streamed response carries no usage at all, and the call would
+        // be billed with nothing to file in ai_usage_log.
+        stream_options: { include_usage: true },
+      }),
+      signal: AbortSignal.timeout(opts.fallbackTimeoutMs),
+    })
+  } catch {
+    return { ok: false, status: null, apiKeyInvalid: false, detail: null, emitted: false }
+  }
+
+  if (!res.ok) {
+    const parsed = await readJson(res)
+    return {
+      ok: false,
+      status: res.status,
+      apiKeyInvalid: false,
+      detail: errorDetail(parsed.ok ? parsed.data : null),
+      emitted: false,
+    }
+  }
+
+  let text = ''
+  let usage: unknown = null
+  let model = opts.deepseekModel
+  let finishReason: string | undefined
+
+  const complete = await readSseBody(res, (frame) => {
+    if (frame.data === '[DONE]') return
+    const chunk = frame.data as DeepSeekStreamChunk | null
+    if (!chunk || typeof chunk !== 'object') return
+    const choice = chunk.choices?.[0]
+    const delta = choice?.delta?.content ?? ''
+    if (delta) { text += delta; onDelta(delta) }
+    if (choice?.finish_reason) finishReason = choice.finish_reason
+    if (chunk.usage) usage = chunk.usage
+    if (chunk.model) model = servedModel(chunk, opts.deepseekModel)
+  })
+
+  if (!complete) {
+    return { ok: false, status: null, apiKeyInvalid: false, detail: null, emitted: text.length > 0 }
+  }
+  return { ok: true, model, text, usage, truncated: finishReason === 'length', emitted: text.length > 0 }
+}
+
+/**
+ * Streaming twin of callGeminiWithDeepSeekFallback. Same providers, same retry
+ * classification, same result shape — `text` is the whole completion, so a caller that
+ * ignores `onDelta` gets exactly what the buffered call returns.
+ *
+ * One rule differs, and it is why this is a separate function: the fallback runs only
+ * while nothing has been emitted. Once a delta has left for the client, a Gemini failure
+ * is final — switching providers mid-document would splice two different answers
+ * together, and no caller can un-render what it already showed.
+ */
+export async function streamGeminiWithDeepSeekFallback(
+  opts: ProviderCallOptions,
+  onDelta: ProviderDeltaHandler
+): Promise<ProviderCallResult> {
+  const geminiKey = process.env.GEMINI_API_KEY
+  const deepseekKey = process.env.DEEPSEEK_API_KEY
+
+  let primaryFailure: StreamAttemptFailure | null = null
+
+  if (geminiKey) {
+    const primary = await streamGemini(geminiKey, opts, onDelta)
+    if (primary.ok) {
+      return {
+        ok: true,
+        provider: 'gemini',
+        model: primary.model,
+        text: primary.text,
+        usage: primary.usage,
+        truncated: primary.truncated,
+      }
+    }
+    logAttemptFailure('gemini', primary)
+    if (primary.emitted || !isRetryable(primary)) {
+      return { ok: false, network: primary.emitted && primary.status === null }
+    }
+    primaryFailure = primary
+  }
+
+  if (!deepseekKey) return { ok: false, network: primaryFailure?.status === null }
+
+  const fallback = await streamDeepSeek(deepseekKey, opts, onDelta)
   if (fallback.ok) {
     return {
       ok: true,

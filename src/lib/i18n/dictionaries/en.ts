@@ -585,6 +585,8 @@ export const en: Dictionary = {
     byQuarter: 'By quarter',
     notesCount: '{n} items',
     analyzing: 'Analyzing...',
+    analyzingPercent: 'Analyzing... {percent}%',
+    streamProgress: 'AI is writing — {done}/{total} sections done',
     analyzeAI: 'AI Analysis',
     lastAnalyzed: 'Last analyzed at {time}. You can analyze again after {cooldown}.',
     noDataForPeriod: 'No note data for {period}.',
