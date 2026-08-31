@@ -43,6 +43,20 @@ export const PALACE_FALLBACK_TIMEOUT_MS = 31_000
 export const PALACE_MAX_TOKENS = 3500
 
 /**
+ * Why one batch produced nothing. The route returns 502 only when EVERY batch did, and
+ * the batches are independent provider calls that can fail for different reasons — a flat
+ * "interpretation_unavailable" says which of five causes fired: never arrived, arrived
+ * cut off, arrived whole but empty, arrived unreadable, or the other batch's reason.
+ */
+interface BatchDiagnosis {
+  cause: string
+  truncated?: boolean
+  provider?: string
+  /** Bounded prefix of the completion, never the prompt — same rule ai-usage.ts follows. */
+  raw?: string
+}
+
+/**
  * Counted in its own bucket, not the sections one. The counter is keyed on an
  * opaque day string, so suffixing it gives the palace readings their own daily
  * allowance — otherwise one page view would spend two of the six and a reader
@@ -170,7 +184,7 @@ export async function POST(request: Request) {
    */
   async function generateBatch(
     indexes: readonly number[],
-  ): Promise<{ palaces: Record<string, PalaceReading>; refundable: boolean }> {
+  ): Promise<{ palaces: Record<string, PalaceReading>; refundable: boolean; diagnosis?: BatchDiagnosis }> {
     // Captured before the call, not after it. DeepSeek's peak windows begin and end on the
     // hour and a batch may spend both attempts back to back, so one starting at 09:59:40
     // and returning at 10:00:30 was billed at the peak rate while being priced off-peak — a
@@ -197,7 +211,11 @@ export async function POST(request: Request) {
         '[tu-vi] palace batch failed:',
         result.network ? 'network/timeout' : 'upstream error',
       )
-      return { palaces: {}, refundable: true }
+      return {
+        palaces: {},
+        refundable: true,
+        diagnosis: { cause: result.network ? 'network/timeout' : 'upstream error' },
+      }
     }
 
     try {
@@ -233,7 +251,16 @@ export async function POST(request: Request) {
           `[tu-vi] palace batch empty: truncated=${result.truncated} chars=${content.length}`,
         )
         // Truncation is a ceiling we set, not abuse, so it stays refundable.
-        return { palaces: {}, refundable: result.truncated }
+        return {
+          palaces: {},
+          refundable: result.truncated,
+          diagnosis: {
+            cause: 'no palaces in a completed body',
+            truncated: result.truncated,
+            provider: result.provider,
+            raw: content.slice(0, 200),
+          },
+        }
       }
       await recordUsage('success')
       return { palaces, refundable: false }
@@ -245,7 +272,16 @@ export async function POST(request: Request) {
       console.error(
         `[tu-vi] palace batch unreadable: ${error instanceof Error ? `${error.name}: ${error.message}` : String(error)}`,
       )
-      return { palaces: {}, refundable: false }
+      return {
+        palaces: {},
+        refundable: false,
+        diagnosis: {
+          cause: 'unreadable body',
+          truncated: result.truncated,
+          provider: result.provider,
+          raw: result.text.slice(0, 200),
+        },
+      }
     }
   }
 
@@ -260,7 +296,12 @@ export async function POST(request: Request) {
   if (Object.keys(palaces).length === 0) {
     // Refund only when no batch produced a billed completion at all.
     if (batches.every((batch) => batch.refundable)) await refundSlot()
-    return NextResponse.json({ error: 'interpretation_unavailable' }, { status: 502 })
+    // One entry per batch: the two are independent provider calls and can fail for
+    // different reasons, which is exactly what a single flat message used to hide.
+    return NextResponse.json({
+      error: 'interpretation_unavailable',
+      batches: batches.map((batch) => batch.diagnosis ?? null),
+    }, { status: 502 })
   }
 
   if (batches.some((batch) => Object.keys(batch.palaces).length === 0)) {

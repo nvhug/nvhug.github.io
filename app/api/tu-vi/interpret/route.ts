@@ -296,13 +296,20 @@ export async function POST(request: Request) {
     // reading they never received. A complete body that simply failed validation
     // WAS delivered and billed, so it keeps its slot: otherwise the retry button
     // is a spend loop.
+    // `diagnosis` already names the cause precisely; it went only to the server log,
+    // where it is out of reach of anyone looking at the failing request itself.
+    const detail = {
+      truncated: result.truncated,
+      provider: result.provider,
+      raw: result.text.slice(0, 200),
+    }
     if (result.truncated) {
       console.error('[tu-vi] completion incomplete:', diagnosis)
       await refundSlot()
-      return NextResponse.json({ error: 'interpretation_unavailable' }, { status: 502 })
+      return NextResponse.json({ error: 'interpretation_unavailable', ...detail }, { status: 502 })
     }
     console.error('[tu-vi] completion rejected by validation:', diagnosis)
-    return NextResponse.json({ error: 'interpretation_unavailable' }, { status: 502 })
+    return NextResponse.json({ error: 'interpretation_unavailable', ...detail }, { status: 502 })
   }
 
   await recordUsage('success')

@@ -196,7 +196,7 @@ HARD RULES:
  */
 async function callNutrition(
   prompt: string
-): Promise<Pick<ProviderResult, 'usage' | 'model' | 'provider'> & { text: string }> {
+): Promise<Pick<ProviderResult, 'usage' | 'model' | 'provider'> & { text: string; truncated: boolean }> {
   const result = await callGeminiWithDeepSeekFallback({
     geminiModel: 'gemini-3.1-flash-lite',
     deepseekModel: 'deepseek-v4-flash',
@@ -207,7 +207,15 @@ async function callNutrition(
     fallbackTimeoutMs: NUTRITION_FALLBACK_TIMEOUT_MS,
   })
   if (!result.ok) throw new Error('nutrition provider unavailable')
-  return { usage: result.usage, model: result.model, provider: result.provider, text: result.text }
+  return {
+    usage: result.usage,
+    model: result.model,
+    provider: result.provider,
+    text: result.text,
+    // Carried out so the unparsable-output branch can say whether the model was cut off
+    // at our own ceiling or malformed at full length. They need different fixes.
+    truncated: result.truncated,
+  }
 }
 
 function extractJSON(raw: string): unknown {
@@ -335,7 +343,7 @@ export async function POST(request: Request) {
   // stage is not recorded until its output has been through resultSchema, because that
   // parse is what decides whether the completion we paid for was usable — and a billed
   // completion the app then rejects is the failure FR-005a exists to make visible.
-  let nutritionCall: Pick<ProviderResult, 'usage' | 'model' | 'provider'>
+  let nutritionCall: Pick<ProviderResult, 'usage' | 'model' | 'provider'> & { truncated?: boolean }
   let nutritionStart = new Date()
   let stageStart = new Date()
   let focusBox: [number, number, number, number] | null = null
@@ -380,8 +388,20 @@ export async function POST(request: Request) {
   } catch (err) {
     // Billed and unusable — the expensive kind of failure, and the one FR-005a is about.
     await record(nutritionCall, 'error', nutritionStart)
-    console.error('[analyze-food] unparsable model output:', err, raw.slice(0, 300))
-    return NextResponse.json({ error: MSG.aiFailed[lang] }, { status: 502 })
+    console.error(
+      `[analyze-food] unparsable model output: provider=${nutritionCall?.provider} truncated=${nutritionCall?.truncated} chars=${raw.length}`,
+      err,
+      raw.slice(0, 300),
+    )
+    // The reader still sees the localized message; these three ride alongside it, because
+    // a billed completion that will not parse is otherwise indistinguishable from a
+    // provider outage in anything the browser can show.
+    return NextResponse.json({
+      error: MSG.aiFailed[lang],
+      truncated: nutritionCall?.truncated ?? null,
+      provider: nutritionCall?.provider ?? null,
+      raw: raw.slice(0, 200),
+    }, { status: 502 })
   }
   await record(nutritionCall, 'success', nutritionStart)
 
