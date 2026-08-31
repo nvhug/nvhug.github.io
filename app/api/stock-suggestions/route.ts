@@ -35,18 +35,39 @@ export const DEFAULT_SCREENER_TICKERS = [
 
 const MAX_SCREENER_TICKERS = 50
 
-// The fallback runs on DeepSeek at maxTokens=2000, which at this codebase's own measured
-// ~120 tokens/sec sustained rate (MEASURED_TOKENS_PER_SECOND in
-// horoscope-interpretation.ts) needs at least ~16.7s to finish a genuinely long response —
-// sizing it lower turns a slow-but-healthy fallback into a timeout instead. 18s covers
-// that with margin; the primary gets most of what's left of maxDuration. This budget
-// covers only the AI call itself — the ticker-stats fetch loop above (up to 50 tickers,
-// unbounded per-request) and the cache insert after both run outside it and are NOT
-// accounted for here; a slow Yahoo Finance response can still exceed maxDuration on top
-// of a healthy AI call.
-const SUGGESTIONS_PRIMARY_TIMEOUT_MS = 37_000
-export const SUGGESTIONS_FALLBACK_TIMEOUT_MS = 18_000
-export const SUGGESTIONS_MAX_TOKENS = 2000
+// The ceiling is not sized for the answer. It is sized for the answer PLUS whatever
+// Gemini decides to spend thinking first, because both come out of maxOutputTokens.
+// Measured 2026-08-31: DeepSeek produces 856-881 content tokens for this prompt across
+// three runs with reasoning_tokens=0, while the Gemini call that failed spent 1927 tokens
+// reasoning and had 66 left for JSON — 1993 of a 2000 ceiling, truncated mid-object and
+// reported as invalid JSON. `thinkingConfig: { thinkingBudget: 0 }` is set and is honoured
+// on most calls; this covers the ones where it is not.
+export const SUGGESTIONS_MAX_TOKENS = 3000
+
+// Per ATTEMPT, not a shared budget. The fallback must outlast a DeepSeek completion that
+// fills the whole ceiling at this codebase's measured ~120 tokens/sec sustained rate
+// (MEASURED_TOKENS_PER_SECOND) — 25s — or a slow-but-healthy fallback dies as a timeout
+// and a real, billed completion is thrown away. The primary is sized off measurement
+// rather than "whatever is left": Gemini served 2343 tokens in ~10s (~234 tokens/sec) on
+// this prompt shape, so 26s is well over twice what even a reasoning-heavy run needs
+// (~2800 tokens ≈ 12s). The two attempts are deliberately equal: when both time out the
+// platform's hard kill is what the request runs into, and that is the failure with no
+// error handling at all — a Vercel 504 discards a DeepSeek completion already paid for.
+const SUGGESTIONS_PRIMARY_TIMEOUT_MS = 26_000
+export const SUGGESTIONS_FALLBACK_TIMEOUT_MS = 26_000
+
+/**
+ * What the request spends OUTSIDE the two provider attempts, reserved out of maxDuration:
+ * the ticker-stats fetch loop above and the cache insert after. The loop measured 1.4s for
+ * all 50 tickers (four chunks of 15, concurrent, with 200ms between chunks), so 5s is
+ * roughly a 3.5x allowance for a slow Yahoo Finance day.
+ *
+ * Previously this was a comment admitting the loop was NOT accounted for. It is now a
+ * number, and `timeouts.test.ts` fails if the two attempts plus this reserve no longer fit
+ * inside maxDuration — the check that would have caught a ceiling raised without one.
+ */
+export const SUGGESTIONS_NON_AI_RESERVE_MS = 5_000
+export { SUGGESTIONS_PRIMARY_TIMEOUT_MS }
 
 function normalizeTickers(value: unknown): string[] {
   if (!Array.isArray(value)) return [...DEFAULT_SCREENER_TICKERS]
