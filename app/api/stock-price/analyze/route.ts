@@ -9,7 +9,9 @@ import { stockAnalysisSchema } from './schema'
 import { cooldownMetadata } from './cooldown'
 import { checkAITrialQuota, incrementAITrialUsage, trialExhaustedBody, QUOTA_EXHAUSTED_STATUS } from '@/lib/ai-trial'
 import { logAiUsage, normalizeUsage } from '@/lib/ai-usage'
-import { callGeminiWithDeepSeekFallback, isProviderConfigured } from '@/lib/ai-provider'
+import { streamGeminiWithDeepSeekFallback, isProviderConfigured } from '@/lib/ai-provider'
+import { parseCompleteSections, sectionProgressPercent } from '@/lib/json-stream'
+import { sseMessage } from '@/lib/sse'
 
 export const runtime = 'nodejs'
 // The old single 50_000ms budget relied on an undeclared, ambiguous platform default —
@@ -28,6 +30,16 @@ export const maxDuration = 60
 const ANALYZE_PRIMARY_TIMEOUT_MS = 24_000
 export const ANALYZE_FALLBACK_TIMEOUT_MS = 31_000
 export const ANALYZE_MAX_TOKENS = 3500
+// The top-level keys the prompt asks for — the denominator of the progress the reader
+// sees. Progress counts keys that have fully arrived, so this only has to match the
+// template's SIZE, not its order. Add a field to the prompt without adding it here and
+// the bar stops short of full.
+export const ANALYZE_SECTION_KEYS = [
+  'grade', 'overallScore', 'scores', 'industryScores', 'industryOverallScore',
+  'summary', 'confidence', 'scoreRationales', 'marketView', 'investmentThesis',
+  'catalysts', 'scenarios', 'actionPlan', 'strengths', 'risks',
+  'dataQuality', 'recommendation', 'sectorName', 'peers',
+] as const
 
 type StoredAnalysis = {
   result: unknown
@@ -340,83 +352,155 @@ export async function POST(request: Request) {
 
   // Before the call, so a request that straddles a peak boundary is priced at the rate it
   // was actually billed at.
-  const startedAt = new Date()
+  // From here the response is an SSE stream. Every gate above still answers with an
+  // ordinary status code and JSON body — 401/400/429/500 — because a status can only be
+  // set before the first byte, and the client reads the 429 body for the saved analysis it
+  // shows during a cooldown. Only failures after generation starts travel as an event.
+  const encoder = new TextEncoder()
 
-  const providerResult = await callGeminiWithDeepSeekFallback({
-    geminiModel: 'gemini-3.7-flash',
-    deepseekModel: 'deepseek-v4-flash',
-    prompt,
-    temperature: 0.3,
-    maxTokens: ANALYZE_MAX_TOKENS,
-    primaryTimeoutMs: ANALYZE_PRIMARY_TIMEOUT_MS,
-    fallbackTimeoutMs: ANALYZE_FALLBACK_TIMEOUT_MS,
+  const stream = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      const send = (event: string, data: unknown) =>
+        controller.enqueue(encoder.encode(sseMessage(event, data)))
+
+      try {
+        // The completion is one JSON object whose top-level keys are the report's
+        // sections, so a section is done the moment its value closes — real progress,
+        // not a timer. See parseCompleteSections.
+        let buffer = ''
+        const sentKeys = new Set<string>()
+
+        send('progress', { percent: 0, done: 0, total: ANALYZE_SECTION_KEYS.length })
+
+        const startedAt = new Date()
+
+        const providerResult = await streamGeminiWithDeepSeekFallback(
+          {
+            geminiModel: 'gemini-3.7-flash',
+            deepseekModel: 'deepseek-v4-flash',
+            prompt,
+            temperature: 0.3,
+            maxTokens: ANALYZE_MAX_TOKENS,
+            primaryTimeoutMs: ANALYZE_PRIMARY_TIMEOUT_MS,
+            fallbackTimeoutMs: ANALYZE_FALLBACK_TIMEOUT_MS,
+          },
+          (delta) => {
+            buffer += delta
+            const complete = parseCompleteSections(buffer)
+            if (!complete) return
+            let added = false
+            for (const key of Object.keys(complete)) {
+              if (sentKeys.has(key)) continue
+              sentKeys.add(key)
+              added = true
+            }
+            // Only the key name travels, never the value: the panel renders the
+            // normalized report from `done`, so a half-written section would be a
+            // preview of something the reader never ends up seeing.
+            if (added) {
+              send('progress', {
+                percent: sectionProgressPercent(sentKeys.size, ANALYZE_SECTION_KEYS.length),
+                done: sentKeys.size,
+                total: ANALYZE_SECTION_KEYS.length,
+                section: [...sentKeys].at(-1),
+              })
+            }
+          },
+        )
+
+        // No usage logged here: nothing was billed on a transport failure.
+        if (!providerResult.ok) {
+          send('error', { error: 'AI analysis unavailable' })
+          controller.close()
+          return
+        }
+
+        // Records this provider call whatever becomes of it. A failure does NOT imply zero cost:
+        // every rejection below happens AFTER a completion arrived and was billed, so filing them
+        // as successes would make wasted spend structurally invisible (FR-005a).
+        const recordUsage = (outcome: 'success' | 'error') =>
+          logAiUsage({
+            surface: 'stock_analyze',
+            provider: providerResult.provider,
+            model: providerResult.model,
+            usage: normalizeUsage(providerResult.usage, providerResult.provider),
+            outcome,
+            userId: user.id,
+            actor: 'user',
+            at: startedAt,
+          })
+
+        const content = providerResult.text
+        if (!content) {
+          await recordUsage('error')
+          send('error', { error: 'Empty response from AI provider' })
+          controller.close()
+          return
+        }
+
+        let parsed: unknown
+        try {
+          parsed = JSON.parse(content)
+        } catch {
+          await recordUsage('error')
+          send('error', { error: 'AI provider returned invalid JSON', raw: content.slice(0, 200) })
+          controller.close()
+          return
+        }
+
+        const result = stockAnalysisSchema.safeParse(parsed)
+        if (!result.success) {
+          await recordUsage('error')
+          console.error('[stock-analysis] invalid response:', result.error.issues)
+          send('error', { error: 'AI trả về báo cáo chưa đầy đủ. Vui lòng phân tích lại.' })
+          controller.close()
+          return
+        }
+
+        await recordUsage('success')
+
+        const analyzedAt = new Date().toISOString()
+        const finalResult = applyEvidence(result.data, fundamentals, governanceDisclosures)
+        const { error: saveError } = await getServiceSupabaseClient()
+          .from('stock_analysis_history')
+          .upsert({
+            user_id: user.id,
+            ticker: normalizedTicker,
+            company_name: companyName,
+            result: finalResult,
+            analyzed_at: analyzedAt,
+          }, { onConflict: 'ticker' })
+
+        if (saveError) {
+          console.error('[stock-analysis] save failed:', saveError)
+          send('error', { error: 'Phân tích xong nhưng không lưu được kết quả.' })
+          controller.close()
+          return
+        }
+
+        if (!quota.unlimited) {
+          await incrementAITrialUsage(supabase, 'stock_analyze')
+        }
+
+        send('done', { analysis: finalResult, ...cooldownMetadata(analyzedAt, Date.now(), isAdmin) })
+        controller.close()
+      } catch (err) {
+        // The stream is already open, so a throw here cannot become a 500 — without this
+        // the connection would hang until the client gave up.
+        console.error('[stock-analysis] stream failed:', err instanceof Error ? err.message : err)
+        send('error', { error: 'AI analysis unavailable' })
+        controller.close()
+      }
+    },
   })
 
-  // No usage logged here: nothing was billed on a transport failure.
-  if (!providerResult.ok) {
-    return NextResponse.json({ error: 'AI analysis unavailable' }, { status: providerResult.network ? 504 : 502 })
-  }
-
-  // Records this provider call whatever becomes of it. A failure does NOT imply zero cost:
-  // every rejection below happens AFTER a completion arrived and was billed, so filing them
-  // as successes would make wasted spend structurally invisible (FR-005a).
-  const recordUsage = (outcome: 'success' | 'error') =>
-    logAiUsage({
-      surface: 'stock_analyze',
-      provider: providerResult.provider,
-      model: providerResult.model,
-      usage: normalizeUsage(providerResult.usage, providerResult.provider),
-      outcome,
-      userId: user.id,
-      actor: 'user',
-      at: startedAt,
-    })
-
-  const content = providerResult.text
-  if (!content) {
-    await recordUsage('error')
-    return NextResponse.json({ error: 'Empty response from AI provider' }, { status: 502 })
-  }
-
-  let parsed: unknown
-  try {
-    parsed = JSON.parse(content)
-  } catch {
-    await recordUsage('error')
-    return NextResponse.json({ error: 'AI provider returned invalid JSON' }, { status: 502 })
-  }
-
-  const result = stockAnalysisSchema.safeParse(parsed)
-  if (!result.success) {
-    await recordUsage('error')
-    console.error('[stock-analysis] invalid response:', result.error.issues)
-    return NextResponse.json({ error: 'AI trả về báo cáo chưa đầy đủ. Vui lòng phân tích lại.' }, { status: 502 })
-  }
-
-  await recordUsage('success')
-
-  const analyzedAt = new Date().toISOString()
-  const finalResult = applyEvidence(result.data, fundamentals, governanceDisclosures)
-  const { error: saveError } = await getServiceSupabaseClient()
-    .from('stock_analysis_history')
-    .upsert({
-      user_id: user.id,
-      ticker: normalizedTicker,
-      company_name: companyName,
-      result: finalResult,
-      analyzed_at: analyzedAt,
-    }, { onConflict: 'ticker' })
-
-  if (saveError) {
-    console.error('[stock-analysis] save failed:', saveError)
-    return NextResponse.json({ error: 'Phân tích xong nhưng không lưu được kết quả.' }, { status: 500 })
-  }
-
-  if (!quota.unlimited) {
-    await incrementAITrialUsage(supabase, 'stock_analyze')
-  }
-
-  return NextResponse.json({ analysis: finalResult, ...cooldownMetadata(analyzedAt, Date.now(), isAdmin) }, {
-    headers: { 'Cache-Control': 'private, no-store' },
+  return new Response(stream, {
+    headers: {
+      'Content-Type':  'text/event-stream; charset=utf-8',
+      'Cache-Control': 'private, no-store, no-transform',
+      // Tells a proxy that buffers by default to pass bytes through as they arrive —
+      // without it the hop in front of the function undoes the streaming.
+      'X-Accel-Buffering': 'no',
+    },
   })
 }

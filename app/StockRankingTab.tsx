@@ -5,6 +5,74 @@ import { AlertCircle, RefreshCw, Sparkles } from 'lucide-react'
 import { filterByRange, formatDateTime, pctChangeForRange } from './stockChartUtils'
 import { type DailyPricePoint } from './stockTypes'
 import { AITrialExhaustedModal, type AITrialExhaustedInfo } from '@/components/ui/ai-trial-exhausted-modal'
+import { parseSseFrame, splitSseFrames } from '@/lib/sse'
+
+interface AnalyzeProgress { percent: number; done: number; total: number; section?: string }
+
+/** Reader-facing name for each section the model writes, so progress says what is happening. */
+const SECTION_LABEL: Record<string, string> = {
+  grade:                'xếp hạng',
+  overallScore:         'điểm tổng',
+  scores:               'điểm thành phần',
+  industryScores:       'điểm ngành',
+  industryOverallScore: 'điểm ngành tổng',
+  summary:              'tổng quan',
+  confidence:           'độ tin cậy',
+  scoreRationales:      'lý do chấm điểm',
+  marketView:           'góc nhìn thị trường',
+  investmentThesis:     'luận điểm đầu tư',
+  catalysts:            'động lực & rủi ro',
+  scenarios:            'kịch bản giá',
+  actionPlan:           'kế hoạch hành động',
+  strengths:            'điểm mạnh',
+  risks:                'rủi ro',
+  dataQuality:          'chất lượng dữ liệu',
+  recommendation:       'khuyến nghị',
+  sectorName:           'ngành',
+  peers:                'mã cùng ngành',
+}
+
+interface AnalyzeDone {
+  analysis: StockAnalysis
+  analyzedAt: string
+  nextAnalyzeAt: string
+  canAnalyze: boolean
+}
+
+/**
+ * Drains the analyze route's SSE response, reporting progress as each section of the
+ * report finishes generating. The report itself is only rendered from `done`: the panel
+ * shows the normalized result, which the raw sections are not yet.
+ */
+async function readAnalysisStream(
+  res: Response,
+  onProgress: (p: AnalyzeProgress) => void,
+): Promise<{ done: AnalyzeDone | null; error: string | null }> {
+  if (!res.body) return { done: null, error: null }
+
+  const reader = res.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  let done: AnalyzeDone | null = null
+  let error: string | null = null
+
+  for (;;) {
+    const chunk = await reader.read()
+    if (chunk.done) break
+    buffer += decoder.decode(chunk.value, { stream: true })
+    const { frames, rest } = splitSseFrames(buffer)
+    buffer = rest
+    for (const raw of frames) {
+      const frame = parseSseFrame(raw)
+      if (!frame) continue
+      if (frame.event === 'progress') onProgress(frame.data as AnalyzeProgress)
+      else if (frame.event === 'done') done = frame.data as AnalyzeDone
+      else if (frame.event === 'error') error = (frame.data as { error?: string }).error ?? null
+    }
+  }
+
+  return { done, error }
+}
 
 type StockAnalysisStats = {
   currentPrice: number
@@ -119,6 +187,9 @@ export function RankingTab({ ticker, company, allPoints, historyMax, historyMin,
   const [analyzedAt, setAnalyzedAt] = useState<string | null>(null)
   const [nextAnalyzeAt, setNextAnalyzeAt] = useState<string | null>(null)
   const [canAnalyze, setCanAnalyze] = useState(true)
+  // Real progress, not a ticker: the route reports one step per section of the report
+  // that has actually finished generating.
+  const [progress, setProgress] = useState<AnalyzeProgress>({ percent: 0, done: 0, total: 0 })
   const loadedSavedRef = useRef(false)
 
   const stats = useMemo<StockAnalysisStats | null>(() => {
@@ -174,14 +245,18 @@ export function RankingTab({ ticker, company, allPoints, historyMax, historyMin,
     if (!stats) return
     setAnalyzing(true)
     setAnalysisError(null)
+    setProgress({ percent: 0, done: 0, total: 0 })
     try {
       const res = await fetch('/api/stock-price/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ticker, companyName: company, stats }),
       })
-      const data = await res.json()
+
+      // Every gate the route applies still answers with a status code and a JSON body —
+      // only the generation itself streams, so this branch is unchanged.
       if (!res.ok) {
+        const data = await res.json().catch(() => null)
         // 402 when plans are on sale, 429 when the cap is just a rate limit — see QUOTA_EXHAUSTED_STATUS
         if ((res.status === 402 || res.status === 429) && data?.trialExhausted) {
           setTrialExhausted({ feature: data.feature, used: data.used, limit: data.limit })
@@ -192,10 +267,15 @@ export function RankingTab({ ticker, company, allPoints, historyMax, historyMin,
         if (typeof data?.canAnalyze === 'boolean') setCanAnalyze(data.canAnalyze)
         throw new Error(data?.error ?? 'Phân tích thất bại')
       }
-      setAnalysis(data.analysis as StockAnalysis)
-      setAnalyzedAt(data.analyzedAt as string)
-      setNextAnalyzeAt(data.nextAnalyzeAt as string)
-      setCanAnalyze(data.canAnalyze as boolean)
+
+      const { done, error } = await readAnalysisStream(res, setProgress)
+      if (error) throw new Error(error)
+      if (!done) throw new Error('Phân tích thất bại')
+
+      setAnalysis(done.analysis)
+      setAnalyzedAt(done.analyzedAt)
+      setNextAnalyzeAt(done.nextAnalyzeAt)
+      setCanAnalyze(done.canAnalyze)
     } catch (err) {
       setAnalysisError(err instanceof Error ? err.message : 'Phân tích thất bại')
     } finally {
@@ -258,7 +338,7 @@ export function RankingTab({ ticker, company, allPoints, historyMax, historyMin,
           <button type="button" onClick={runAnalysis} disabled={analyzing || loadingSaved || !stats}
             className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50">
             {analyzing ? <RefreshCw className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />}
-            {analyzing ? 'Đang phân tích...' : analysis ? 'Phân tích lại' : 'Phân tích bằng AI'}
+            {analyzing ? `Đang phân tích... ${progress.percent}%` : analysis ? 'Phân tích lại' : 'Phân tích bằng AI'}
           </button>
         )}
       </div>
@@ -275,9 +355,32 @@ export function RankingTab({ ticker, company, allPoints, historyMax, historyMin,
         </div>
       )}
 
-      {!analysis && (analyzing || loadingSaved) && (
+      {!analysis && loadingSaved && (
         <div className="flex h-64 items-center justify-center gap-2 text-xs text-zinc-400">
-          <RefreshCw className="size-4 animate-spin" /> {loadingSaved ? `Đang tải phân tích đã lưu của ${ticker}...` : `Đang chấm điểm ${ticker}...`}
+          <RefreshCw className="size-4 animate-spin" /> Đang tải phân tích đã lưu của {ticker}...
+        </div>
+      )}
+
+      {!analysis && !loadingSaved && analyzing && (
+        <div className="flex h-64 flex-col items-center justify-center gap-3">
+          <div className="w-full max-w-sm space-y-2">
+            <div className="h-2 overflow-hidden rounded-full border border-emerald-200 bg-emerald-50">
+              <div
+                className="h-full bg-emerald-500 transition-all duration-300"
+                style={{ width: `${progress.percent}%` }}
+              />
+            </div>
+            <p className="flex items-center gap-2 text-xs text-zinc-500" aria-live="polite">
+              <RefreshCw className="size-3.5 shrink-0 animate-spin" />
+              Đang chấm điểm {ticker} — {progress.percent}%
+              {progress.total > 0 && ` (${progress.done}/${progress.total} phần)`}
+            </p>
+            {progress.section && (
+              <p className="text-xs text-zinc-400">
+                Vừa xong: {SECTION_LABEL[progress.section] ?? progress.section}
+              </p>
+            )}
+          </div>
         </div>
       )}
 
