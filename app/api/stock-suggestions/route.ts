@@ -343,8 +343,19 @@ Trả về CHỈ JSON hợp lệ (không markdown, không giải thích):
   try {
     parsed = JSON.parse(content) as { suggestions?: unknown[] }
   } catch {
+    // Without these three there is nothing to go on: a completion that arrived, was
+    // billed, and will not parse looks identical whether it was cut off at our own token
+    // ceiling, mangled at full length, or served by the provider you did not expect.
     await recordUsage('error')
-    return NextResponse.json({ error: 'AI returned invalid JSON' }, { status: 502 })
+    console.error(
+      `[stock-suggestions] invalid JSON: provider=${result.provider} model=${result.model} truncated=${result.truncated} chars=${content.length}`,
+    )
+    return NextResponse.json({
+      error: 'AI returned invalid JSON',
+      truncated: result.truncated,
+      provider: result.provider,
+      raw: content.slice(0, 200),
+    }, { status: 502 })
   }
 
   const rawSuggestions = parsed.suggestions
