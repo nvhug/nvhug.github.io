@@ -15,7 +15,7 @@ import { UsageBreakdown, type BreakdownRow } from './_components/UsageBreakdown'
 import { UsageLog } from './_components/UsageLog'
 import { LogFilters } from './_components/LogFilters'
 import { formatDateTime, formatTokens, formatUserIdentity } from './_lib/format'
-import { MODEL_FILTER_OPTIONS, intersectLogDateBounds, isFullySelected, modelFilterPattern } from './_lib/filters'
+import { modelChipsFromLog, intersectLogDateBounds, isFullySelected, modelFilterPattern } from './_lib/filters'
 import {
   actorScopeOf,
   EMPTY_SUMMARY,
@@ -40,6 +40,13 @@ const SURFACE_LABELS: Record<Surface, string> = {
 }
 
 const TOP_USERS = 10
+
+/**
+ * How many log rows the chip lookup reads to find the distinct models in view. This app
+ * writes single-digit AI calls a day, so this covers years; the cap is here so the page
+ * can never pull an unbounded table into the browser just to build a filter row.
+ */
+const MODEL_OPTION_SCAN_LIMIT = 2_000
 
 /**
  * Period bounds, resolved in Asia/Ho_Chi_Minh and pinned by the caller.
@@ -74,6 +81,10 @@ export default function AiUsagePage() {
   const [report, setReport] = useState<UsageReport | null>(null)
   const [profiles, setProfiles] = useState<Record<string, { fullName: string | null; email: string | null }>>({})
   const [logRows, setLogRows] = useState<LogRow[]>([])
+  // Chips come from what the log actually holds, not from the price table — see
+  // modelChipsFromLog. Deliberately NOT narrowed by modelFilter: the chip row has to keep
+  // offering the other models once one is selected, or the filter would be a one-way door.
+  const [modelOptions, setModelOptions] = useState<string[]>([])
   const [logTotal, setLogTotal] = useState(0)
   const [logPage, setLogPage] = useState(1)
   const [logError, setLogError] = useState(false)
@@ -169,10 +180,44 @@ export default function AiUsagePage() {
     void loadReport()
   }, [roleLoading, role, loadReport])
 
+  const loadModelOptions = useCallback(async () => {
+    try {
+      // Only the one column, and bounded: this is a distinct-values lookup, not a second
+      // copy of the log. PostgREST has no DISTINCT, so the dedupe happens in
+      // modelChipsFromLog. The cap is far above this app's volume (single-digit AI calls a
+      // day) and exists so the page can never pull an unbounded table into the browser.
+      let q = getSupabaseBrowserClient()
+        .from('ai_usage_log')
+        .select('model')
+        .gte('created_at', logBounds.from)
+        .lt('created_at', logBounds.to)
+        .limit(MODEL_OPTION_SCAN_LIMIT)
+
+      if (scope?.kind === 'user') q = q.eq('user_id', scope.userId)
+      else if (scope?.kind === 'deleted') q = q.is('user_id', null).eq('actor', 'user')
+      else if (scope?.kind === 'system') q = q.eq('actor', 'system')
+
+      const { data, error } = await q
+      if (error) throw error
+      const rows = (data ?? []) as { model: string }[]
+      setModelOptions(modelChipsFromLog(rows.map((r) => r.model)))
+    } catch (err) {
+      // A chip row that fails to load is worth nothing to shout about — the log itself
+      // still renders, and every row shows its own model.
+      console.error('[ai-usage] model options failed:', err)
+      setModelOptions([])
+    }
+  }, [logBounds, scope])
+
   useEffect(() => {
     if (roleLoading || role !== 'admin') return
     void loadLog()
   }, [roleLoading, role, loadLog])
+
+  useEffect(() => {
+    if (roleLoading || role !== 'admin') return
+    void loadModelOptions()
+  }, [roleLoading, role, loadModelOptions])
 
   // Display names are resolved here rather than joined in the RPC, so the function needs no
   // access to profile data. Three cases, and the third is not an error.
@@ -620,7 +665,7 @@ export default function AiUsagePage() {
             emptyText={t('admin.settings.aiUsage.emptyPeriod', { period: periodLabel })}
             filters={
               <LogFilters
-                models={MODEL_FILTER_OPTIONS}
+                models={modelOptions}
                 selectedModel={modelFilter}
                 onSelectModel={selectModelFilter}
                 surfaces={surfaceFilterOptions}

@@ -13,7 +13,7 @@
  * produced its cost, so "why was this call costed at this amount" stays answerable
  * months later once rates have moved.
  */
-export const PRICING_VERSION = '2026-08-26'
+export const PRICING_VERSION = '2026-08-31'
 
 /**
  * USD -> VND. A fixed constant on purpose: reporting AI spend does not justify an FX
@@ -58,6 +58,12 @@ export const MODEL_PRICES: Record<string, ModelPrice> = {
   'gemini-3.7-flash': { cachedInput: 0, input: 0, output: 0, peakMultiplier: false },
   // Same free-tier note as above. Paid rate to switch to: $0.30 / $2.50 per 1M input/output.
   'gemini-3.1-flash-lite': { cachedInput: 0, input: 0, output: 0, peakMultiplier: false },
+  // The other two rungs of GEMINI_CASCADE (ADR-022). Absent from this table they priced as
+  // NULL, which the usage page renders as "chưa biết" — an unknown cost for a call that is
+  // in fact free. Same free-tier note as above; paid rates to switch to are $0.30 / $2.50
+  // for the lite model and $0.75 / $3.75 for the full one.
+  'gemini-3.5-flash-lite': { cachedInput: 0, input: 0, output: 0, peakMultiplier: false },
+  'gemini-3.5-flash': { cachedInput: 0, input: 0, output: 0, peakMultiplier: false },
 }
 
 /**

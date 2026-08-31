@@ -1,17 +1,29 @@
 // Raw-log filtering helpers. Pure functions only — the query itself stays in page.tsx,
 // where the Supabase client lives.
 
-import { MODEL_PRICES, KNOWN_UNPRICED, MODEL_SUFFIX_PATTERN } from '@/lib/ai-pricing'
+import { MODEL_SUFFIX_PATTERN } from '@/lib/ai-pricing'
 
 /**
- * Every model this app can serve, priced or knowingly unpriced. Not a `SELECT DISTINCT`
- * over `ai_usage_log`: `ai-pricing.ts` is already the authoritative registry an unlisted
- * served model would fail loudly against (see `computeCostUsd`), so this list satisfies
- * "every model that has ever appeared" (FR-002) without a new query or a period scope.
+ * The chips to offer, derived from the models actually present in the log.
+ *
+ * This used to be `keys(MODEL_PRICES) ∪ KNOWN_UNPRICED`, on the reasoning that the price
+ * table is the authoritative registry of every model the app can serve. Both halves of
+ * that stopped holding. The table must keep an entry for every model that has EVER been
+ * logged or its historical rows lose their cost, so it accumulates retired models —
+ * gpt-4o-mini and deepseek-v4-pro have never appeared in this log at all, and
+ * gemini-3.7-flash stopped being callable when ADR-022 replaced it. Chips for models with
+ * no rows are filters that can only ever return nothing.
+ *
+ * Served ids are canonicalised the same way pricing does it, so `gemini-3.5-flash-002`
+ * and `gemini-3.5-flash` are one chip rather than two, and the chip's own name is what
+ * `modelFilterPattern` below matches back against.
  */
-export const MODEL_FILTER_OPTIONS: string[] = [
-  ...new Set([...Object.keys(MODEL_PRICES), ...KNOWN_UNPRICED]),
-].sort()
+export function modelChipsFromLog(servedModels: readonly string[]): string[] {
+  const canonical = servedModels
+    .filter((model) => typeof model === 'string' && model !== '')
+    .map((model) => model.replace(MODEL_SUFFIX_PATTERN, ''))
+  return [...new Set(canonical)].sort()
+}
 
 /**
  * Whether every id in `pageIds` is present in `selectedIds` — the single definition of

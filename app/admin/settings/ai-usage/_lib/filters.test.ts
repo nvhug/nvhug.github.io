@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { MODEL_FILTER_OPTIONS, escapeIlikeTerm, intersectLogDateBounds, isFullySelected, modelFilterPattern } from './filters'
+import { modelChipsFromLog, escapeIlikeTerm, intersectLogDateBounds, isFullySelected, modelFilterPattern } from './filters'
 import { MODEL_PRICES, KNOWN_UNPRICED } from '@/lib/ai-pricing'
 
 describe('isFullySelected', () => {
@@ -38,16 +38,32 @@ describe('escapeIlikeTerm', () => {
   })
 })
 
-describe('MODEL_FILTER_OPTIONS', () => {
-  it('lists every model this app can serve, priced or not, with no duplicates', () => {
-    const expected = new Set([...Object.keys(MODEL_PRICES), ...KNOWN_UNPRICED])
+describe('modelChipsFromLog', () => {
+  it('offers a chip only for a model the log actually holds', () => {
+    // The point of the change: no chip for gemini-3.7-flash or gpt-4o-mini just because
+    // the price table still carries them for historical rows.
+    expect(modelChipsFromLog(['gemini-3.5-flash-lite', 'deepseek-v4-flash']))
+      .toEqual(['deepseek-v4-flash', 'gemini-3.5-flash-lite'])
+  })
 
-    expect(new Set(MODEL_FILTER_OPTIONS)).toEqual(expected)
-    expect(MODEL_FILTER_OPTIONS.length).toBe(expected.size)
+  it('folds a served point-release onto the same chip as its canonical name', () => {
+    // Gemini answers `gemini-3.5-flash-002` for a `gemini-3.5-flash` request; two chips
+    // for one model would split the same rows across two filters.
+    expect(modelChipsFromLog(['gemini-3.5-flash', 'gemini-3.5-flash-002']))
+      .toEqual(['gemini-3.5-flash'])
   })
 
   it('is sorted, so the chip row renders in a stable order', () => {
-    expect(MODEL_FILTER_OPTIONS).toEqual([...MODEL_FILTER_OPTIONS].sort())
+    const chips = modelChipsFromLog(['gemini-3.5-flash', 'deepseek-v4-flash', 'gemini-3.1-flash-lite'])
+    expect(chips).toEqual([...chips].sort())
+  })
+
+  it('has nothing to offer for an empty log', () => {
+    expect(modelChipsFromLog([])).toEqual([])
+  })
+
+  it('ignores a blank model rather than rendering an empty chip', () => {
+    expect(modelChipsFromLog(['', 'deepseek-v4-flash'])).toEqual(['deepseek-v4-flash'])
   })
 })
 
