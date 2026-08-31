@@ -443,7 +443,14 @@ export async function POST(request: Request) {
           parsed = JSON.parse(content)
         } catch {
           await recordUsage('error')
-          send('error', { error: 'AI provider returned invalid JSON', raw: content.slice(0, 200) })
+          send('error', {
+            error: 'AI provider returned invalid JSON',
+            // Distinguishes the two ways a finished completion can be unusable:
+            // cut off at our own token ceiling, or malformed at full length.
+            truncated: providerResult.truncated,
+            provider: providerResult.provider,
+            raw: content.slice(0, 200),
+          })
           controller.close()
           return
         }

@@ -402,12 +402,33 @@ function deepseekFrame(content: string, extra: Record<string, unknown> = {}) {
   return JSON.stringify({ choices: [{ delta: { content } }], ...extra })
 }
 
+/**
+ * A healthy stream: the deltas, then the terminal frame carrying the stop reason and the
+ * usage counts. Real streams always send one — a fixture without it is a fixture of a
+ * *broken* stream, which is why these helpers exist rather than raw frames.
+ */
+function geminiStream(...deltas: string[]): Response {
+  return sseResponse(
+    ...deltas.map(text => geminiFrame(text)),
+    JSON.stringify({
+      candidates: [{ content: { parts: [{ text: '' }] }, finishReason: 'STOP' }],
+      usageMetadata: { promptTokenCount: 10, candidatesTokenCount: 4 },
+    }),
+  )
+}
+
+function deepseekStream(...deltas: string[]): Response {
+  return sseResponse(
+    ...deltas.map(content => deepseekFrame(content)),
+    JSON.stringify({ choices: [{ delta: {}, finish_reason: 'stop' }] }),
+    JSON.stringify({ choices: [], usage: { prompt_tokens: 10, completion_tokens: 4 } }),
+    '[DONE]',
+  )
+}
+
 describe('streamGeminiWithDeepSeekFallback', () => {
   it('hands over each delta in order and returns the whole completion', async () => {
-    mockFetchSequence([sseResponse(
-      geminiFrame('{"from":'),
-      geminiFrame('"gemini"}', { usageMetadata: { promptTokenCount: 10, candidatesTokenCount: 4 } }),
-    )])
+    mockFetchSequence([geminiStream('{"from":', '"gemini"}')])
 
     const deltas: string[] = []
     const result = await streamGeminiWithDeepSeekFallback(OPTS, d => deltas.push(d))
@@ -427,11 +448,7 @@ describe('streamGeminiWithDeepSeekFallback', () => {
   it('falls back to DeepSeek when Gemini fails before any delta', async () => {
     mockFetchSequence([
       httpResponse(500, { error: 'boom' }),
-      sseResponse(
-        deepseekFrame('{"from":"deepseek"}'),
-        JSON.stringify({ choices: [], usage: { prompt_tokens: 10, completion_tokens: 4 } }),
-        '[DONE]',
-      ),
+      deepseekStream('{"from":"deepseek"}'),
     ])
 
     const result = await streamGeminiWithDeepSeekFallback(OPTS, () => {})
@@ -468,7 +485,7 @@ describe('streamGeminiWithDeepSeekFallback', () => {
   it('still falls back when the stream breaks before a single delta', async () => {
     const fetchMock = mockFetchSequence([
       sseThenBreaks(),
-      sseResponse(deepseekFrame('{"from":"deepseek"}'), '[DONE]'),
+      deepseekStream('{"from":"deepseek"}'),
     ])
 
     const result = await streamGeminiWithDeepSeekFallback(OPTS, () => {})
@@ -484,7 +501,12 @@ describe('streamGeminiWithDeepSeekFallback', () => {
     ['CRLF CRLF, as Gemini sends', '\r\n\r\n'],
     ['LF LF, as DeepSeek sends', '\n\n'],
   ])('reads a stream terminated with %s', async (_label, eol) => {
-    mockFetchSequence([sseResponseWith(eol, geminiFrame('{"from":'), geminiFrame('"gemini"}'))])
+    mockFetchSequence([sseResponseWith(
+      eol,
+      geminiFrame('{"from":'),
+      geminiFrame('"gemini"}'),
+      JSON.stringify({ candidates: [{ content: { parts: [{ text: '' }] }, finishReason: 'STOP' }] }),
+    )])
 
     const deltas: string[] = []
     const result = await streamGeminiWithDeepSeekFallback(OPTS, d => deltas.push(d))
@@ -499,5 +521,52 @@ describe('streamGeminiWithDeepSeekFallback', () => {
     const result = await streamGeminiWithDeepSeekFallback(OPTS, () => {})
 
     expect(result).toMatchObject({ ok: true, truncated: true })
+  })
+})
+
+describe('streamGeminiWithDeepSeekFallback — a stream that ends without finishing', () => {
+  // The failure mode streaming adds and the buffered call cannot have: a non-streamed 200
+  // body is atomic, but a stream can close cleanly half way through a completion. Read as
+  // a success it yields a valid JSON PREFIX that then fails to parse — reported to the
+  // reader as "invalid JSON" from a provider that never actually said it was done.
+  it('falls back when it closed before producing anything', async () => {
+    // A 200 whose body closes with no frames at all. Read as a success this is the
+    // "empty completion" that the CRLF bug manufactured; read correctly it is a failed
+    // attempt, and nothing has been emitted, so the fallback can still rescue it.
+    mockFetchSequence([sseResponse(), deepseekStream('{"from":"deepseek"}')])
+
+    const result = await streamGeminiWithDeepSeekFallback(OPTS, () => {})
+
+    expect(result).toMatchObject({ ok: true, provider: 'deepseek' })
+  })
+
+  it('does not fall back once the unfinished stream had already been emitted', async () => {
+    const fetchMock = mockFetchSequence([sseResponse(geminiFrame('{"grade":"C",'))])
+
+    const deltas: string[] = []
+    const result = await streamGeminiWithDeepSeekFallback(OPTS, d => deltas.push(d))
+
+    expect(deltas).toEqual(['{"grade":"C",'])
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(result).toEqual({ ok: false, network: true })
+  })
+
+  it('still accepts a stream that ends on a real stop reason', async () => {
+    mockFetchSequence([sseResponse(
+      geminiFrame('{"ok":true}'),
+      geminiFrame('', { candidates: [{ finishReason: 'STOP' }] }),
+    )])
+
+    expect(await streamGeminiWithDeepSeekFallback(OPTS, () => {}))
+      .toMatchObject({ ok: true, provider: 'gemini', text: '{"ok":true}' })
+  })
+
+  it('accepts a completion the provider itself reports as hitting the ceiling', async () => {
+    mockFetchSequence([sseResponse(
+      geminiFrame('{"cut":', { candidates: [{ finishReason: 'MAX_TOKENS' }] }),
+    )])
+
+    expect(await streamGeminiWithDeepSeekFallback(OPTS, () => {}))
+      .toMatchObject({ ok: true, truncated: true })
   })
 })

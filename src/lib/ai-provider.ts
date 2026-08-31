@@ -363,6 +363,10 @@ type StreamAttemptResult = StreamAttemptSuccess | StreamAttemptFailure
  * Feeds every SSE frame in the response body to `onFrame`. Returns false when the read
  * itself failed — a network drop or a timeout firing mid-stream — which is a transport
  * failure, told apart here from a stream that simply ended.
+ *
+ * Note what this CANNOT tell you: a stream that closed cleanly half way through a
+ * completion looks identical to one that finished. Only the provider's own stop reason
+ * separates them, which is why both attempts below require one before reporting success.
  */
 async function readSseBody(res: Response, onFrame: (frame: SseFrame) => void): Promise<boolean> {
   if (!res.body) return false
@@ -462,7 +466,9 @@ async function streamGemini(
     if (chunk.modelVersion) model = servedModel(chunk, opts.geminiModel)
   })
 
-  if (!complete) {
+  // A stream that closed without ever saying why it stopped did not finish: the caller
+  // would otherwise receive a valid JSON *prefix* as a complete answer. See streamEnded.
+  if (!complete || !finishReason) {
     return { ok: false, status: null, apiKeyInvalid: false, detail: null, emitted: text.length > 0 }
   }
   return { ok: true, model, text, usage, truncated: finishReason === 'MAX_TOKENS', emitted: text.length > 0 }
@@ -524,7 +530,8 @@ async function streamDeepSeek(
     if (chunk.model) model = servedModel(chunk, opts.deepseekModel)
   })
 
-  if (!complete) {
+  // Same rule as the primary: no stop reason means the stream stopped, it did not finish.
+  if (!complete || !finishReason) {
     return { ok: false, status: null, apiKeyInvalid: false, detail: null, emitted: text.length > 0 }
   }
   return { ok: true, model, text, usage, truncated: finishReason === 'length', emitted: text.length > 0 }

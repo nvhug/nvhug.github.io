@@ -970,7 +970,14 @@ Trả về JSON hợp lệ với đúng cấu trúc sau (không thêm/bỏ field
           // `raw` is what makes it diagnosable at all: a stream that yields no sections and
           // then fails to parse gives no other clue what the provider actually sent.
           await recordUsage('error')
-          send('error', { error: 'AI provider returned invalid JSON', raw: result.text.slice(0, 200) })
+          send('error', {
+            error: 'AI provider returned invalid JSON',
+            // Distinguishes the two ways a finished completion can be unusable:
+            // cut off at our own token ceiling, or malformed at full length.
+            truncated: result.truncated,
+            provider: result.provider,
+            raw: result.text.slice(0, 200),
+          })
           controller.close()
           return
         }
