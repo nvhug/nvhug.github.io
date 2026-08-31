@@ -192,15 +192,14 @@ export async function POST(request: Request) {
     const startedAt = new Date()
 
     const result = await callGeminiWithDeepSeekFallback({
-      geminiModel: 'gemini-3.1-flash-lite',
       deepseekModel: 'deepseek-v4-flash',
       prompt: buildPalacePrompt(reading, lang, indexes),
       temperature: 0.6,
       // Six palaces measured ~2350 output tokens; this leaves real headroom
       // without approaching what the request has time to receive.
       maxTokens: PALACE_MAX_TOKENS,
-      primaryTimeoutMs: PALACE_PRIMARY_TIMEOUT_MS,
-      fallbackTimeoutMs: PALACE_FALLBACK_TIMEOUT_MS,
+      budgetMs: PALACE_PRIMARY_TIMEOUT_MS + PALACE_FALLBACK_TIMEOUT_MS,
+      deepseekReserveMs: PALACE_FALLBACK_TIMEOUT_MS,
     })
 
     // One branch, not two: a transport failure — from either provider — means nothing was

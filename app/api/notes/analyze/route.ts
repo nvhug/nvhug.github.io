@@ -894,7 +894,6 @@ Trả về JSON hợp lệ với đúng cấu trúc sau (không thêm/bỏ field
 
         const result = await streamGeminiWithDeepSeekFallback(
           {
-            geminiModel: 'gemini-3.7-flash',
             deepseekModel: 'deepseek-v4-flash',
             prompt,
             temperature: 0.3,
@@ -902,8 +901,8 @@ Trả về JSON hợp lệ với đúng cấu trúc sau (không thêm/bỏ field
             // the largest JSON shape of any surface here, and in Vietnamese, which costs more
             // tokens per word. Sized above the 3500 the next-biggest surfaces use.
             maxTokens: ANALYZE_MAX_TOKENS,
-            primaryTimeoutMs: ANALYZE_PRIMARY_TIMEOUT_MS,
-            fallbackTimeoutMs: ANALYZE_FALLBACK_TIMEOUT_MS,
+            budgetMs: ANALYZE_PRIMARY_TIMEOUT_MS + ANALYZE_FALLBACK_TIMEOUT_MS,
+            deepseekReserveMs: ANALYZE_FALLBACK_TIMEOUT_MS,
           },
           {
             // Sections already sent belong to an answer that was abandoned. The client

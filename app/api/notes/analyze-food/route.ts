@@ -198,13 +198,12 @@ async function callNutrition(
   prompt: string
 ): Promise<Pick<ProviderResult, 'usage' | 'model' | 'provider'> & { text: string; truncated: boolean }> {
   const result = await callGeminiWithDeepSeekFallback({
-    geminiModel: 'gemini-3.1-flash-lite',
     deepseekModel: 'deepseek-v4-flash',
     prompt,
     temperature: 0.2,
     maxTokens: NUTRITION_MAX_TOKENS,
-    primaryTimeoutMs: NUTRITION_PRIMARY_TIMEOUT_MS,
-    fallbackTimeoutMs: NUTRITION_FALLBACK_TIMEOUT_MS,
+    budgetMs: NUTRITION_PRIMARY_TIMEOUT_MS + NUTRITION_FALLBACK_TIMEOUT_MS,
+    deepseekReserveMs: NUTRITION_FALLBACK_TIMEOUT_MS,
   })
   if (!result.ok) throw new Error('nutrition provider unavailable')
   return {

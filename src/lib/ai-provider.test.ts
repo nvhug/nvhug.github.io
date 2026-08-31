@@ -1,19 +1,22 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   callGeminiWithDeepSeekFallback,
+  GEMINI_CASCADE,
   isProviderConfigured,
   streamGeminiWithDeepSeekFallback,
   type ProviderCallOptions,
 } from './ai-provider'
 
+// A single-rung chain keeps the existing cases about Gemini-vs-DeepSeek readable; the
+// multi-rung behaviour has its own describe block at the bottom.
 const OPTS: ProviderCallOptions = {
-  geminiModel: 'gemini-3.7-flash',
+  geminiModels: ['gemini-3.5-flash-lite'],
   deepseekModel: 'deepseek-v4-flash',
   prompt: 'say something',
   temperature: 0.6,
   maxTokens: 1234,
-  primaryTimeoutMs: 20_000,
-  fallbackTimeoutMs: 12_000,
+  budgetMs: 32_000,
+  deepseekReserveMs: 12_000,
 }
 
 const GEMINI_BODY = {
@@ -256,19 +259,31 @@ describe('callGeminiWithDeepSeekFallback', () => {
       })
     })
 
-    it('disables Gemini\'s internal reasoning tokens, matching the DeepSeek attempt already disabling its own', async () => {
-      // Root cause of frequent real-world fallbacks (2026-08-30 investigation): gemini-3.7-flash
-      // spends hundreds of tokens "thinking" before any output, which alone can push a call
-      // past a 20s primary timeout even for a trivial prompt. thinkingBudget: 0 removes that
-      // pass entirely — the same latency/cost tradeoff the DeepSeek attempt already makes via
-      // `thinking: { type: 'disabled' }`.
+    // A thinking pass costs tokens and wall clock before any output, and on one measured
+    // production call ate 1927 of a 2000-token ceiling. Which key turns it off differs by
+    // model, and sending the wrong one is a hard 400 — so this asserts the mapping, not a
+    // single value. Verified against the live API 2026-08-31.
+    it.each([
+      ['gemini-3.5-flash-lite', { thinkingLevel: 'minimal' }],
+      ['gemini-3.1-flash-lite', { thinkingBudget: 0 }],
+      ['gemini-3.5-flash', { thinkingBudget: 0 }],
+    ])('turns off thinking on %s the way that model accepts', async (model, thinkingConfig) => {
       const fetchMock = mockFetchSequence([httpResponse(200, GEMINI_BODY)])
 
-      await callGeminiWithDeepSeekFallback(OPTS)
+      await callGeminiWithDeepSeekFallback({ ...OPTS, geminiModels: [model as string] })
 
-      expect(bodyOf(fetchMock.mock.calls[0])).toMatchObject({
-        generationConfig: { thinkingConfig: { thinkingBudget: 0 } },
-      })
+      expect(bodyOf(fetchMock.mock.calls[0])).toMatchObject({ generationConfig: { thinkingConfig } })
+    })
+
+    it('sends a thinking config for every model in the shipped cascade', async () => {
+      // A model with no table entry is sent `undefined` and thinks by default — which is
+      // exactly the failure this whole cascade exists to survive, reintroduced silently.
+      for (const model of GEMINI_CASCADE) {
+        const fetchMock = mockFetchSequence([httpResponse(200, GEMINI_BODY)])
+        await callGeminiWithDeepSeekFallback({ ...OPTS, geminiModels: [model] })
+        const cfg = bodyOf(fetchMock.mock.calls[0]).generationConfig as Record<string, unknown>
+        expect(cfg.thinkingConfig, `no thinking config for ${model}`).toBeDefined()
+      }
     })
 
     it('reports truncated:true when the provider stopped at the token ceiling', async () => {
@@ -308,7 +323,7 @@ describe('callGeminiWithDeepSeekFallback', () => {
 
       await callGeminiWithDeepSeekFallback(OPTS)
 
-      expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('gemini attempt failed: status=500'))
+      expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('gemini:gemini-3.5-flash-lite attempt failed: status=500'))
       expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('deepseek attempt failed: status=502'))
     })
 
@@ -320,7 +335,7 @@ describe('callGeminiWithDeepSeekFallback', () => {
 
       await callGeminiWithDeepSeekFallback(OPTS)
 
-      expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('gemini attempt failed: status=network/timeout'))
+      expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('gemini:gemini-3.5-flash-lite attempt failed: status=network/timeout'))
     })
   })
 
@@ -626,5 +641,107 @@ describe('streamGeminiWithDeepSeekFallback — onRestart', () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1)
     expect(result).toEqual({ ok: false, network: false })
+  })
+})
+
+describe('the Gemini cascade', () => {
+  const CHAIN = ['gemini-3.5-flash-lite', 'gemini-3.1-flash-lite', 'gemini-3.5-flash']
+  const CHAIN_OPTS: ProviderCallOptions = { ...OPTS, geminiModels: CHAIN }
+
+  function modelOf(call: unknown[]): string {
+    return String(call[0]).match(/models\/([^:]+):/)?.[1] ?? ''
+  }
+
+  it('stops at the first rung that answers', async () => {
+    const fetchMock = mockFetchSequence([httpResponse(200, GEMINI_BODY)])
+
+    const result = await callGeminiWithDeepSeekFallback(CHAIN_OPTS)
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(modelOf(fetchMock.mock.calls[0])).toBe('gemini-3.5-flash-lite')
+    expect(result).toMatchObject({ ok: true, provider: 'gemini' })
+  })
+
+  // The reason the chain exists: free-tier quota is per model, so one 429 says nothing
+  // about the next model's allowance.
+  it('walks to the next model on a quota failure, in order', async () => {
+    const fetchMock = mockFetchSequence([
+      httpResponse(429, { error: 'rate limited' }),
+      httpResponse(429, { error: 'rate limited' }),
+      httpResponse(200, GEMINI_BODY),
+    ])
+
+    const result = await callGeminiWithDeepSeekFallback(CHAIN_OPTS)
+
+    expect(fetchMock.mock.calls.map(modelOf)).toEqual(CHAIN)
+    expect(result).toMatchObject({ ok: true, provider: 'gemini' })
+  })
+
+  it('reaches DeepSeek only after every rung has failed', async () => {
+    const fetchMock = mockFetchSequence([
+      httpResponse(429, {}), httpResponse(429, {}), httpResponse(429, {}),
+      httpResponse(200, DEEPSEEK_BODY),
+    ])
+
+    const result = await callGeminiWithDeepSeekFallback(CHAIN_OPTS)
+
+    expect(fetchMock).toHaveBeenCalledTimes(4)
+    expect(urlOf(fetchMock.mock.calls[3])).toContain('api.deepseek.com')
+    expect(result).toMatchObject({ ok: true, provider: 'deepseek' })
+  })
+
+  // A genuine 400 is the request's own fault; every other model rejects it identically,
+  // so walking the chain would only burn the budget before the inevitable failure.
+  it('abandons the whole chain on a non-retryable failure', async () => {
+    const fetchMock = mockFetchSequence([httpResponse(400, { error: 'bad request' })])
+
+    const result = await callGeminiWithDeepSeekFallback(CHAIN_OPTS)
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(result).toEqual({ ok: false, network: false })
+  })
+
+  // The reserve is what stops a slow chain from eating the last resort. With a budget
+  // barely above it, no Gemini rung has enough left to be worth starting, and the request
+  // goes straight to the fallback instead of spending everything on rungs that cannot
+  // finish. Without the reserve this is the case where DeepSeek is never reached at all.
+  it('skips the Gemini rungs entirely when only the reserve is left', async () => {
+    const fetchMock = mockFetchSequence([httpResponse(200, DEEPSEEK_BODY)])
+
+    const result = await callGeminiWithDeepSeekFallback({
+      ...CHAIN_OPTS,
+      budgetMs: 13_000,
+      deepseekReserveMs: 12_000,
+    })
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(urlOf(fetchMock.mock.calls[0])).toContain('api.deepseek.com')
+    expect(result).toMatchObject({ ok: true, provider: 'deepseek' })
+  })
+
+  it('starts no attempt at all when the budget is already spent', async () => {
+    const fetchMock = mockFetchSequence([])
+
+    const result = await callGeminiWithDeepSeekFallback({ ...CHAIN_OPTS, budgetMs: 0 })
+
+    // Nothing can finish, and a started call can still be billed even when aborted.
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(result).toEqual({ ok: false, network: true })
+  })
+
+  it('streams down the chain too, discarding between rungs', async () => {
+    mockFetchSequence([
+      sseResponse(geminiFrame('{"from":"rung1",')),   // emits, then ends unfinished
+      geminiStream('{"from":"rung2"}'),
+    ])
+
+    const events: string[] = []
+    const result = await streamGeminiWithDeepSeekFallback(
+      { ...CHAIN_OPTS, geminiModels: CHAIN.slice(0, 2) },
+      { onDelta: d => events.push(`delta:${d}`), onRestart: () => events.push('restart') },
+    )
+
+    expect(events).toEqual(['delta:{"from":"rung1",', 'restart', 'delta:{"from":"rung2"}'])
+    expect(result).toMatchObject({ ok: true, provider: 'gemini', text: '{"from":"rung2"}' })
   })
 })

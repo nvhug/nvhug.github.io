@@ -43,21 +43,82 @@ export interface ProviderCallFailure {
 
 export type ProviderCallResult = ProviderCallSuccess | ProviderCallFailure
 
+/**
+ * How to stop each Gemini model thinking before it answers. This is a per-MODEL table,
+ * not one setting, because the parameter itself changed between generations and the old
+ * one is a hard error on the new models — measured 2026-08-31 against the live API:
+ *
+ *   gemini-3.1-flash-lite   thinkingBudget: 0        -> 200, thoughts=0
+ *   gemini-3.5-flash        thinkingBudget: 0        -> 200, thoughts=0
+ *   gemini-3.5-flash-lite   thinkingBudget: 0        -> 400 "invalid argument"
+ *   gemini-3.6-flash        thinkingBudget: 0        -> 400 "invalid argument"
+ *   gemini-3.6-flash        (no thinkingConfig)      -> 200, thoughts=193
+ *   gemini-3.5-flash-lite   thinkingLevel: 'minimal' -> 200, thoughts=0
+ *   gemini-3.6-flash        thinkingLevel: 'minimal' -> 200, thoughts=0
+ *
+ * A model with no entry here would be sent no thinkingConfig at all and would think by
+ * default, so `ai-provider.test.ts` fails if any model in GEMINI_CASCADE is missing one.
+ */
+const GEMINI_THINKING: Record<string, Record<string, unknown>> = {
+  'gemini-3.1-flash-lite': { thinkingBudget: 0 },
+  'gemini-3.5-flash-lite': { thinkingLevel: 'minimal' },
+  'gemini-3.5-flash': { thinkingBudget: 0 },
+}
+
+/**
+ * The Gemini models tried in order, cheapest-and-fastest first, before DeepSeek.
+ *
+ * Free-tier quota is per MODEL, not per key — observed directly on 2026-08-31, when
+ * gemini-3.7-flash returned 429 while gemini-3.1-flash-lite kept serving on the same key.
+ * That is the whole reason this is a chain: each rung is a separate allowance.
+ *
+ * Order is cost-first, not quality-first: the better models are reached only when the
+ * cheap ones fail, so the DEFAULT answer is the first rung's. Measured on this codebase's
+ * own prompts (prose length on the notes report, latency on the suggestions ranking):
+ * 3.5-flash-lite 3088 chars at ~3-5s, 3.1-flash-lite 2682 chars at ~6s, 3.5-flash 3730
+ * chars at ~12s. 3.5-flash-lite leads on both axes against 3.1-flash-lite, which is why
+ * it goes first rather than the other way round.
+ *
+ * gemini-3.6-flash is deliberately ABSENT: same prompt, three runs, 6.8s / 64.7s / 73.2s.
+ * The slow tail exceeds every route's maxDuration on its own, and its prose (3514 chars)
+ * is no better than 3.5-flash's. gemini-2.5-flash and gemini-2.5-flash-lite are absent
+ * because the API answers 404 "no longer available to new users" for this account.
+ */
+export const GEMINI_CASCADE = [
+  'gemini-3.5-flash-lite',
+  'gemini-3.1-flash-lite',
+  'gemini-3.5-flash',
+] as const
+
 export interface ProviderCallOptions {
-  /** Feature-specific model id for the Gemini primary attempt, e.g. 'gemini-3.7-flash'. */
-  geminiModel: string
+  /** Gemini models to try in order before DeepSeek. Defaults to GEMINI_CASCADE. */
+  geminiModels?: readonly string[]
   /** Feature-specific model id for the DeepSeek fallback attempt. Always 'deepseek-v4-flash' today. */
   deepseekModel: string
-  /** The full prompt text (both providers receive the same prompt). */
+  /** The full prompt text (every provider receives the same prompt). */
   prompt: string
   /** Passed through as-is to both providers' `temperature`. */
   temperature: number
   /** Passed through as each provider's max-output-tokens field. */
   maxTokens: number
-  /** Per-ATTEMPT timeout, not a shared budget. */
-  primaryTimeoutMs: number
-  fallbackTimeoutMs: number
+  /**
+   * Wall-clock budget for the WHOLE chain, not per attempt. With N rungs, per-attempt
+   * timeouts could no longer be summed against a route's maxDuration — four rungs at 26s
+   * each is 104s of a 60s function. A shared deadline is what makes the chain affordable:
+   * a rung that fails fast (a 429 answers in under a second) costs almost none of it, and
+   * only a genuine timeout is expensive.
+   */
+  budgetMs: number
+  /**
+   * Held back from every Gemini rung so the DeepSeek attempt is still reachable at the
+   * end. Without it a slow Gemini rung eats the budget and the last resort never runs.
+   */
+  deepseekReserveMs: number
 }
+
+/** Below this there is no point starting an attempt — it cannot finish, and a started
+ *  call that is aborted is still capable of being billed. */
+const MIN_ATTEMPT_MS = 3_000
 
 interface AttemptSuccess {
   ok: true
@@ -156,11 +217,16 @@ async function readJson(res: Response): Promise<{ ok: true; data: unknown } | { 
   }
 }
 
-async function attemptGemini(apiKey: string, opts: ProviderCallOptions): Promise<AttemptResult> {
+async function attemptGemini(
+  apiKey: string,
+  opts: ProviderCallOptions,
+  model: string,
+  timeoutMs: number,
+): Promise<AttemptResult> {
   let res: Response
   try {
     res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(opts.geminiModel)}:generateContent`,
+      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
@@ -170,17 +236,12 @@ async function attemptGemini(apiKey: string, opts: ProviderCallOptions): Promise
             temperature: opts.temperature,
             maxOutputTokens: opts.maxTokens,
             responseMimeType: 'application/json',
-            // gemini-3.x flash models spend tokens on an internal "thinking" pass before
-            // any output — measured at 300+ tokens for a one-sentence answer — which adds
-            // real wall-clock latency on top of what's already a slow endpoint (15-25s
-            // observed even trivial prompts) and can alone push a call past a primary
-            // timeout designed around a non-reasoning completion. DeepSeek's own attempt
-            // already disables its equivalent (`thinking: { type: 'disabled' }` below);
-            // this makes Gemini's the same trade for the same reason.
-            thinkingConfig: { thinkingBudget: 0 },
+            // Which key turns thinking off depends on the model — see GEMINI_THINKING.
+            // Sending the wrong one is a hard 400, not a silently ignored field.
+            thinkingConfig: GEMINI_THINKING[model],
           },
         }),
-        signal: AbortSignal.timeout(opts.primaryTimeoutMs),
+        signal: AbortSignal.timeout(timeoutMs),
       }
     )
   } catch {
@@ -205,14 +266,18 @@ async function attemptGemini(apiKey: string, opts: ProviderCallOptions): Promise
   const parts = candidate?.content?.parts
   return {
     ok: true,
-    model: servedModel(data, opts.geminiModel),
+    model: servedModel(data, model),
     text: Array.isArray(parts) ? parts.map((p) => p?.text ?? '').join('') : '',
     usage: (data as { usageMetadata?: unknown } | null)?.usageMetadata ?? null,
     truncated: candidate?.finishReason === 'MAX_TOKENS',
   }
 }
 
-async function attemptDeepSeek(apiKey: string, opts: ProviderCallOptions): Promise<AttemptResult> {
+async function attemptDeepSeek(
+  apiKey: string,
+  opts: ProviderCallOptions,
+  timeoutMs: number,
+): Promise<AttemptResult> {
   let res: Response
   try {
     res = await fetch('https://api.deepseek.com/v1/chat/completions', {
@@ -228,7 +293,7 @@ async function attemptDeepSeek(apiKey: string, opts: ProviderCallOptions): Promi
         temperature: opts.temperature,
         max_tokens: opts.maxTokens,
       }),
-      signal: AbortSignal.timeout(opts.fallbackTimeoutMs),
+      signal: AbortSignal.timeout(timeoutMs),
     })
   } catch {
     return { ok: false, status: null, apiKeyInvalid: false, detail: null }
@@ -274,7 +339,11 @@ export function isProviderConfigured(): boolean {
  * recoverable for exactly this reason. Deliberately just `provider`/`status`, never the
  * prompt: the same no-content rule `ai-usage.ts` follows.
  */
-function logAttemptFailure(provider: ProviderName, failure: AttemptFailure): void {
+function remainingFor(deadline: number, reserveMs: number): number {
+  return deadline - Date.now() - reserveMs
+}
+
+function logAttemptFailure(provider: string, failure: AttemptFailure): void {
   const status = failure.status ?? 'network/timeout'
   const detail = failure.detail ? ` detail=${JSON.stringify(failure.detail)}` : ''
   console.error(`[ai-provider] ${provider} attempt failed: status=${status}${detail}`)
@@ -294,33 +363,44 @@ export async function callGeminiWithDeepSeekFallback(
   const geminiKey = process.env.GEMINI_API_KEY
   const deepseekKey = process.env.DEEPSEEK_API_KEY
 
-  // Set only when Gemini was actually attempted and failed retryably — carried past the
-  // `if (geminiKey)` block so the no-fallback-configured path below can still report how
-  // the one attempt that DID run actually failed, instead of a hardcoded false.
-  let primaryFailure: AttemptFailure | null = null
+  const deadline = Date.now() + opts.budgetMs
+  // Set by the last attempt that ran, so the exhausted-chain return can report how it
+  // actually failed instead of a hardcoded value.
+  let lastFailure: AttemptFailure | null = null
 
   // No Gemini key configured is treated as an unavailable primary rather than an error:
   // there is nothing to classify, so the fallback is attempted directly.
   if (geminiKey) {
-    const primary = await attemptGemini(geminiKey, opts)
-    if (primary.ok) {
-      return {
-        ok: true,
-        provider: 'gemini',
-        model: primary.model,
-        text: primary.text,
-        usage: primary.usage,
-        truncated: primary.truncated,
+    for (const model of opts.geminiModels ?? GEMINI_CASCADE) {
+      const timeoutMs = remainingFor(deadline, opts.deepseekReserveMs)
+      if (timeoutMs < MIN_ATTEMPT_MS) break
+
+      const attempt = await attemptGemini(geminiKey, opts, model, timeoutMs)
+      if (attempt.ok) {
+        return {
+          ok: true,
+          provider: 'gemini',
+          model: attempt.model,
+          text: attempt.text,
+          usage: attempt.usage,
+          truncated: attempt.truncated,
+        }
       }
+      logAttemptFailure(`gemini:${model}`, attempt)
+      // A genuine 400 is the request's own fault. Another model would reject it
+      // identically, so trying the rest of the chain only burns the budget.
+      if (!isRetryable(attempt)) return { ok: false, network: false }
+      lastFailure = attempt
     }
-    logAttemptFailure('gemini', primary)
-    if (!isRetryable(primary)) return { ok: false, network: false }
-    primaryFailure = primary
   }
 
-  if (!deepseekKey) return { ok: false, network: primaryFailure?.status === null }
+  if (!deepseekKey) return { ok: false, network: lastFailure?.status === null }
 
-  const fallback = await attemptDeepSeek(deepseekKey, opts)
+  // The reserve exists precisely so there is something left here; spend all of it.
+  const deepseekMs = remainingFor(deadline, 0)
+  if (deepseekMs < MIN_ATTEMPT_MS) return { ok: false, network: true }
+
+  const fallback = await attemptDeepSeek(deepseekKey, opts, deepseekMs)
   if (fallback.ok) {
     return {
       ok: true,
@@ -426,12 +506,14 @@ interface DeepSeekStreamChunk {
 async function streamGemini(
   apiKey: string,
   opts: ProviderCallOptions,
-  onDelta: ProviderDeltaHandler
+  onDelta: ProviderDeltaHandler,
+  model: string,
+  timeoutMs: number,
 ): Promise<StreamAttemptResult> {
   let res: Response
   try {
     res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(opts.geminiModel)}:streamGenerateContent?alt=sse`,
+      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
@@ -441,13 +523,11 @@ async function streamGemini(
             temperature: opts.temperature,
             maxOutputTokens: opts.maxTokens,
             responseMimeType: 'application/json',
-            // Same trade as the buffered attempt: a thinking pass costs tokens and wall
-            // clock before a single character is streamed, which is precisely what this
-            // path exists to avoid.
-            thinkingConfig: { thinkingBudget: 0 },
+            // Per-model, same as the buffered attempt — see GEMINI_THINKING.
+            thinkingConfig: GEMINI_THINKING[model],
           },
         }),
-        signal: AbortSignal.timeout(opts.primaryTimeoutMs),
+        signal: AbortSignal.timeout(timeoutMs),
       }
     )
   } catch {
@@ -468,7 +548,7 @@ async function streamGemini(
 
   let text = ''
   let usage: unknown = null
-  let model = opts.geminiModel
+  let servedId = model
   let finishReason: string | undefined
 
   const complete = await readSseBody(res, (frame) => {
@@ -480,7 +560,7 @@ async function streamGemini(
     if (candidate?.finishReason) finishReason = candidate.finishReason
     // Every chunk may restate usage; the last one carries the final counts.
     if (chunk.usageMetadata) usage = chunk.usageMetadata
-    if (chunk.modelVersion) model = servedModel(chunk, opts.geminiModel)
+    if (chunk.modelVersion) servedId = servedModel(chunk, model)
   })
 
   // A stream that closed without ever saying why it stopped did not finish: the caller
@@ -488,13 +568,14 @@ async function streamGemini(
   if (!complete || !finishReason) {
     return { ok: false, status: null, apiKeyInvalid: false, detail: null, emitted: text.length > 0 }
   }
-  return { ok: true, model, text, usage, truncated: finishReason === 'MAX_TOKENS', emitted: text.length > 0 }
+  return { ok: true, model: servedId, text, usage, truncated: finishReason === 'MAX_TOKENS', emitted: text.length > 0 }
 }
 
 async function streamDeepSeek(
   apiKey: string,
   opts: ProviderCallOptions,
-  onDelta: ProviderDeltaHandler
+  onDelta: ProviderDeltaHandler,
+  timeoutMs: number,
 ): Promise<StreamAttemptResult> {
   let res: Response
   try {
@@ -513,7 +594,7 @@ async function streamDeepSeek(
         // be billed with nothing to file in ai_usage_log.
         stream_options: { include_usage: true },
       }),
-      signal: AbortSignal.timeout(opts.fallbackTimeoutMs),
+      signal: AbortSignal.timeout(timeoutMs),
     })
   } catch {
     return { ok: false, status: null, apiKeyInvalid: false, detail: null, emitted: false }
@@ -572,35 +653,48 @@ export async function streamGeminiWithDeepSeekFallback(
   const geminiKey = process.env.GEMINI_API_KEY
   const deepseekKey = process.env.DEEPSEEK_API_KEY
 
-  let primaryFailure: StreamAttemptFailure | null = null
+  const deadline = Date.now() + opts.budgetMs
+  let lastFailure: StreamAttemptFailure | null = null
 
   if (geminiKey) {
-    const primary = await streamGemini(geminiKey, opts, handlers.onDelta)
-    if (primary.ok) {
-      return {
-        ok: true,
-        provider: 'gemini',
-        model: primary.model,
-        text: primary.text,
-        usage: primary.usage,
-        truncated: primary.truncated,
+    for (const model of opts.geminiModels ?? GEMINI_CASCADE) {
+      const timeoutMs = remainingFor(deadline, opts.deepseekReserveMs)
+      if (timeoutMs < MIN_ATTEMPT_MS) break
+
+      // Every rung after the first starts a NEW document, so anything the previous one
+      // emitted has to be withdrawn first — the same contract as the DeepSeek handover.
+      if (lastFailure?.emitted) handlers.onRestart?.()
+
+      const attempt = await streamGemini(geminiKey, opts, handlers.onDelta, model, timeoutMs)
+      if (attempt.ok) {
+        return {
+          ok: true,
+          provider: 'gemini',
+          model: attempt.model,
+          text: attempt.text,
+          usage: attempt.usage,
+          truncated: attempt.truncated,
+        }
       }
+      logAttemptFailure(`gemini:${model}`, attempt)
+      const strandedOutput = attempt.emitted && !handlers.onRestart
+      if (strandedOutput || !isRetryable(attempt)) {
+        return { ok: false, network: attempt.emitted && attempt.status === null }
+      }
+      lastFailure = attempt
     }
-    logAttemptFailure('gemini', primary)
-    const strandedOutput = primary.emitted && !handlers.onRestart
-    if (strandedOutput || !isRetryable(primary)) {
-      return { ok: false, network: primary.emitted && primary.status === null }
-    }
-    primaryFailure = primary
   }
 
-  if (!deepseekKey) return { ok: false, network: primaryFailure?.status === null }
+  if (!deepseekKey) return { ok: false, network: lastFailure?.status === null }
+
+  const deepseekMs = remainingFor(deadline, 0)
+  if (deepseekMs < MIN_ATTEMPT_MS) return { ok: false, network: true }
 
   // Before the fallback's first delta, never after: the caller has to be clear of the
   // abandoned answer before the replacement starts arriving.
-  if (primaryFailure?.emitted) handlers.onRestart?.()
+  if (lastFailure?.emitted) handlers.onRestart?.()
 
-  const fallback = await streamDeepSeek(deepseekKey, opts, handlers.onDelta)
+  const fallback = await streamDeepSeek(deepseekKey, opts, handlers.onDelta, deepseekMs)
   if (fallback.ok) {
     return {
       ok: true,

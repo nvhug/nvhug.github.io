@@ -75,6 +75,7 @@ import { NUTRITION_FALLBACK_TIMEOUT_MS, NUTRITION_MAX_TOKENS, POST } from './rou
 import { MEASURED_TOKENS_PER_SECOND } from '@/lib/horoscope-interpretation'
 import { requestVisionJSON } from '@/lib/ai-vision'
 import { logAiUsage } from '@/lib/ai-usage'
+import { GEMINI_CASCADE } from '@/lib/ai-provider'
 import { resolveAIAccess, incrementAITrialUsage } from '@/lib/ai-trial'
 
 const NUTRITION_JSON = JSON.stringify({
@@ -286,7 +287,11 @@ describe('POST /api/notes/analyze-food', () => {
       model: 'gemini-3.6-flash',
       provider: 'gemini',
     })
+    // Every rung of GEMINI_CASCADE has to fail before DeepSeek is reached — one 500 only
+    // moves to the next model now, it no longer hands over to the fallback.
     mockFetch
+      .mockResolvedValueOnce(new Response('upstream error', { status: 500 }))
+      .mockResolvedValueOnce(new Response('upstream error', { status: 500 }))
       .mockResolvedValueOnce(new Response('upstream error', { status: 500 }))
       .mockResolvedValueOnce(deepseekOk(NUTRITION_JSON))
 
@@ -298,9 +303,9 @@ describe('POST /api/notes/analyze-food', () => {
     expect(payload.items[0].normalized_table_key).toBe('whole_milk')
     expect(payload.focusBox).toEqual([10, 10, 900, 900])
 
-    expect(mockFetch).toHaveBeenCalledTimes(2)
+    expect(mockFetch).toHaveBeenCalledTimes(GEMINI_CASCADE.length + 1)
     expect(String(mockFetch.mock.calls[0][0])).toContain('generativelanguage.googleapis.com')
-    expect(String(mockFetch.mock.calls[1][0])).toContain('api.deepseek.com')
+    expect(String(mockFetch.mock.calls.at(-1)![0])).toContain('api.deepseek.com')
 
     // Two rows: the vision stage on its own provider, the nutrition stage on the fallback.
     expect(vi.mocked(logAiUsage)).toHaveBeenCalledTimes(2)
@@ -317,10 +322,11 @@ describe('POST /api/notes/analyze-food', () => {
     ['gemini', () => mockFetch.mockResolvedValueOnce(geminiOk(NUTRITION_JSON))],
     [
       'deepseek',
-      () =>
-        mockFetch
-          .mockResolvedValueOnce(new Response('upstream error', { status: 500 }))
-          .mockResolvedValueOnce(deepseekOk(NUTRITION_JSON)),
+      () => {
+        // One 500 per Gemini rung, then the fallback — the chain has to be exhausted.
+        GEMINI_CASCADE.forEach(() => mockFetch.mockResolvedValueOnce(new Response('upstream error', { status: 500 })))
+        return mockFetch.mockResolvedValueOnce(deepseekOk(NUTRITION_JSON))
+      },
     ],
   ])('checks and increments the food_analyze trial quota exactly once when %s serves', async (_provider, arrange) => {
     vi.mocked(resolveAIAccess).mockResolvedValueOnce({

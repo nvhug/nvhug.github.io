@@ -232,15 +232,14 @@ export async function POST(request: Request) {
   const startedAt = new Date()
 
   const result = await callGeminiWithDeepSeekFallback({
-    geminiModel: 'gemini-3.1-flash-lite',
     deepseekModel: 'deepseek-v4-flash',
     prompt,
     temperature: 0.6,
     // Sized from measured completions — see SECTIONS_MAX_TOKENS. Covers the
     // 11-section reading only; the twelve-palace block has its own route.
     maxTokens: SECTIONS_MAX_TOKENS,
-    primaryTimeoutMs: SECTIONS_PRIMARY_TIMEOUT_MS,
-    fallbackTimeoutMs: SECTIONS_FALLBACK_TIMEOUT_MS,
+    budgetMs: SECTIONS_PRIMARY_TIMEOUT_MS + SECTIONS_FALLBACK_TIMEOUT_MS,
+    deepseekReserveMs: SECTIONS_FALLBACK_TIMEOUT_MS,
   })
 
   // Neither provider produced a completion, so nothing was billed and there is no

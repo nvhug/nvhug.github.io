@@ -376,13 +376,12 @@ export async function POST(request: Request) {
 
         const providerResult = await streamGeminiWithDeepSeekFallback(
           {
-            geminiModel: 'gemini-3.7-flash',
             deepseekModel: 'deepseek-v4-flash',
             prompt,
             temperature: 0.3,
             maxTokens: ANALYZE_MAX_TOKENS,
-            primaryTimeoutMs: ANALYZE_PRIMARY_TIMEOUT_MS,
-            fallbackTimeoutMs: ANALYZE_FALLBACK_TIMEOUT_MS,
+            budgetMs: ANALYZE_PRIMARY_TIMEOUT_MS + ANALYZE_FALLBACK_TIMEOUT_MS,
+            deepseekReserveMs: ANALYZE_FALLBACK_TIMEOUT_MS,
           },
           {
             // Only the progress bar was ever driven from these deltas, so abandoning a

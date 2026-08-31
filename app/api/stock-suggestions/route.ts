@@ -329,13 +329,12 @@ Trả về CHỈ JSON hợp lệ (không markdown, không giải thích):
   const startedAt = new Date()
 
   const result = await callGeminiWithDeepSeekFallback({
-    geminiModel: 'gemini-3.7-flash',
     deepseekModel: 'deepseek-v4-flash',
     prompt,
     temperature: 0.1,
     maxTokens: SUGGESTIONS_MAX_TOKENS,
-    primaryTimeoutMs: SUGGESTIONS_PRIMARY_TIMEOUT_MS,
-    fallbackTimeoutMs: SUGGESTIONS_FALLBACK_TIMEOUT_MS,
+    budgetMs: SUGGESTIONS_PRIMARY_TIMEOUT_MS + SUGGESTIONS_FALLBACK_TIMEOUT_MS,
+    deepseekReserveMs: SUGGESTIONS_FALLBACK_TIMEOUT_MS,
   })
 
   // Nothing was served, so nothing was billed: no usage row on this path.
