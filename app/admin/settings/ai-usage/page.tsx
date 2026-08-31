@@ -12,11 +12,14 @@ import { useUserRole } from '@/lib/useUserRole'
 import { UsageTiles } from './_components/UsageTiles'
 import { UsageTrend } from './_components/UsageTrend'
 import { UsageBreakdown, type BreakdownRow } from './_components/UsageBreakdown'
-import { LOG_PAGE_SIZE, UsageLog } from './_components/UsageLog'
+import { UsageLog } from './_components/UsageLog'
+import { LogFilters } from './_components/LogFilters'
 import { formatDateTime, formatTokens, formatUserIdentity } from './_lib/format'
+import { MODEL_FILTER_OPTIONS, intersectLogDateBounds, isFullySelected, modelFilterPattern } from './_lib/filters'
 import {
   actorScopeOf,
   EMPTY_SUMMARY,
+  LOG_PAGE_SIZE,
   PERIODS,
   sameScope,
   totalTokens,
@@ -83,7 +86,19 @@ export default function AiUsagePage() {
   const [deleteTarget, setDeleteTarget] = useState<LogRow | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
+  // Log-only filters (FR-002 through FR-006) — independent of, but composable with,
+  // `scope`/`days` above. Reset `logPage` and clear `selectedIds` on any change (FR-008,
+  // FR-010).
+  const [modelFilter, setModelFilter] = useState<string | null>(null)
+  const [surfaceFilter, setSurfaceFilter] = useState<Surface | null>(null)
+  const [dateFrom, setDateFrom] = useState<string | null>(null)
+  const [dateTo, setDateTo] = useState<string | null>(null)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false)
+  const [bulkDeleting, setBulkDeleting] = useState(false)
+
   const bounds = useMemo(() => periodBounds(days), [days])
+  const logBounds = useMemo(() => intersectLogDateBounds(bounds, { dateFrom, dateTo }), [bounds, dateFrom, dateTo])
 
   // No setState before the first await: called from an effect, a synchronous one would
   // cascade a render. `refreshing` is turned ON by the handlers that cause a re-fetch,
@@ -118,8 +133,8 @@ export default function AiUsagePage() {
           'id, user_id, actor, surface, provider, model, input_tokens, cached_input_tokens, output_tokens, reasoning_tokens, cost_usd, outcome, created_at',
           { count: 'exact' }
         )
-        .gte('created_at', bounds.from)
-        .lt('created_at', bounds.to)
+        .gte('created_at', logBounds.from)
+        .lt('created_at', logBounds.to)
         // id is the tiebreaker, not decoration: the two horoscope palace batches and the
         // two food-photo stages are written in the same millisecond, and without it a row
         // can land on two pages or on neither.
@@ -130,17 +145,24 @@ export default function AiUsagePage() {
       if (scope?.kind === 'user') q = q.eq('user_id', scope.userId)
       else if (scope?.kind === 'deleted') q = q.is('user_id', null).eq('actor', 'user')
       else if (scope?.kind === 'system') q = q.eq('actor', 'system')
+      // Not .eq(): a served model id can carry a point-release suffix the chip's
+      // canonical name doesn't have (see modelFilterPattern's doc comment).
+      if (modelFilter) q = q.filter('model', 'match', modelFilterPattern(modelFilter))
+      if (surfaceFilter) q = q.eq('surface', surfaceFilter)
 
       const { data, error, count } = await q
       if (error) throw error
-      setLogRows((data ?? []) as LogRow[])
+      const rows = (data ?? []) as LogRow[]
+      setLogRows(rows)
       setLogTotal(count ?? 0)
       setLogError(false)
+      return rows
     } catch (err) {
       console.error('[ai-usage] log failed:', err)
       setLogError(true)
+      return undefined
     }
-  }, [bounds, scope, logPage])
+  }, [logBounds, scope, logPage, modelFilter, surfaceFilter])
 
   useEffect(() => {
     if (roleLoading || role !== 'admin') return
@@ -194,8 +216,137 @@ export default function AiUsagePage() {
   function selectScope(next: ActorScope) {
     refetch(() => {
       setScope((cur) => (cur && sameScope(cur, next) ? null : next))
-      setLogPage(1)
+      resetLogView()
     })
+  }
+
+  function changeLogPage(p: number) {
+    setLogPage(p)
+    setSelectedIds(new Set())
+  }
+
+  // Every control that changes which rows the log query can return shares this: back to
+  // page 1, and drop a selection that may no longer point at rows the admin can see.
+  // Pulled out after two separate review rounds each caught a different handler that had
+  // been written by hand and forgot one half of it.
+  function resetLogView() {
+    setLogPage(1)
+    setSelectedIds(new Set())
+  }
+
+  function selectModelFilter(model: string | null) {
+    setModelFilter(model)
+    resetLogView()
+  }
+
+  function selectSurfaceFilter(surface: Surface | null) {
+    setSurfaceFilter(surface)
+    resetLogView()
+  }
+
+  function changeDateFrom(v: string | null) {
+    // Swap rather than let the two fields visibly disagree with the (already-normalized)
+    // query: an admin who sets "From" after "To" should see the fields reflect what the
+    // table actually shows, not a pair of values that look backwards forever.
+    if (v && dateTo && v > dateTo) {
+      setDateFrom(dateTo)
+      setDateTo(v)
+    } else {
+      setDateFrom(v)
+    }
+    resetLogView()
+  }
+
+  function changeDateTo(v: string | null) {
+    if (v && dateFrom && v < dateFrom) {
+      setDateTo(dateFrom)
+      setDateFrom(v)
+    } else {
+      setDateTo(v)
+    }
+    resetLogView()
+  }
+
+  function toggleRow(id: string) {
+    setSelectedIds((cur) => {
+      const next = new Set(cur)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function toggleAllRows() {
+    setSelectedIds(
+      isFullySelected(logRows.map((r) => r.id), selectedIds) ? new Set() : new Set(logRows.map((r) => r.id))
+    )
+  }
+
+  /**
+   * Deletes every selected row in one request (POST /bulk-delete), through the same
+   * admin-only, service-role-backed path as the single-row delete. Rows Postgres actually
+   * removed clear from the table and from selection; ids it didn't find stay selected so
+   * the admin can immediately see and retry just those (FR-013).
+   */
+  async function confirmBulkDelete() {
+    const ids = [...selectedIds]
+    if (ids.length === 0) return
+    setBulkDeleting(true)
+    try {
+      const res = await fetch('/api/admin/ai-usage/bulk-delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids }),
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const { deletedIds, failedIds } = (await res.json()) as { deletedIds: string[]; failedIds: string[] }
+
+      setBulkDeleteConfirm(false)
+      setSelectedIds(new Set(failedIds))
+
+      if (failedIds.length === 0) {
+        toast.success(t('admin.settings.aiUsage.bulkDeleteSuccess', { count: String(deletedIds.length) }))
+      } else if (deletedIds.length > 0) {
+        toast.error(
+          t('admin.settings.aiUsage.bulkDeletePartial', {
+            deleted: String(deletedIds.length),
+            total: String(ids.length),
+            failed: String(failedIds.length),
+          })
+        )
+      } else {
+        toast.error(t('admin.settings.aiUsage.bulkDeleteError'))
+      }
+
+      // Always refresh, even on a full failure: a failedId can mean the row was already
+      // removed by someone/something else (a per-row delete, another admin), not that
+      // nothing changed — skipping the refresh would leave an already-gone row rendered
+      // as a live, selectable table row indefinitely.
+      if (deletedIds.length > 0 && deletedIds.length === logRows.length && logPage > 1) {
+        // Same last-page guard as the single-row delete: leaving the admin on a page that
+        // just lost every one of its rows means they have to click their own way out of it.
+        // Every failedId is already empty in this branch (deletedIds accounts for the
+        // whole page), so there is nothing left to prune from selection.
+        setLogPage(logPage - 1)
+        await loadReport()
+      } else {
+        // Independent reads, run together rather than back to back.
+        const [freshRows] = await Promise.all([loadLog(), loadReport()])
+        // A partial failure's retained ids (failedIds, still in selectedIds) can land on
+        // a different page once the successfully-deleted rows shift everything after
+        // them — prune to whatever this page actually still shows, so the bulk bar's
+        // count never outlives the rows it's counting.
+        if (freshRows) {
+          const freshIds = new Set(freshRows.map((r) => r.id))
+          setSelectedIds((cur) => new Set([...cur].filter((id) => freshIds.has(id))))
+        }
+      }
+    } catch (err) {
+      console.error('[ai-usage] bulk delete failed:', err)
+      toast.error(t('admin.settings.aiUsage.bulkDeleteError'))
+    } finally {
+      setBulkDeleting(false)
+    }
   }
 
   /**
@@ -214,6 +365,14 @@ export default function AiUsagePage() {
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       setDeleteTarget(null)
       toast.success(t('admin.settings.aiUsage.deleteRowSuccess'))
+      // Otherwise a row deleted through its own per-row button (not bulk-delete) lingers
+      // in the selection forever, over-counting the bulk bar and breaking "select all".
+      setSelectedIds((cur) => {
+        if (!cur.has(row.id)) return cur
+        const next = new Set(cur)
+        next.delete(row.id)
+        return next
+      })
       // Deleting the last row of a page other than the first would otherwise leave the
       // admin on an empty page they have to click their own way out of.
       if (logRows.length === 1 && logPage > 1) setLogPage(logPage - 1)
@@ -246,6 +405,11 @@ export default function AiUsagePage() {
   const totals = { cost: summary.cost_usd, tokens: totalTokens(summary) }
   const everRecorded = (report?.summary.calls ?? 0) > 0 || logTotal > 0
   const periodLabel = t(`admin.settings.aiUsage.period${days}` as 'admin.settings.aiUsage.period30')
+
+  const surfaceFilterOptions = (Object.keys(SURFACE_LABELS) as Surface[]).map((key) => ({
+    key,
+    label: SURFACE_LABELS[key],
+  }))
 
   const surfaceRows: BreakdownRow[] = (report?.by_surface ?? []).map((r) => ({
     key: r.surface,
@@ -328,7 +492,13 @@ export default function AiUsagePage() {
               onClick={() =>
                 refetch(() => {
                   setDays(p)
-                  setLogPage(1)
+                  resetLogView()
+                  // The explicit date range narrows *within* the active period
+                  // (intersectLogDateBounds) — carrying it across a period change can
+                  // leave it entirely outside the new period, producing an inverted
+                  // from > to query range that silently returns zero rows.
+                  setDateFrom(null)
+                  setDateTo(null)
                 })
               }
               className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500 ${
@@ -352,7 +522,7 @@ export default function AiUsagePage() {
             onClick={() =>
               refetch(() => {
                 setScope(null)
-                setLogPage(1)
+                resetLogView()
               })
             }
             aria-label={t('admin.settings.aiUsage.clearFilter')}
@@ -440,7 +610,7 @@ export default function AiUsagePage() {
             rows={logRows}
             total={logTotal}
             page={logPage}
-            onPage={setLogPage}
+            onPage={changeLogPage}
             error={logError}
             onRetry={() => void loadLog()}
             onDelete={setDeleteTarget}
@@ -448,6 +618,30 @@ export default function AiUsagePage() {
             userLabel={(row) => labelForScope(actorScopeOf(row), true)}
             surfaceLabel={(s) => SURFACE_LABELS[s] ?? s}
             emptyText={t('admin.settings.aiUsage.emptyPeriod', { period: periodLabel })}
+            filters={
+              <LogFilters
+                models={MODEL_FILTER_OPTIONS}
+                selectedModel={modelFilter}
+                onSelectModel={selectModelFilter}
+                surfaces={surfaceFilterOptions}
+                selectedSurface={surfaceFilter}
+                onSelectSurface={selectSurfaceFilter}
+                dateFrom={dateFrom}
+                dateTo={dateTo}
+                onDateFromChange={changeDateFrom}
+                onDateToChange={changeDateTo}
+                onSelectUser={(userId) => selectScope({ kind: 'user', userId })}
+                onSelectDeleted={() => selectScope({ kind: 'deleted' })}
+                onSelectSystem={() => selectScope({ kind: 'system' })}
+                isDeletedActive={scope?.kind === 'deleted'}
+                isSystemActive={scope?.kind === 'system'}
+              />
+            }
+            selectedIds={selectedIds}
+            onToggleRow={toggleRow}
+            onToggleAll={toggleAllRows}
+            onBulkDelete={() => setBulkDeleteConfirm(true)}
+            bulkDeleting={bulkDeleting}
           />
 
           <p className="text-center text-xs text-zinc-300">
@@ -471,6 +665,15 @@ export default function AiUsagePage() {
         loading={!!deletingId}
         onConfirm={() => void confirmDelete()}
         onCancel={() => setDeleteTarget(null)}
+      />
+
+      <ConfirmModal
+        open={bulkDeleteConfirm}
+        itemContent={t('admin.settings.aiUsage.bulkSelectedCount', { count: String(selectedIds.size) })}
+        itemMeta={t('admin.settings.aiUsage.bulkDeleteConfirmHint')}
+        loading={bulkDeleting}
+        onConfirm={() => void confirmBulkDelete()}
+        onCancel={() => setBulkDeleteConfirm(false)}
       />
     </div>
   )

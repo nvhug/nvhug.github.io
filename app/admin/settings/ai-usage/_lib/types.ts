@@ -7,6 +7,13 @@
 export const PERIODS = [7, 30, 90] as const
 export type PeriodDays = (typeof PERIODS)[number]
 
+/**
+ * Raw-log page size, and also bulk delete's cap (FR-015): a bulk delete never reaches
+ * beyond one loaded page. Shared with the server route so the enforcement point and the
+ * UI's page size can never drift apart.
+ */
+export const LOG_PAGE_SIZE = 15
+
 export type Surface =
   | 'notes_analyze'
   | 'food_analyze'

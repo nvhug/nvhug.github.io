@@ -67,6 +67,15 @@ export const MODEL_PRICES: Record<string, ModelPrice> = {
 export const KNOWN_UNPRICED = new Set<string>(['gpt-4o-mini', 'google/gemini-3.6-flash'])
 
 /**
+ * A point-release/date/preview suffix a provider may append to a served model id beyond
+ * what this price table (and the AI-usage log's model filter) key on. Exported so any
+ * other caller matching a *served* id back to a canonical model name — the log filter,
+ * today — uses the exact same suffix vocabulary as pricing does, rather than a second
+ * definition that can drift out of sync.
+ */
+export const MODEL_SUFFIX_PATTERN = /-(\d{3,4}|latest|preview|exp|preview-\d{2}-\d{2}|\d{4}-\d{2}-\d{2})$/
+
+/**
  * Maps a served model id onto a price-table key.
  *
  * Providers answer with point-release ids the table does not carry: ask Gemini for
@@ -78,10 +87,7 @@ export const KNOWN_UNPRICED = new Set<string>(['gpt-4o-mini', 'google/gemini-3.6
  * the model that was requested. `null` when none of those is priced.
  */
 export function resolvePriceKey(servedModel: string, requestedModel?: string): string | null {
-  const stripped = servedModel.replace(
-    /-(\d{3,4}|latest|preview|exp|preview-\d{2}-\d{2}|\d{4}-\d{2}-\d{2})$/,
-    ''
-  )
+  const stripped = servedModel.replace(MODEL_SUFFIX_PATTERN, '')
   for (const candidate of [servedModel, stripped, requestedModel]) {
     // Object.hasOwn, never a bare index: `MODEL_PRICES['constructor']` resolves through the
     // prototype chain to a truthy non-price, and the arithmetic below then yields NaN, which
