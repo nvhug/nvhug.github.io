@@ -1,14 +1,23 @@
 'use client'
 
+import { useEffect, useRef } from 'react'
 import { Trash2 } from 'lucide-react'
 import { formatUsd } from '@/lib/ai-pricing'
 import { useLanguage } from '@/lib/i18n/language-context'
 import { formatDateTime, formatTokens } from '../_lib/format'
-import { totalTokens, type LogRow } from '../_lib/types'
+import { isFullySelected } from '../_lib/filters'
+import { LOG_PAGE_SIZE, totalTokens, type LogRow } from '../_lib/types'
 
 const COPPER = '#a8542a'
 
-export const LOG_PAGE_SIZE = 15
+function HeaderCheckbox({ checked, indeterminate, onChange, label }: { checked: boolean; indeterminate: boolean; onChange: () => void; label: string }) {
+  const ref = useRef<HTMLInputElement>(null)
+  // Native `indeterminate` has no HTML attribute — it can only be set imperatively.
+  useEffect(() => {
+    if (ref.current) ref.current.indeterminate = indeterminate
+  }, [indeterminate])
+  return <input ref={ref} type="checkbox" checked={checked} onChange={onChange} aria-label={label} className="h-4 w-4 rounded border-zinc-300" />
+}
 
 export function UsageLog({
   rows,
@@ -22,6 +31,12 @@ export function UsageLog({
   onDelete,
   deletingId,
   emptyText,
+  filters,
+  selectedIds,
+  onToggleRow,
+  onToggleAll,
+  onBulkDelete,
+  bulkDeleting,
 }: {
   rows: LogRow[]
   total: number
@@ -35,9 +50,19 @@ export function UsageLog({
   /** The row whose delete is in flight, so only its own button goes quiet. */
   deletingId: string | null
   emptyText: string
+  /** The model/feature/user/date filter row — rendered inside this card, above the table,
+   * so the log stays one visual unit regardless of filter state (per DESIGN.md). */
+  filters: React.ReactNode
+  selectedIds: Set<string>
+  onToggleRow: (id: string) => void
+  onToggleAll: () => void
+  onBulkDelete: () => void
+  bulkDeleting: boolean
 }) {
   const { t, lang } = useLanguage()
   const pages = Math.max(1, Math.ceil(total / LOG_PAGE_SIZE))
+  const allSelected = isFullySelected(rows.map((row) => row.id), selectedIds)
+  const someSelected = !allSelected && rows.some((row) => selectedIds.has(row.id))
 
   return (
     <div className="overflow-hidden rounded-xl border border-zinc-100 bg-white">
@@ -47,6 +72,34 @@ export function UsageLog({
         </h3>
         {total > 0 ? <span className="text-xs tabular-nums text-zinc-400">{total}</span> : null}
       </div>
+
+      {filters}
+
+      {/* Not shown during the error state: the table it refers to is replaced by the
+          retry message below, so a live "N selected · Delete" bar would let the admin
+          fire a delete against rows they can no longer see. */}
+      {!error && selectedIds.size > 0 ? (
+        <div className="flex items-center justify-between gap-3 border-b border-zinc-100 bg-zinc-50/80 px-4 py-2">
+          <span className="text-xs font-medium text-zinc-600">
+            {t('admin.settings.aiUsage.bulkSelectedCount', { count: String(selectedIds.size) })}
+          </span>
+          <button
+            type="button"
+            onClick={onBulkDelete}
+            disabled={bulkDeleting}
+            aria-label={t('admin.settings.aiUsage.bulkDeleteButton', { count: String(selectedIds.size) })}
+            className="inline-flex items-center gap-1.5 rounded-md border border-rose-200 px-2.5 py-1 text-xs font-medium text-rose-600 transition-colors hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <Trash2 className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
+            {/* Text hidden on mobile per the constitution's icon-button convention — the
+                aria-label above keeps the button named at every width, since the count
+                changes and can't be a static title attribute. */}
+            <span className="hidden sm:inline" aria-hidden>
+              {t('admin.settings.aiUsage.bulkDeleteButton', { count: String(selectedIds.size) })}
+            </span>
+          </button>
+        </div>
+      ) : null}
 
       {error ? (
         // Scoped to this card on purpose. The aggregates above came from a different query
@@ -66,13 +119,22 @@ export function UsageLog({
       ) : (
         <>
           {/* The one genuinely wide table on this page. It scrolls inside its own
-              container so the page body never does, and the timestamp column stays put:
-              scroll right without it and a row loses the only thing identifying it. */}
+              container so the page body never does. The sticky-left region now covers two
+              columns (checkbox, timestamp) so a row scrolled to see its cost still keeps
+              both "is it selected" and "which row is this" on screen. */}
           <div className="overflow-x-auto">
             <table className="w-full min-w-170 text-left text-sm">
               <thead>
                 <tr className="border-b border-zinc-100 bg-zinc-50/80 text-[11px] font-semibold uppercase tracking-wider text-zinc-400">
-                  <th scope="col" className="sticky left-0 bg-zinc-50 px-3 py-2">
+                  <th scope="col" className="sticky left-0 w-10 bg-zinc-50 px-3 py-2">
+                    <HeaderCheckbox
+                      checked={allSelected}
+                      indeterminate={someSelected}
+                      onChange={onToggleAll}
+                      label={t('admin.settings.aiUsage.selectAllRows')}
+                    />
+                  </th>
+                  <th scope="col" className="sticky left-10 bg-zinc-50 px-3 py-2">
                     {t('admin.settings.aiUsage.colTime')}
                   </th>
                   <th scope="col" className="px-3 py-2">{t('admin.settings.aiUsage.colUser')}</th>
@@ -90,7 +152,16 @@ export function UsageLog({
               <tbody>
                 {rows.map((row) => (
                   <tr key={row.id} className="border-b border-zinc-50 last:border-0">
-                    <td className="sticky left-0 bg-white px-3 py-2 text-xs tabular-nums text-zinc-500">
+                    <td className="sticky left-0 w-10 bg-white px-3 py-2">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(row.id)}
+                        onChange={() => onToggleRow(row.id)}
+                        aria-label={t('admin.settings.aiUsage.selectRow', { time: formatDateTime(row.created_at, lang) })}
+                        className="h-4 w-4 rounded border-zinc-300"
+                      />
+                    </td>
+                    <td className="sticky left-10 bg-white px-3 py-2 text-xs tabular-nums text-zinc-500">
                       {formatDateTime(row.created_at, lang)}
                     </td>
                     {/* Wider than the model column and carrying a title: the label is
