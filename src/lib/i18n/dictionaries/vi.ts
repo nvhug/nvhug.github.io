@@ -42,11 +42,192 @@ export const vi = {
     admin: 'Quản trị',
     profile: 'Hồ sơ',
     logout: 'Đăng xuất',
+    login: 'Đăng nhập',
     accountLabel: 'Tài khoản',
   },
 
   footer: {
-    copyright: '© 2026 Notez. Không gian riêng cho mọi điều bạn quan tâm.',
+    copyright: '© 2026 Notez. Trở thành phiên bản tốt hơn mỗi ngày, theo cách của riêng bạn.',
+  },
+
+  // Public landing page at `/` — the only copy a visitor with no account reads.
+  // Bound by ADR-017: no plan, no price, no upgrade, and nothing offered in
+  // return for a donation. Claims must match what is actually built today (FR-019),
+  // and each block must enumerate its area's real capabilities (FR-025) — the
+  // enumeration itself lives in `app/_landing/blocks.ts`, keyed into `cap` below.
+  // Sign-in button labels are NOT here — they reuse `login.*` so the action keeps
+  // one name through the whole flow.
+  landing: {
+    brand: 'Notez',
+    signIn: 'Đăng nhập',
+
+    heroLine: 'Ghi lại mọi thứ',
+    heroBody:
+      'Một ngày của bạn ghi được hết vào đây: việc tốt việc chưa tốt, thói quen, bữa ăn và calo, buổi tập, cân nặng. Rồi những thứ dài hơi hơn — mục tiêu, tài sản, lá số.',
+    heroPrice: 'Miễn phí toàn bộ, kể cả các tính năng AI.',
+    heroPrivacy: 'Mọi dữ liệu là riêng tư — chỉ mình bạn đọc được, không ai khác.',
+
+    countAreasLabel: 'khu vực chính',
+    countDashboardLabel: 'mục theo dõi mỗi ngày',
+    countAiLabel: 'tính năng AI',
+    countPriceValue: '0đ',
+    countPriceLabel: 'trọn gói, không thu phí',
+
+    illustrative: 'số liệu minh hoạ',
+
+    block: {
+      money: {
+        eyebrow: 'Tiền · Tài sản',
+        title: 'Quản lý tài sản',
+        body:
+          'Mỗi loại tài sản ghi theo đơn vị của nó — vàng theo chỉ hoặc lượng, tiền gửi, tiền mặt, các khoản đầu tư khác — rồi app cộng lại thành một con số tài sản ròng và vẽ tỉ lệ phân bổ. Dòng tiền vào ra, ai đang nợ mình, mình đang nợ ai, khoản nào đã tất toán đều nằm cùng một chỗ.',
+      },
+      invest: {
+        eyebrow: 'Đầu tư · Cổ phiếu',
+        title: 'Danh mục đầu tư',
+        body:
+          'Danh mục đang giữ với giá vốn và lãi lỗ, danh sách mã theo dõi, cảnh báo khi giá chạm mức đặt trước, và phần AI chấm điểm rồi xếp hạng cổ phiếu. Phần AI chỉ để tham khảo, không phải lời khuyên đầu tư.',
+      },
+      blog: {
+        eyebrow: 'Blog riêng tư',
+        title: 'Bài viết riêng tư của bạn',
+        body:
+          'Blog trong app là của riêng tài khoản bạn — không công khai, không ai vào đọc được. Dán markdown vào là tự đổi thành bài viết có định dạng, gắn thẻ để tìm lại, và mỗi tài khoản mới được tặng sẵn một bộ bài mở đầu để không phải nhìn trang trắng.',
+      },
+      quotes: {
+        eyebrow: 'Quote',
+        title: 'Câu nói tâm đắc',
+        body:
+          'Lưu những câu nói bạn thấy đáng giữ, kèm tác giả hoặc nguồn. App lấy ra một câu mỗi ngày, nên thứ bạn tự chọn quay lại đúng lúc cần chứ không nằm im trong một ghi chú nào đó.',
+      },
+      life: {
+        eyebrow: 'Ghi chú · Calo · Sức khoẻ',
+        title: 'Tốt hơn mỗi ngày',
+        body:
+          'Mỗi ngày bạn ghi lại việc tốt, việc chưa tốt, và những thói quen hằng ngày, Ghi lại Calo bằng cách chụp ảnh, AI phân tích, tính lượng Calo. Theo dõi bài tập gym, cân nặng, tiêu hoá và  AI phân tích tháng qua bạn đã sống thế nào. Để trở thành phiên bản tốt hơn chính bạn ngày hôm qua.',
+      },
+      fate: {
+        eyebrow: 'Lá số',
+        title: 'Luận giải tử vi',
+        body:
+          'Nhập ngày sinh, giờ sinh và giới tính; app tự đổi sang lịch âm, dựng lá số mười hai cung, cho điểm từng mảng của cuộc sống rồi để AI luận giải từng phần và từng cung. Chỉ để tham khảo và giải trí.',
+      },
+      privacy: {
+        eyebrow: 'Riêng tư',
+        title: 'Tất cả là riêng tư',
+        body:
+          'Ghi chú, calo, ảnh bữa ăn, cân nặng, tài sản, ngày giờ sinh — không có thứ nào trong đó người khác xem được. Mỗi tài khoản chỉ đọc được dữ liệu của chính nó, và điều đó ràng buộc ở tầng cơ sở dữ liệu chứ không phải chỉ ẩn trên giao diện. Bài viết cũng riêng theo tài khoản. Chỉ khi bạn tự mời một người vào quỹ chung thì mới có một thứ được chia sẻ, và chỉ đúng thứ đó.',
+      },
+    },
+
+    // One line per capability the product actually ships. Keys and order come from
+    // `app/_landing/blocks.ts`; a key here with no block, or a block key with no copy,
+    // fails blocks.test.ts.
+    cap: {
+      goldUnit: 'Vàng ghi theo chỉ hoặc lượng, tự quy ra tiền',
+      cashflow: 'Thu và chi, ghi từng khoản theo ngày',
+      convert: 'Chuyển đổi qua lại giữa các loại tài sản',
+      debts: 'Cho vay và đang nợ, có trạng thái tất toán',
+      netWorth: 'Tài sản ròng và tỉ lệ phân bổ theo loại',
+      goldPrice: 'Giá vàng cập nhật để tính lại giá trị',
+      sharedFund: 'Quỹ chung cho hai người, mời qua email',
+
+      portfolio: 'Danh mục đang giữ, giá vốn và lãi lỗ',
+      watchlist: 'Danh sách mã đang theo dõi',
+      stockAi: 'AI chấm điểm và xếp hạng, chỉ để tham khảo',
+      alerts: 'Cảnh báo khi giá chạm mức đặt trước',
+
+      journal: 'Việc tốt / việc chưa tốt mỗi ngày\nThói quen hằng ngày có nhắc giờ',
+      todos: 'Việc cần làm và danh sách định mua',
+      calories: 'Chụp ảnh bữa ăn cho AI đọc ra calo',
+      trackers: 'Buổi tập gym, cân nặng, tiêu hoá',
+      goals: 'Mục tiêu dài hạn chia thành mục nhỏ',
+      calendar: 'Lịch tháng để nhìn lại cả tháng',
+      reading: 'Bài viết về sức khoẻ của riêng bạn',
+      stats: 'Thống kê và AI Insights trên dữ liệu đã ghi',
+
+      lunar: 'Tự đổi ngày giờ sinh sang lịch âm',
+      palaces: 'Lá số mười hai cung, dựng sẵn',
+      scores: 'Cho điểm từng mảng của cuộc sống',
+      fateAi: 'AI luận giải từng phần và từng cung',
+
+      blogPrivate: 'Riêng tư mặc định — công khai chỉ khi chính bạn bật lên',
+      blogTags: 'Gắn thẻ, tìm kiếm, bình luận và lượt thích',
+      blogMarkdown: 'Dán markdown vào là tự đổi thành bài có định dạng',
+      blogSeeded: 'Tài khoản mới có sẵn một bộ bài mở đầu',
+      blogBilingual: 'Giao diện đọc song ngữ Việt / Anh',
+
+      quoteOwn: 'Tự lưu những câu nói bạn thấy đáng giữ',
+      quoteDaily: 'Mỗi ngày app lấy ra một câu',
+      quoteAuthor: 'Ghi kèm tác giả hoặc nguồn gốc',
+
+      ownAccount: 'Dữ liệu nằm trong tài khoản của riêng bạn',
+      noPeeking: 'Ràng buộc ở tầng dữ liệu, không phải ẩn trên giao diện',
+      noAds: 'Không quảng cáo, không bán dữ liệu cho ai',
+      inviteOnly: 'Chỉ chia sẻ khi bạn tự mời người vào quỹ chung',
+
+    },
+
+    assetsTotal: 'Tổng tài sản',
+    assetsGold: 'vàng',
+    assetsBank: 'ngân hàng',
+    assetsCash: 'tiền mặt',
+    moneyMockupAlt:
+      'Minh hoạ trang tài sản: tổng tài sản ròng và ba dòng vàng, ngân hàng, tiền mặt kèm tỉ lệ.',
+
+    stockHeading: 'Danh mục',
+    stockShare: 'tỉ trọng',
+    stockCodeA: 'mã 1',
+    stockCodeB: 'mã 2',
+    stockCodeC: 'mã 3',
+    stockAlertLabel: 'cảnh báo giá',
+    stockAlertValue: '{count} mã đang bật',
+    stockDisclaimer: 'Không phải lời khuyên đầu tư.',
+    stockMockupAlt:
+      'Minh hoạ danh mục đầu tư: ba mã ẩn tên với tỉ trọng và mức tăng giảm, cùng số cảnh báo giá đang bật.',
+
+    dayToday: 'hôm nay',
+    dayGood: 'tốt',
+    dayBad: 'tệ',
+    dayCalories: 'calo',
+    dayGym: 'tập gym',
+    dayWeight: 'cân nặng',
+    dayGoal: 'mục tiêu',
+    dayAi: 'thống kê AI',
+    dayAiValue: '{count} insight mới',
+    lifeMockupAlt:
+      'Minh hoạ một ngày: ba ghi chú tốt và tệ, mức calo so với mục tiêu, buổi tập gym trong tuần, tiến độ mục tiêu dài hạn, cân nặng so với mục tiêu, và số insight AI mới.',
+
+    blogHeading: 'Bài viết của bạn',
+    blogBilingualBadge: 'VI · EN',
+    blogPrivateBadge: 'riêng tư',
+    blogTagHealth: 'sức khoẻ',
+    blogTagMoney: 'tài chính',
+    blogTagNote: 'ghi chú',
+    blogTitleHealth: 'Hôm nay ăn uống thế nào',
+    blogTitleMoney: 'Xem lại chi tiêu tháng này',
+    blogTitleNote: 'Vài dòng suy nghĩ cuối tuần',
+    blogDaysAgo: '{count} ngày trước',
+    blogMockupAlt:
+      'Minh hoạ danh sách bài viết: ba bài với tiêu đề minh hoạ, thẻ, dòng tóm tắt được định dạng, ngày đăng tương đối và dấu riêng tư, cùng huy hiệu song ngữ Việt/Anh.',
+
+    quoteDailyLabel: 'Trích dẫn hôm nay',
+    quoteText: 'Hoa nở một mùa, người sống một kiếp,\nVui vẻ tùy duyên, thong dong tự tại.',
+    quoteAuthorLabel: '— Notez',
+    quoteMockupAlt:
+      'Minh hoạ thẻ trích dẫn: nhãn trích dẫn hôm nay, hai dòng trích dẫn mẫu, và dòng tác giả Notez.',
+
+    fatePalaces: '12 cung',
+    areaLove: 'Tình duyên',
+    areaFamily: 'Gia đạo',
+    areaCareer: 'Sự nghiệp',
+    areaHealth: 'Sức khỏe',
+    fateMockupAlt:
+      'Minh hoạ lá số: lưới mười hai cung quanh một ô trung tâm, và điểm số bốn lĩnh vực tình duyên, gia đạo, sự nghiệp, sức khỏe.',
+
+    footerCta: 'Mở sổ của riêng bạn',
+    footerBlog: 'Bài viết',
+    footerPrivacy: 'Riêng tư',
   },
 
   home: {
@@ -64,54 +245,12 @@ export const vi = {
     next: 'Tiếp →',
   },
 
-  about: {
-    eyebrow: 'Hồ sơ',
-    title: 'Về tôi',
-    intro1: 'Tôi là kỹ sư phần mềm làm việc remote-first, coi trọng sự tự do, quyền tự chủ và những công việc có ý nghĩa. Với hơn 11 năm kinh nghiệm, tôi giúp các nhóm xây dựng sản phẩm ổn định bằng sự tập trung điềm tĩnh và tư duy dài hạn.',
-    intro2: 'Tôi có thể giúp: xây dựng các tính năng web thực tế, cải thiện chất lượng triển khai, và đưa ý tưởng vào sản xuất một cách rõ ràng.',
-    whoIAmTitle: 'Tôi là ai',
-    whoIAmP1: 'Tôi đã làm việc tại một công ty từ năm 2015, phát triển từ vai trò triển khai đến làm chủ toàn bộ quy trình. Tôi là kỹ sư hướng nội, thích sự sâu sắc hơn sự ồn ào và coi trọng việc thực thi có kỷ luật.',
-    whoIAmP2: 'Tôi làm việc với tinh thần trách nhiệm, chọn giải pháp thực tế, và quan tâm sâu sắc đến các hệ thống dễ bảo trì. Blog này ghi lại những bài học từ các dự án thực tế và các quyết định kỹ thuật hàng ngày.',
-    focusTitle: 'Trọng tâm chuyên môn',
-    focusIntro: 'Cách tôi thường tạo ra giá trị trong các nhóm sản phẩm:',
-    focusItem1Title: 'Xác định vấn đề',
-    focusItem1Desc: 'Làm rõ yêu cầu từ sớm và biến các ý tưởng chưa rõ ràng thành kế hoạch triển khai thực tế',
-    focusItem2Title: 'Kỷ luật triển khai',
-    focusItem2Desc: 'Duy trì động lực với phạm vi rõ ràng, thực thi nhất quán và tiến độ đáng tin cậy',
-    focusItem3Title: 'Chất lượng kỹ thuật',
-    focusItem3Desc: 'Ưu tiên khả năng bảo trì, dễ đọc và độ ổn định hệ thống lâu dài',
-    focusItem4Title: 'Cải tiến liên tục',
-    focusItem4Desc: 'Học nhanh, thích nghi công cụ mới, và cải thiện quy trình làm việc của nhóm theo thời gian',
-    beyondCodeTitle: 'Ngoài công việc',
-    beyondCodeIntro: 'Ngoài công việc, tôi giữ sự cân bằng qua:',
-    beyondCodeItem1: 'Bóng đá - năng lượng, nhịp điệu và sự bền bỉ.',
-    beyondCodeItem2: 'Học hỏi - công cụ mới, ý tưởng mới, khả năng đánh giá tốt hơn.',
-    beyondCodeItem3: 'Làm việc sâu - ít lời hơn, kết quả tốt hơn.',
-    skillsTitle: 'Kỹ năng',
-    coreStackLabel: 'Công nghệ chính',
-    additionalLangLabel: 'Ngôn ngữ khác',
-    toolingLabel: 'Công cụ & Nền tảng',
-    statsTitle: 'Thống kê',
-    statStarted: 'Bắt đầu',
-    statExperience: 'Kinh nghiệm',
-    statExperienceValue: 'Hơn 11 năm',
-    statCompany: 'Công ty',
-    statCompanyValue: '1 công ty tính đến nay',
-    box3Title: 'Quan tâm đến công việc của tôi?',
-    box3Desc: 'Sẵn sàng hợp tác chu đáo và các công việc kỹ thuật hướng sản phẩm.',
-    sendEmail: 'Gửi Email',
-    closingTitle: 'Quan tâm đến công việc của tôi?',
-    closingDesc: 'Tôi viết về kỹ thuật thực tế, triển khai gọn gàng và tư duy sản phẩm bền vững. Nếu điều đó phù hợp với bạn, hãy kết nối.',
-    readArticles: 'Đọc bài viết →',
-    contactMe: 'Liên hệ',
-  },
-
   privacy: {
     eyebrow: 'Pháp lý',
     title: 'Chính sách bảo mật',
     lastUpdated: 'Cập nhật lần cuối: 21 Tháng 7, 2026',
     overviewTitle: 'Tổng quan',
-    overviewBody: 'Note Viet (notez.vn) là một blog cá nhân và nền tảng ghi chú. Chính sách này giải thích những dữ liệu được thu thập khi bạn đăng nhập bằng Facebook hoặc Google, cách sử dụng chúng, và cách bạn có thể yêu cầu xoá dữ liệu.',
+    overviewBody: 'Notez (notez.vn) là một blog cá nhân và nền tảng ghi chú. Chính sách này giải thích những dữ liệu được thu thập khi bạn đăng nhập bằng Facebook hoặc Google, cách sử dụng chúng, và cách bạn có thể yêu cầu xoá dữ liệu.',
     dataCollectTitle: 'Dữ liệu chúng tôi thu thập',
     dataCollectIntro: 'Khi bạn đăng nhập bằng Facebook hoặc Google, chúng tôi chỉ nhận thông tin hồ sơ cơ bản được nhà cung cấp đó cấp quyền:',
     dataItems: ['Tên của bạn', 'Địa chỉ email của bạn', 'URL ảnh đại diện của bạn'],
@@ -884,12 +1023,12 @@ export const vi = {
       newPost: 'Bài viết mới',
       statTotal: 'Tổng bài viết',
       statTotalHint: 'Trong thư viện',
-      statPublished: 'Đã xuất bản',
-      statPublishedHint: 'Hiển thị với người đọc',
-      statDrafts: 'Bản nháp',
-      statDraftsHint: 'Đang chờ chỉnh sửa',
-      filterPublished: 'Đã xuất bản',
-      filterDraft: 'Bản nháp',
+      statPublic: 'Công khai',
+      statPublicHint: 'Ai cũng đọc được',
+      statPrivate: 'Riêng tư',
+      statPrivateHint: 'Chỉ mình bạn đọc được',
+      filterPublic: 'Công khai',
+      filterPrivate: 'Riêng tư',
       searchPlaceholder: 'Tìm bài viết...',
       allTagsOption: 'Tất cả thẻ',
       emptyNoPosts: 'Chưa có bài viết nào.',
@@ -900,13 +1039,13 @@ export const vi = {
       colStatus: 'Trạng thái',
       colCreated: 'Ngày tạo',
       colActions: 'Hành động',
-      badgePublished: 'Đã xuất bản',
-      badgeDraft: 'Bản nháp',
-      viewPublishedTitle: 'Xem bài đã xuất bản',
+      badgePublic: 'Công khai',
+      badgePrivate: 'Riêng tư',
+      viewPublicTitle: 'Xem bài công khai',
       viewTitle: 'Xem',
       editTitle: 'Sửa',
-      unpublishTitle: 'Gỡ xuất bản',
-      publishTitle: 'Xuất bản',
+      makePrivateTitle: 'Chuyển thành riêng tư',
+      makePublicTitle: 'Chuyển thành công khai',
       deleteTitle: 'Xoá',
       createError: 'Không thể tạo bài viết. Vui lòng kiểm tra console để biết chi tiết.',
       updateError: 'Không thể lưu bài viết. Vui lòng kiểm tra console để biết chi tiết.',
@@ -941,8 +1080,8 @@ export const vi = {
       applyAllSuccess: 'Đã áp dụng "{template}" cho tất cả bài viết',
       postsHeading: 'Bài viết — gán giao diện',
       emptyNoPosts: 'Chưa có bài viết nào.',
-      live: 'đang chạy',
-      draft: 'bản nháp',
+      live: 'công khai',
+      draft: 'riêng tư',
       descriptions: {
         parchment: 'Phong cách nhật ký ấm áp. Thẻ bo tròn, chữ cái đầu lớn, tông màu hổ phách.',
         ink: 'Phong cách biên tập tối. Đánh số mục tự động, điểm nhấn màu cam.',
@@ -959,7 +1098,8 @@ export const vi = {
       updateHeading: 'Cập nhật bài viết',
       createSubtitle: 'Soạn bài viết mới và xuất bản khi sẵn sàng.',
       updateSubtitle: 'Chỉnh sửa nội dung, thông tin và trạng thái hiển thị.',
-      draftMode: 'Chế độ nháp',
+      privateMode: 'Chế độ riêng tư',
+      seededLocked: 'Bài viết mẫu luôn ở chế độ riêng tư',
       createSubmit: 'Tạo bài viết',
       saveSubmit: 'Lưu thay đổi',
       titleLabel: 'Tiêu đề',
@@ -1122,6 +1262,12 @@ export const vi = {
   forbidden: {
     heading: 'Không có quyền truy cập',
     message: 'Tài khoản của bạn không có quyền xem trang này.',
+    backHome: 'Về trang chủ',
+  },
+
+  blogPostNotFound: {
+    heading: 'Không tìm thấy bài viết',
+    message: 'Bài viết này không tồn tại, hoặc chủ tài khoản chưa công khai.',
     backHome: 'Về trang chủ',
   },
 

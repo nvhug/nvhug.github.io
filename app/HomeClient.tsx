@@ -13,9 +13,11 @@ const ITEMS_PER_PAGE = 5
 export default function HomeClient({
   initialPosts,
   initialQuotes,
+  isLoggedIn,
 }: {
   initialPosts: Post[]
   initialQuotes: Quote[]
+  isLoggedIn: boolean
 }) {
   const { t } = useLanguage()
   const [searchTerm, setSearchTerm] = useState('')
@@ -103,6 +105,7 @@ export default function HomeClient({
             )}
           </div>
 
+          {isLoggedIn && (
           <div className="mt-5 space-y-2">
             <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
               <div className="flex min-w-0 flex-wrap items-center gap-2">
@@ -159,6 +162,7 @@ export default function HomeClient({
               </div>
             </div>
           </div>
+          )}
         </div>
       </section>
 
@@ -168,7 +172,7 @@ export default function HomeClient({
             <p className="mb-4">
               {searchTerm ? t('home.noArticlesFound') : t('home.noArticlesYet')}
             </p>
-            {!searchTerm && (
+            {!searchTerm && isLoggedIn && (
               <Link href="/admin/create" className="font-semibold text-emerald-700 hover:underline">
                 {t('home.writeFirstArticle')}
               </Link>

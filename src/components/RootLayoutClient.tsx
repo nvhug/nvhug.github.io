@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { BookOpen, CircleDollarSign, Coffee, Home, LogOut, NotebookPen, Quote, Settings, Sparkles, User as UserIcon, type LucideIcon } from 'lucide-react'
+import { BookOpen, CircleDollarSign, Coffee, Home, LogIn, LogOut, NotebookPen, Quote, Settings, Sparkles, User as UserIcon, type LucideIcon } from 'lucide-react'
 import { Toaster } from 'sonner'
 import { useEffect, useRef, useState } from 'react'
 import { getSupabaseBrowserClient } from '@/lib/supabase-browser'
@@ -141,11 +141,28 @@ export function RootLayoutClient({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const isAdmin = pathname.startsWith('/admin')
   const isLogin = pathname === '/login'
-  const hideSiteChrome = isAdmin || isLogin
+  // `/` is the public landing page and brings its own header and footer. The
+  // authenticated chrome must not render there: every link in it needs a session
+  // a stranger does not have (FR-013).
+  const isLanding = pathname === '/'
+  // A single post at /blog/<slug> is reachable by an anonymous visitor when it
+  // is public (sql/28), and the global nav's every item is a protected route —
+  // clicking one would bounce a stranger straight to /login. The template
+  // already renders its own back link (`backHref`), so it does not depend on
+  // this chrome for navigation.
+  const isBlogPost = pathname.startsWith('/blog/')
+  const hideSiteChrome = isAdmin || isLogin || isLanding || isBlogPost
 
   const [user, setUser] = useState<User | null>(null)
 
   useEffect(() => {
+    // `user` only ever renders inside the AccountMenu in the header below, and
+    // that header is skipped entirely whenever hideSiteChrome is true — most
+    // consequentially on `/`, the site's highest-traffic anonymous page, where
+    // this would otherwise be a real network round-trip to Supabase Auth for a
+    // value nothing on the page can read.
+    if (hideSiteChrome) return
+
     const supabase = getSupabaseBrowserClient()
     supabase.auth.getUser().then(({ data }: { data: { user: User | null } }) => setUser(data.user))
 
@@ -155,7 +172,7 @@ export function RootLayoutClient({ children }: { children: React.ReactNode }) {
       }
     )
     return () => subscription.unsubscribe()
-  }, [])
+  }, [hideSiteChrome])
 
   const navItems = [
     { href: '/notes', label: t('header.navNotes'), icon: NotebookPen },
@@ -246,14 +263,17 @@ export function RootLayoutClient({ children }: { children: React.ReactNode }) {
                 {user ? (
                   <AccountMenu user={user} onLogout={handleLogout} navItems={navItems} pathname={pathname} />
                 ) : (
-                  <button
-                    type="button"
-                    onClick={handleLogout}
+                  // Sign in, not sign out. The landing page sends strangers to /privacy,
+                  // which keeps this chrome — and a Logout control offered to
+                  // someone who has never had a session is nonsense to them and, worse,
+                  // hits /api/logout and dumps them on /login.
+                  <Link
+                    href="/login"
                     className="ml-1 flex h-11 w-11 touch-manipulation items-center justify-center rounded-lg text-zinc-500 transition-colors hover:bg-emerald-50 hover:text-zinc-900 active:bg-emerald-50 active:text-zinc-900 sm:h-auto sm:w-auto sm:p-1.5"
-                    aria-label={t('header.logout')}
+                    aria-label={t('header.login')}
                   >
-                    <LogOut className="h-4 w-4" />
-                  </button>
+                    <LogIn className="h-4 w-4" />
+                  </Link>
                 )}
               </div>
             </div>
@@ -262,7 +282,9 @@ export function RootLayoutClient({ children }: { children: React.ReactNode }) {
       )}
       {children}
       <Toaster position="top-right" richColors />
-      <BugReportButton />
+      {/* Not on the landing page: a stranger who has never used the app should not
+          be invited to report a bug in it. */}
+      {!isLanding && <BugReportButton />}
       {!hideSiteChrome && (
         <div className="border-t border-emerald-100 bg-white">
           <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-10 sm:px-6">

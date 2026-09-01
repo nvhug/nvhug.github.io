@@ -106,8 +106,13 @@
   padding: 140px 40px 80px;
 }
 
-/* Navigation */
-nav {
+/* Navigation — legacy static-page chrome.
+   Scoped to `.container` deliberately. As a bare element selector this turned EVERY
+   <nav> in the app into a fixed cream bar pinned to the top of the viewport, which is
+   exactly what happened to the landing page's footer link list. Nothing in the React
+   app renders a `.container` page wrapper any more, so these rules are inert today;
+   they are kept rather than deleted because they belong to markup that predates it. */
+.container nav {
   position: fixed;
   top: 0;
   width: 100%;
@@ -134,20 +139,20 @@ nav {
   color: #a05b35;
 }
 
-nav ul {
+.container nav ul {
   display: flex;
   gap: 30px;
   list-style: none;
 }
 
-nav a {
+.container nav a {
   text-decoration: none;
   color: #333;
   font-size: 14px;
   transition: color 0.3s ease;
 }
 
-nav a:hover {
+.container nav a:hover {
   color: #a05b35;
 }
 
@@ -476,11 +481,11 @@ button.btn-secondary:hover {
 }
 
 @media (max-width: 768px) {
-  nav {
+  .container nav {
     padding: 16px 20px;
   }
 
-  nav ul {
+  .container nav ul {
     gap: 15px;
   }
 
@@ -532,8 +537,8 @@ button.btn-secondary:hover {
 
   .label,
   .chapter,
-  nav a,
-  footer p,
+  .container nav a,
+  .container footer p,
   .btn,
   a.btn,
   button.btn,

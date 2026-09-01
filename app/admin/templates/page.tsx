@@ -173,7 +173,7 @@ export default function TemplatesPage() {
   const fetchPosts = useCallback(async () => {
     const { data } = await supabase
       .from('posts')
-      .select('id, title, slug, template, created_at, published')
+      .select('id, title, slug, template, created_at, is_public')
       .order('created_at', { ascending: false })
     setPosts((data as Post[]) || [])
     setLoading(false)
@@ -266,8 +266,8 @@ export default function TemplatesPage() {
                 <div key={post.id} className="flex flex-col gap-2 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium ${post.published ? 'bg-emerald-100 text-emerald-700' : 'bg-zinc-100 text-zinc-500'}`}>
-                        {post.published ? t('admin.templates.live') : t('admin.templates.draft')}
+                      <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium ${post.is_public ? 'bg-emerald-100 text-emerald-700' : 'bg-zinc-100 text-zinc-500'}`}>
+                        {post.is_public ? t('admin.templates.live') : t('admin.templates.draft')}
                       </span>
                       <Link
                         href={`/blog/${post.slug}`}

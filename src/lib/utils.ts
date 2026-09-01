@@ -1,8 +1,19 @@
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
+import type { Post } from "@/types"
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
+}
+
+// A seeded starter copy is byte-identical across every account (ADR-018), so it
+// can never be made public — every account would end up publishing the same
+// content. Enforced again at the DB layer: CHECK posts_seeded_copy_never_public
+// (sql/28.blog_public_posts.sql). One predicate so the admin list's disabled
+// toggle, its click handler, and PostForm's own display state can never drift
+// from each other or from the constraint.
+export function canPostBePublic(post: Pick<Post, "is_seeded_copy">): boolean {
+  return !post.is_seeded_copy
 }
 
 export function formatDate(isoDate: string): string {

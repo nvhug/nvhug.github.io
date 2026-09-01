@@ -4,12 +4,11 @@ import Link from 'next/link'
 import { formatDate } from '@/lib/utils'
 import { ReadingProgress } from '@/components/ReadingProgress'
 import { TableOfContents } from '@/components/TableOfContents'
-import { CommentsSection } from '@/components/blog/CommentsSection'
 import type { TemplateProps } from './ParchmentTemplate'
 
 export function NotionTemplate({
   post, processedContent, readingMinutes, backHref,
-  comments, newComment, onCommentChange, onAddComment,
+  commentsSlot,
 }: TemplateProps) {
   return (
     <div className="tpl-notion relative min-h-svh bg-white pb-16">
@@ -83,12 +82,7 @@ export function NotionTemplate({
         </aside>
       </div>
 
-      <CommentsSection
-        comments={comments}
-        newComment={newComment}
-        onCommentChange={onCommentChange}
-        onSubmit={onAddComment}
-      />
+      {commentsSlot}
     </div>
   )
 }

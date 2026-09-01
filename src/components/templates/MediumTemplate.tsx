@@ -4,12 +4,11 @@ import Link from 'next/link'
 import { formatDate } from '@/lib/utils'
 import { ReadingProgress } from '@/components/ReadingProgress'
 import { TableOfContents } from '@/components/TableOfContents'
-import { CommentsSection } from '@/components/blog/CommentsSection'
 import type { TemplateProps } from './ParchmentTemplate'
 
 export function MediumTemplate({
   post, processedContent, readingMinutes, backHref,
-  comments, newComment, onCommentChange, onAddComment,
+  comments, commentsSlot,
 }: TemplateProps) {
   return (
     <div className="tpl-medium relative min-h-svh bg-white pb-16 pt-20">
@@ -71,12 +70,7 @@ export function MediumTemplate({
         </aside>
       </div>
 
-      <CommentsSection
-        comments={comments}
-        newComment={newComment}
-        onCommentChange={onCommentChange}
-        onSubmit={onAddComment}
-      />
+      {commentsSlot}
     </div>
   )
 }

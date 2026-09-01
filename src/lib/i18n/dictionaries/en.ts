@@ -44,11 +44,182 @@ export const en: Dictionary = {
     admin: 'Admin',
     profile: 'Profile',
     logout: 'Logout',
+    login: 'Sign in',
     accountLabel: 'Account',
   },
 
   footer: {
-    copyright: '© 2026 Notez. A private space for everything you care about.',
+    copyright: '© 2026 Notez. Become a better version of yourself every day, your own way.',
+  },
+
+  landing: {
+    brand: 'Notez',
+    signIn: 'Sign in',
+
+    heroLine: 'Note everything',
+    heroBody:
+      'Your whole day fits in here: what went well and what did not, habits, meals and calories, gym sessions, weight. Then the longer-run things — goals, assets, your birth chart.',
+    heroPrice: 'Free, all of it, AI features included.',
+    heroPrivacy: 'Everything you record is private — readable by you and nobody else.',
+
+    countAreasLabel: 'main areas',
+    countDashboardLabel: 'things tracked daily',
+    countAiLabel: 'AI features',
+    countPriceValue: '0đ',
+    countPriceLabel: 'all in, no charge',
+
+    illustrative: 'illustrative figures',
+
+    block: {
+      money: {
+        eyebrow: 'Money · Assets',
+        title: 'Know what you have, instead of guessing',
+        body:
+          'Every holding is recorded in its own unit — gold in chi or luong, deposits, cash, other investments — and the app adds them into one net-worth figure with its allocation drawn out. Money in and out, who owes you, who you owe and what is already settled all sit in the same place.',
+      },
+      invest: {
+        eyebrow: 'Investing · Stocks',
+        title: 'Portfolio and watchlist, on the same page as your assets',
+        body:
+          'What you hold with its cost basis and profit or loss, a watchlist, an alert when a price reaches a level you set, and an AI pass that scores and ranks stocks. The AI part is for reference only, not investment advice.',
+      },
+      blog: {
+        eyebrow: 'Private blog',
+        title: 'Somewhere of your own to write at length, read by nobody else',
+        body:
+          'The blog inside the app belongs to your account alone - not public, not readable by anyone else. Paste markdown and it becomes a formatted post, tag it so you can find it again, and every new account is given a starter set so it never opens on a blank page.',
+      },
+      quotes: {
+        eyebrow: 'Quotes',
+        title: 'The line you want to read again on a hard day',
+        body:
+          'Save the lines worth keeping, with an author or a source. The app surfaces one a day, so what you chose comes back when you need it instead of sitting forgotten in some note.',
+      },
+      life: {
+        eyebrow: 'Notes · Calories · Health',
+        title: 'Better every day',
+        body:
+          'Every day you log what went well, what did not, and your daily habits. Log calories just by snapping a photo — the AI reads the dish and counts them for you. Track gym sessions, weight and digestion, and let the AI break down the month you have lived. To become a better version of who you were yesterday.',
+      },
+      fate: {
+        eyebrow: 'Birth chart',
+        title: 'Twelve palaces, read back in plain language',
+        body:
+          'Enter your birth date, time and gender; the app converts to the lunar calendar, builds the twelve-palace chart, scores each area of life and has the AI read back each section and each palace. For reference and entertainment only.',
+      },
+      privacy: {
+        eyebrow: 'Privacy',
+        title: 'Everything is private',
+        body:
+          'Notes, calories, meal photos, weight, assets, birth date and time — none of it is visible to anyone else. Each account can read only its own data, and that is enforced in the database rather than hidden in the interface. Posts are per-account too. Exactly one thing can ever be shared, and only if you invite someone into a fund yourself.',
+      },
+    },
+
+    cap: {
+      goldUnit: 'Gold in chi or luong, priced into dong for you',
+      cashflow: 'Money in and out, entry by entry, by date',
+      convert: 'Convert between one kind of asset and another',
+      debts: 'Lending and borrowing, with a settled state',
+      netWorth: 'Net worth and how it is allocated by kind',
+      goldPrice: 'A gold rate that updates and revalues the holding',
+      sharedFund: 'A shared fund for two, invited by email',
+
+      portfolio: 'Holdings with cost basis and profit or loss',
+      watchlist: 'A watchlist of the tickers you follow',
+      stockAi: 'AI scoring and ranking, for reference only',
+      alerts: 'An alert when a price reaches the level you set',
+
+      journal: 'What went well or badly each day\nDaily habits that remind you',
+      todos: 'Todos, and a list of things you mean to buy',
+      calories: 'A meal photo the AI reads for calories',
+      trackers: 'Gym sessions, weight, digestion',
+      goals: 'Long-term goals broken into sub-items',
+      calendar: 'A month calendar to look back across',
+      reading: 'Your own health articles',
+      stats: 'Stats and AI Insights over what you recorded',
+
+      lunar: 'Birth date and time converted to the lunar calendar',
+      palaces: 'The twelve-palace chart, built for you',
+      scores: 'A score for each area of life',
+      fateAi: 'AI reading per section and per palace',
+
+      blogPrivate: 'Private by default — public only when you choose to make it so',
+      blogTags: 'Tags, search, comments and likes',
+      blogMarkdown: 'Paste markdown; it becomes a formatted post',
+      blogSeeded: 'A new account starts with a starter set of posts',
+      blogBilingual: 'Bilingual reading interface, Vietnamese and English',
+
+      quoteOwn: 'Save the lines you think are worth keeping',
+      quoteDaily: 'The app surfaces one each day',
+      quoteAuthor: 'Record the author or the source with it',
+
+      ownAccount: 'Your data lives in your account and nowhere else',
+      noPeeking: 'Enforced in the database, not hidden in the UI',
+      noAds: 'No ads, and your data is never sold',
+      inviteOnly: 'Shared only when you invite someone into a fund',
+
+    },
+
+    assetsTotal: 'Total assets',
+    assetsGold: 'gold',
+    assetsBank: 'bank',
+    assetsCash: 'cash',
+    moneyMockupAlt:
+      'Illustration of the assets page: a net-worth total and three rows — gold, bank, cash — with their shares.',
+
+    stockHeading: 'Portfolio',
+    stockShare: 'weight',
+    stockCodeA: 'ticker 1',
+    stockCodeB: 'ticker 2',
+    stockCodeC: 'ticker 3',
+    stockAlertLabel: 'price alerts',
+    stockAlertValue: '{count} armed',
+    stockDisclaimer: 'Not investment advice.',
+    stockMockupAlt:
+      'Illustration of a portfolio: three unnamed tickers with their weight and change, and the number of price alerts armed.',
+
+    dayToday: 'today',
+    dayGood: 'good',
+    dayBad: 'bad',
+    dayCalories: 'calories',
+    dayGym: 'gym',
+    dayWeight: 'weight',
+    dayGoal: 'goal',
+    dayAi: 'AI stats',
+    dayAiValue: '{count} new insights',
+    lifeMockupAlt:
+      'Illustration of one day: three good and bad notes, calories against a target, gym sessions this week, long-term goal progress, weight against a target, and a count of new AI insights.',
+
+    blogHeading: 'Your posts',
+    blogBilingualBadge: 'VI · EN',
+    blogPrivateBadge: 'private',
+    blogTagHealth: 'health',
+    blogTagMoney: 'money',
+    blogTagNote: 'notes',
+    blogTitleHealth: 'How I ate today',
+    blogTitleMoney: 'Reviewing this month’s spending',
+    blogTitleNote: 'A few weekend thoughts',
+    blogDaysAgo: '{count} days ago',
+    blogMockupAlt:
+      'Illustration of a post list: three posts with an illustrative title, a tag, a formatted summary line, a relative date and a private mark, plus a Vietnamese/English bilingual badge.',
+
+    quoteDailyLabel: 'Quote of the day',
+    quoteText: 'Flowers bloom for a season, we live but one life,\nMeet it with ease, and let go lightly.',
+    quoteAuthorLabel: '- Notez',
+    quoteMockupAlt:
+      'Illustration of a quote card: a quote-of-the-day label, two lines of a sample quote, and a Notez author line.',
+
+    fatePalaces: '12 palaces',
+    areaLove: 'Love',
+    areaFamily: 'Family',
+    areaCareer: 'Career',
+    areaHealth: 'Health',
+    fateMockupAlt:
+      'Illustration of a birth chart: a grid of twelve palaces around an open centre, and scores for four areas — love, family, career, health.',
+
+    footerCta: 'Open a notebook of your own',
+    footerBlog: 'Blog',
+    footerPrivacy: 'Privacy',
   },
 
   home: {
@@ -66,54 +237,12 @@ export const en: Dictionary = {
     next: 'Next →',
   },
 
-  about: {
-    eyebrow: 'Profile',
-    title: 'About Me',
-    intro1: 'I am a remote-first software engineer who values freedom, ownership, and meaningful work. With 11+ years of experience, I help teams build reliable products with calm focus and long-term thinking.',
-    intro2: 'How I can help: build practical web features, improve delivery quality, and move ideas into production with clarity.',
-    whoIAmTitle: 'Who I Am',
-    whoIAmP1: 'I have worked at one company since 2015, growing from implementation to end-to-end ownership. I am an introverted engineer who prefers depth over noise and values disciplined execution.',
-    whoIAmP2: 'I build with responsibility, choose pragmatic solutions, and care deeply about maintainable systems. This blog captures lessons from real projects and daily engineering decisions.',
-    focusTitle: 'Professional Focus',
-    focusIntro: 'How I usually create impact in product teams:',
-    focusItem1Title: 'Problem Framing',
-    focusItem1Desc: 'Clarify requirements early and turn unclear ideas into practical implementation plans',
-    focusItem2Title: 'Delivery Discipline',
-    focusItem2Desc: 'Keep momentum with clear scope, consistent execution, and dependable timelines',
-    focusItem3Title: 'Engineering Quality',
-    focusItem3Desc: 'Prioritize maintainability, readability, and long-term system stability',
-    focusItem4Title: 'Continuous Improvement',
-    focusItem4Desc: 'Learn fast, adapt to new tools, and improve team workflows over time',
-    beyondCodeTitle: 'Beyond Code',
-    beyondCodeIntro: 'Outside work, I stay grounded through:',
-    beyondCodeItem1: 'Football - energy, rhythm, and resilience.',
-    beyondCodeItem2: 'Learning - new tools, new ideas, better judgment.',
-    beyondCodeItem3: 'Deep work - fewer words, better outcomes.',
-    skillsTitle: 'Skills',
-    coreStackLabel: 'Core Engineering Stack',
-    additionalLangLabel: 'Additional Languages',
-    toolingLabel: 'Tooling and Platform',
-    statsTitle: 'Stats',
-    statStarted: 'Started',
-    statExperience: 'Experience',
-    statExperienceValue: '11+ years',
-    statCompany: 'Company',
-    statCompanyValue: '1 company so far',
-    box3Title: 'Interested in my work?',
-    box3Desc: 'Open to thoughtful collaboration and product-focused engineering work.',
-    sendEmail: 'Send Email',
-    closingTitle: 'Interested in my work?',
-    closingDesc: 'I write about practical engineering, clean delivery, and sustainable product thinking. If that resonates, let us connect.',
-    readArticles: 'Read Articles →',
-    contactMe: 'Contact Me',
-  },
-
   privacy: {
     eyebrow: 'Legal',
     title: 'Privacy Policy',
     lastUpdated: 'Last updated: July 21, 2026',
     overviewTitle: 'Overview',
-    overviewBody: 'Note Viet (notez.vn) is a personal blog and notes platform. This policy explains what data is collected when you log in with Facebook or Google, how it is used, and how you can request deletion.',
+    overviewBody: 'Notez (notez.vn) is a personal blog and notes platform. This policy explains what data is collected when you log in with Facebook or Google, how it is used, and how you can request deletion.',
     dataCollectTitle: 'Data We Collect',
     dataCollectIntro: 'When you sign in with Facebook or Google, we receive only the basic profile information granted by that provider:',
     dataItems: ['Your name', 'Your email address', 'Your profile picture URL'],
@@ -886,12 +1015,12 @@ export const en: Dictionary = {
       newPost: 'New Post',
       statTotal: 'Total Posts',
       statTotalHint: 'In library',
-      statPublished: 'Published',
-      statPublishedHint: 'Visible to readers',
-      statDrafts: 'Drafts',
-      statDraftsHint: 'Pending editing',
-      filterPublished: 'Published',
-      filterDraft: 'Draft',
+      statPublic: 'Public',
+      statPublicHint: 'Anyone can read it',
+      statPrivate: 'Private',
+      statPrivateHint: 'Only you can read it',
+      filterPublic: 'Public',
+      filterPrivate: 'Private',
       searchPlaceholder: 'Search posts...',
       allTagsOption: 'All tags',
       emptyNoPosts: 'No posts yet.',
@@ -902,13 +1031,13 @@ export const en: Dictionary = {
       colStatus: 'Status',
       colCreated: 'Created',
       colActions: 'Actions',
-      badgePublished: 'Published',
-      badgeDraft: 'Draft',
-      viewPublishedTitle: 'View published post',
+      badgePublic: 'Public',
+      badgePrivate: 'Private',
+      viewPublicTitle: 'View public post',
       viewTitle: 'View',
       editTitle: 'Edit',
-      unpublishTitle: 'Unpublish',
-      publishTitle: 'Publish',
+      makePrivateTitle: 'Make private',
+      makePublicTitle: 'Make public',
       deleteTitle: 'Delete',
       createError: 'Failed to create post. Please check the console for details.',
       updateError: 'Failed to save post. Please check the console for details.',
@@ -943,8 +1072,8 @@ export const en: Dictionary = {
       applyAllSuccess: 'Applied "{template}" to all posts',
       postsHeading: 'Posts — assign template',
       emptyNoPosts: 'No posts yet.',
-      live: 'live',
-      draft: 'draft',
+      live: 'public',
+      draft: 'private',
       descriptions: {
         parchment: 'Warm journal. Rounded card, drop cap, amber accents.',
         ink: 'Dark editorial. Auto-numbered sections, orange accents.',
@@ -961,7 +1090,8 @@ export const en: Dictionary = {
       updateHeading: 'Update Post',
       createSubtitle: 'Compose a new article and publish when ready.',
       updateSubtitle: 'Refine content, metadata, and visibility settings.',
-      draftMode: 'Draft mode',
+      privateMode: 'Private mode',
+      seededLocked: 'Starter posts always stay private',
       createSubmit: 'Create Post',
       saveSubmit: 'Save Changes',
       titleLabel: 'Title',
@@ -1118,6 +1248,12 @@ export const en: Dictionary = {
   forbidden: {
     heading: 'Access denied',
     message: 'Your account does not have permission to view this page.',
+    backHome: 'Back to home',
+  },
+
+  blogPostNotFound: {
+    heading: 'Post not found',
+    message: 'This post does not exist, or the owner has not made it public.',
     backHome: 'Back to home',
   },
 

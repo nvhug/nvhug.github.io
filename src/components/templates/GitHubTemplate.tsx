@@ -4,12 +4,11 @@ import Link from 'next/link'
 import { formatDate } from '@/lib/utils'
 import { ReadingProgress } from '@/components/ReadingProgress'
 import { TableOfContents } from '@/components/TableOfContents'
-import { CommentsSection } from '@/components/blog/CommentsSection'
 import type { TemplateProps } from './ParchmentTemplate'
 
 export function GitHubTemplate({
   post, processedContent, readingMinutes, backHref,
-  comments, newComment, onCommentChange, onAddComment,
+  comments, commentsSlot,
 }: TemplateProps) {
   return (
     <div className="tpl-github relative min-h-svh bg-[#ffffff] pb-16 pt-20">
@@ -67,12 +66,7 @@ export function GitHubTemplate({
         </aside>
       </div>
 
-      <CommentsSection
-        comments={comments}
-        newComment={newComment}
-        onCommentChange={onCommentChange}
-        onSubmit={onAddComment}
-      />
+      {commentsSlot}
     </div>
   )
 }

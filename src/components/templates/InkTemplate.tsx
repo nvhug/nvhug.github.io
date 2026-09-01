@@ -4,12 +4,11 @@ import Link from 'next/link'
 import { formatDate } from '@/lib/utils'
 import { ReadingProgress } from '@/components/ReadingProgress'
 import { TableOfContents } from '@/components/TableOfContents'
-import { CommentsSection } from '@/components/blog/CommentsSection'
 import type { TemplateProps } from './ParchmentTemplate'
 
 export function InkTemplate({
   post, processedContent, readingMinutes, backHref,
-  comments, newComment, onCommentChange, onAddComment,
+  comments, commentsSlot,
 }: TemplateProps) {
   return (
     <div className="tpl-ink relative min-h-svh overflow-x-clip bg-[#0f172a] pb-16 pt-24">
@@ -57,14 +56,11 @@ export function InkTemplate({
       </div>
 
       {/* Comments on a slightly lighter dark surface */}
-      <div className="mt-12 border-t border-slate-800 bg-[#0a1122]">
-        <CommentsSection
-          comments={comments}
-          newComment={newComment}
-          onCommentChange={onCommentChange}
-          onSubmit={onAddComment}
-        />
-      </div>
+      {commentsSlot && (
+        <div className="mt-12 border-t border-slate-800 bg-[#0a1122]">
+          {commentsSlot}
+        </div>
+      )}
     </div>
   )
 }

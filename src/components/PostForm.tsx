@@ -7,7 +7,7 @@ import { marked } from 'marked'
 
 import { supabase } from '@/lib/supabase'
 import { Post, Tag } from '@/types'
-import { generateSlug, truncateHtml } from '@/lib/utils'
+import { canPostBePublic, generateSlug, truncateHtml } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ConfirmModal } from '@/components/ui/confirm-modal'
@@ -53,7 +53,7 @@ export interface PostFormValues {
   slug: string
   excerpt: string
   content: string
-  published: boolean
+  isPublic: boolean
   tagIds: string[]
 }
 
@@ -74,13 +74,18 @@ export default function PostForm({ mode, initialPost, autotagName, submitting, o
   const [slugTouched, setSlugTouched] = useState(mode === 'edit')
   const [excerpt, setExcerpt] = useState(initialPost?.excerpt ?? '')
   const [content, setContent] = useState(initialPost?.content ?? '')
-  const [published, setPublished] = useState(initialPost?.published ?? false)
+  const [isPublic, setIsPublic] = useState(initialPost?.is_public ?? false)
   const [tags, setTags] = useState<Tag[]>([])
   const [tagIds, setTagIds] = useState<string[]>(initialPost?.tags?.map((t) => t.id) ?? [])
   const [newTagName, setNewTagName] = useState('')
   const [creatingTag, setCreatingTag] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
+
+  const seeded = initialPost ? !canPostBePublic(initialPost) : false
+  // What the visibility controls display and what gets submitted: a seeded copy
+  // is always private, whatever the stored value says.
+  const publicState = seeded ? false : isPublic
 
   const fetchTags = useCallback(async () => {
     try {
@@ -176,7 +181,7 @@ export default function PostForm({ mode, initialPost, autotagName, submitting, o
       slug: slug.trim(),
       excerpt: excerpt.trim() || truncateHtml(finalContent),
       content: finalContent,
-      published,
+      isPublic: publicState,
       tagIds,
     })
   }
@@ -220,7 +225,7 @@ export default function PostForm({ mode, initialPost, autotagName, submitting, o
           <div className="flex flex-wrap items-center gap-2">
             <div className="hidden items-center gap-1.5 rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 sm:inline-flex">
               <CircleDot className="h-3.5 w-3.5" />
-              {published ? t('admin.posts.badgePublished') : t('admin.postForm.draftMode')}
+              {publicState ? t('admin.posts.badgePublic') : t('admin.postForm.privateMode')}
             </div>
             {mode === 'edit' && onDelete && (
               <Button
@@ -294,24 +299,28 @@ export default function PostForm({ mode, initialPost, autotagName, submitting, o
             </h3>
             <button
               type="button"
-              onClick={() => setPublished((prev) => !prev)}
-              className="flex w-full items-center justify-between rounded-lg border border-emerald-200 bg-emerald-50/60 px-3 py-2.5 text-sm"
+              disabled={seeded}
+              onClick={() => setIsPublic((prev) => !prev)}
+              className="flex w-full items-center justify-between rounded-lg border border-emerald-200 bg-emerald-50/60 px-3 py-2.5 text-sm disabled:cursor-not-allowed disabled:opacity-60"
             >
               <span className="font-medium text-zinc-900">
-                {published ? t('admin.posts.badgePublished') : t('admin.posts.badgeDraft')}
+                {publicState ? t('admin.posts.badgePublic') : t('admin.posts.badgePrivate')}
               </span>
               <span
                 className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-                  published ? 'bg-emerald-500' : 'bg-zinc-300'
+                  publicState ? 'bg-emerald-500' : 'bg-zinc-300'
                 }`}
               >
                 <span
                   className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${
-                    published ? 'translate-x-4' : 'translate-x-0.5'
+                    publicState ? 'translate-x-4' : 'translate-x-0.5'
                   }`}
                 />
               </span>
             </button>
+            {seeded && (
+              <p className="mt-2 text-xs text-zinc-500">{t('admin.postForm.seededLocked')}</p>
+            )}
           </section>
 
           <section className="rounded-2xl border border-emerald-100 bg-white p-6 shadow-[0_30px_60px_-45px_rgba(16,185,129,0.32)]">

@@ -25,7 +25,7 @@ function CreatePostContent() {
             slug: values.slug,
             excerpt: values.excerpt,
             content: values.content,
-            published: values.published,
+            is_public: values.isPublic,
           },
         ])
         .select()

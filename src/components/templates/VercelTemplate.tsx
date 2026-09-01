@@ -4,12 +4,11 @@ import Link from 'next/link'
 import { formatDate } from '@/lib/utils'
 import { ReadingProgress } from '@/components/ReadingProgress'
 import { TableOfContents } from '@/components/TableOfContents'
-import { CommentsSection } from '@/components/blog/CommentsSection'
 import type { TemplateProps } from './ParchmentTemplate'
 
 export function VercelTemplate({
   post, processedContent, readingMinutes, backHref,
-  comments, newComment, onCommentChange, onAddComment,
+  comments, commentsSlot,
 }: TemplateProps) {
   return (
     <div className="tpl-vercel relative min-h-svh overflow-x-clip bg-black pb-16 pt-20 text-[#ededed]">
@@ -64,14 +63,11 @@ export function VercelTemplate({
         </aside>
       </div>
 
-      <div className="mt-10 border-t border-[#1a1a1a]">
-        <CommentsSection
-          comments={comments}
-          newComment={newComment}
-          onCommentChange={onCommentChange}
-          onSubmit={onAddComment}
-        />
-      </div>
+      {commentsSlot && (
+        <div className="mt-10 border-t border-[#1a1a1a]">
+          {commentsSlot}
+        </div>
+      )}
     </div>
   )
 }

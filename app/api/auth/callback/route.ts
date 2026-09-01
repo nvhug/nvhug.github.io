@@ -2,6 +2,7 @@ import { createServerClient } from '@supabase/ssr'
 import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 import { NextResponse, after } from 'next/server'
+import { safeNextPath } from '@/lib/permissions'
 import { seedCopiedContent, seedDashboardPhase } from '@/lib/seed-account'
 
 /**
@@ -41,7 +42,10 @@ async function seedIfNewAccount(userId: string): Promise<void> {
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
-  const next = searchParams.get('next') ?? '/'
+  // Defaults to the dashboard, not '/': '/' is the public landing page now, so a
+  // callback arriving without `next` (an email confirmation link, say) would drop
+  // a freshly signed-in user on the product pitch and bounce them.
+  const next = safeNextPath(searchParams.get('next'))
 
   if (!code) {
     return NextResponse.redirect(`${origin}/login?error=no_code`)

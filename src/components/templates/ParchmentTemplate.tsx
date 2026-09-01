@@ -1,11 +1,11 @@
 'use client'
 
+import type { ReactNode } from 'react'
 import Link from 'next/link'
 import { Post, Comment } from '@/types'
 import { formatDate } from '@/lib/utils'
 import { ReadingProgress } from '@/components/ReadingProgress'
 import { TableOfContents } from '@/components/TableOfContents'
-import { CommentsSection } from '@/components/blog/CommentsSection'
 
 export interface TemplateProps {
   post: Post
@@ -13,14 +13,15 @@ export interface TemplateProps {
   readingMinutes: number
   backHref: string
   comments: Comment[]
-  newComment: { author: string; content: string }
-  onCommentChange: (field: 'author' | 'content', value: string) => void
-  onAddComment: (e: React.FormEvent) => void
+  // Owner-gated <CommentsSection> element, or null for a stranger — RLS on the
+  // `comments` table grants no anon or other-account access at all, so a
+  // stranger's list would always be empty and their submit would silently fail.
+  commentsSlot: ReactNode
 }
 
 export function ParchmentTemplate({
   post, processedContent, readingMinutes, backHref,
-  comments, newComment, onCommentChange, onAddComment,
+  comments, commentsSlot,
 }: TemplateProps) {
   return (
     <div className="tpl-parchment relative min-h-svh overflow-x-clip bg-[#f7f4ed] pb-16 pt-24 text-[#171717]">
@@ -74,12 +75,7 @@ export function ParchmentTemplate({
         </aside>
       </div>
 
-      <CommentsSection
-        comments={comments}
-        newComment={newComment}
-        onCommentChange={onCommentChange}
-        onSubmit={onAddComment}
-      />
+      {commentsSlot}
     </div>
   )
 }

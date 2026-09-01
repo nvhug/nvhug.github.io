@@ -200,7 +200,6 @@ interface SourcePost {
   slug: string
   content: string
   excerpt: string | null
-  published: boolean
 }
 
 interface SourceQuote {
@@ -258,7 +257,7 @@ async function readSourcePosts(
   try {
     const { data, error } = await admin
       .from('posts')
-      .select('title, slug, content, excerpt, published, created_at')
+      .select('title, slug, content, excerpt, created_at')
       .eq('user_id', ownerId)
       .in('title', titles)
       .order('created_at', { ascending: true })
@@ -389,10 +388,14 @@ export async function seedCopiedContent(admin: SupabaseClient, userId: string): 
       slug: buildCopiedPostSlug(post.slug, userId),
       content: post.content,
       excerpt: post.excerpt,
-      // Kept from the source (FR-011b). Safe to keep published now that the
-      // blog is private (sql/61): the copy shows on its own owner's blog, which
-      // is exactly what FR-011c asks for, and nowhere else.
-      published: post.published,
+      // Never public, whatever the source row says (ADR-024). Individual posts
+      // can be made public again, but a seeded copy is byte-identical in every
+      // account — publishing it from all of them is exactly the cross-account
+      // duplicate content ADR-018 was written to stop, so keeping copies private
+      // is what keeps that solved. `is_seeded_copy` is the column the
+      // `posts_seeded_copy_never_public` CHECK constraint keys on.
+      is_public: false,
+      is_seeded_copy: true,
     }))
 
     try {

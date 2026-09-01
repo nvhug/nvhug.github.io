@@ -24,7 +24,8 @@ export interface Post {
   slug: string
   content: string
   excerpt: string
-  published: boolean
+  is_public: boolean
+  is_seeded_copy?: boolean
   template?: string
   user_id?: string
   created_at: string

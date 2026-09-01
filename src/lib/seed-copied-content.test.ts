@@ -7,9 +7,20 @@ const USER = '9f8c1b2a-3d4e-4f56-8a7b-0c1d2e3f4a5b'
 
 type Insert = { table: string; rows: Record<string, unknown>[] }
 
-/** A source post as it comes back from the owner's account. */
-function sourcePost(title: string, slug: string, published = true) {
-  return { id: `src-${slug}`, title, slug, content: `body of ${title}`, excerpt: 'x', published }
+/**
+ * A source post as it comes back from the owner's account. `isPublic` is here
+ * only so a test can prove the seeder ignores it — the source lookup no longer
+ * selects that column at all.
+ */
+function sourcePost(title: string, slug: string, isPublic = true) {
+  return {
+    id: `src-${slug}`,
+    title,
+    slug,
+    content: `body of ${title}`,
+    excerpt: 'x',
+    is_public: isPublic,
+  }
 }
 
 const ALL_SOURCE_POSTS = [
@@ -145,7 +156,11 @@ describe('seedCopiedContent — post copies (FR-011, FR-011a)', () => {
     }
   })
 
-  it('keeps the published state of the source rather than defaulting it (FR-011b)', async () => {
+  it('writes every copy private and flagged as seeded, whatever the source says (ADR-024)', async () => {
+    // A seeded copy is byte-identical in every account, so it is never public —
+    // and `is_seeded_copy` is what the posts_seeded_copy_never_public CHECK
+    // constraint keys on. One public and one private source prove the source
+    // state is ignored rather than carried over.
     const mixed = [
       sourcePost(SOURCE_POST_TITLES.health[0], 'h0', true),
       sourcePost(SOURCE_POST_TITLES.blog[0], 'b0', false),
@@ -153,8 +168,11 @@ describe('seedCopiedContent — post copies (FR-011, FR-011a)', () => {
     const { admin, inserts } = makeAdminStub({ posts: mixed })
     await seedCopiedContent(admin, USER)
     const rows = rowsInserted(inserts, 'posts')
-    expect(rows.find((r) => r.slug === `h0-9f8c1b2a`)?.published).toBe(true)
-    expect(rows.find((r) => r.slug === `b0-9f8c1b2a`)?.published).toBe(false)
+    expect(rows).toHaveLength(2)
+    for (const row of rows) {
+      expect(row.is_public).toBe(false)
+      expect(row.is_seeded_copy).toBe(true)
+    }
   })
 
   it('never copies the source id, which would collide on the primary key', async () => {

@@ -4,12 +4,11 @@ import Link from 'next/link'
 import { formatDate } from '@/lib/utils'
 import { ReadingProgress } from '@/components/ReadingProgress'
 import { TableOfContents } from '@/components/TableOfContents'
-import { CommentsSection } from '@/components/blog/CommentsSection'
 import type { TemplateProps } from './ParchmentTemplate'
 
 export function AppleTemplate({
   post, processedContent, readingMinutes, backHref,
-  comments, newComment, onCommentChange, onAddComment,
+  comments, commentsSlot,
 }: TemplateProps) {
   return (
     <div className="tpl-apple relative min-h-svh bg-white pb-16">
@@ -77,12 +76,7 @@ export function AppleTemplate({
         </aside>
       </div>
 
-      <CommentsSection
-        comments={comments}
-        newComment={newComment}
-        onCommentChange={onCommentChange}
-        onSubmit={onAddComment}
-      />
+      {commentsSlot}
     </div>
   )
 }

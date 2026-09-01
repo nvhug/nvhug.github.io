@@ -61,7 +61,7 @@ export default function EditPostPage({ params }: { params: Promise<{ id: string 
           slug: values.slug,
           excerpt: values.excerpt,
           content: values.content,
-          published: values.published,
+          is_public: values.isPublic,
           updated_at: new Date().toISOString(),
         })
         .eq('id', id)

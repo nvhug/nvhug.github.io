@@ -1,8 +1,8 @@
 import PrivacyContent from './PrivacyContent'
 
 export const metadata = {
-  title: 'Privacy Policy — Note Viet',
-  description: 'Privacy policy for Note Viet — how we handle your data.',
+  title: 'Privacy Policy — Notez',
+  description: 'Privacy policy for Notez — how we handle your data.',
 }
 
 export default function PrivacyPage() {

@@ -7,24 +7,24 @@ import {
   CircleDot,
   Eye,
   FileText,
+  Globe,
   Layers,
   Pencil,
   Plus,
-  Rss,
   Search,
   Trash2,
 } from 'lucide-react'
 
 import { supabase } from '@/lib/supabase'
 import { Post, Tag } from '@/types'
-import { formatDate } from '@/lib/utils'
+import { canPostBePublic, formatDate } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { ConfirmModal } from '@/components/ui/confirm-modal'
 import { useLanguage } from '@/lib/i18n/language-context'
 
-type StatusFilter = 'all' | 'published' | 'draft'
+type StatusFilter = 'all' | 'public' | 'private'
 type PostRow = Post & { post_tags: { tags: Tag | null }[] }
 
 export default function AdminPostsPage() {
@@ -71,17 +71,18 @@ export default function AdminPostsPage() {
     return () => window.clearTimeout(timer)
   }, [])
 
-  async function togglePublished(post: Post) {
+  async function toggleVisibility(post: Post) {
+    if (!canPostBePublic(post)) return
     setBusyId(post.id)
     try {
       const { error } = await supabase
         .from('posts')
-        .update({ published: !post.published })
+        .update({ is_public: !post.is_public })
         .eq('id', post.id)
 
       if (error) throw error
       setPosts((prev) =>
-        prev.map((p) => (p.id === post.id ? { ...p, published: !p.published } : p))
+        prev.map((p) => (p.id === post.id ? { ...p, is_public: !p.is_public } : p))
       )
     } catch (error) {
       console.error('Error updating post:', error)
@@ -114,15 +115,15 @@ export default function AdminPostsPage() {
   const counts = useMemo(
     () => ({
       all: posts.length,
-      published: posts.filter((p) => p.published).length,
-      draft: posts.filter((p) => !p.published).length,
+      public: posts.filter((p) => p.is_public).length,
+      private: posts.filter((p) => !p.is_public).length,
     }),
     [posts]
   )
 
   const filteredPosts = posts.filter((post) => {
-    if (statusFilter === 'published' && !post.published) return false
-    if (statusFilter === 'draft' && post.published) return false
+    if (statusFilter === 'public' && !post.is_public) return false
+    if (statusFilter === 'private' && post.is_public) return false
     if (tagFilter !== 'all' && !post.tags?.some((tag) => tag.id === tagFilter)) return false
     if (search) {
       const term = search.toLowerCase()
@@ -138,8 +139,8 @@ export default function AdminPostsPage() {
 
   const statusTabs: { key: StatusFilter; label: string; count: number }[] = [
     { key: 'all', label: t('common.all'), count: counts.all },
-    { key: 'published', label: t('admin.posts.filterPublished'), count: counts.published },
-    { key: 'draft', label: t('admin.posts.filterDraft'), count: counts.draft },
+    { key: 'public', label: t('admin.posts.filterPublic'), count: counts.public },
+    { key: 'private', label: t('admin.posts.filterPrivate'), count: counts.private },
   ]
 
   const statCards = [
@@ -151,18 +152,18 @@ export default function AdminPostsPage() {
       hint: t('admin.posts.statTotalHint'),
     },
     {
-      key: 'published',
-      label: t('admin.posts.statPublished'),
-      value: counts.published,
+      key: 'public',
+      label: t('admin.posts.statPublic'),
+      value: counts.public,
       icon: CircleDot,
-      hint: t('admin.posts.statPublishedHint'),
+      hint: t('admin.posts.statPublicHint'),
     },
     {
-      key: 'draft',
-      label: t('admin.posts.statDrafts'),
-      value: counts.draft,
+      key: 'private',
+      label: t('admin.posts.statPrivate'),
+      value: counts.private,
       icon: CalendarClock,
-      hint: t('admin.posts.statDraftsHint'),
+      hint: t('admin.posts.statPrivateHint'),
     },
   ]
 
@@ -287,7 +288,7 @@ export default function AdminPostsPage() {
                 {filteredPosts.map((post) => (
                   <tr key={post.id} className="border-b border-emerald-50 last:border-0 hover:bg-emerald-50/70">
                     <td className="max-w-xs px-5 py-3.5">
-                      {post.published ? (
+                      {post.is_public ? (
                         <Link href={`/blog/${post.slug}`}>
                           <div className="font-semibold text-emerald-600 hover:text-emerald-700 hover:underline">{post.title}</div>
                           <div className="line-clamp-1 text-xs text-zinc-500">{post.excerpt}</div>
@@ -313,10 +314,10 @@ export default function AdminPostsPage() {
                       </div>
                     </td>
                     <td className="px-5 py-3.5">
-                      {post.published ? (
-                        <Badge className="border border-emerald-300 bg-emerald-50 text-emerald-700">{t('admin.posts.badgePublished')}</Badge>
+                      {post.is_public ? (
+                        <Badge className="border border-emerald-300 bg-emerald-50 text-emerald-700">{t('admin.posts.badgePublic')}</Badge>
                       ) : (
-                        <Badge variant="secondary" className="bg-zinc-100 text-zinc-700">{t('admin.posts.badgeDraft')}</Badge>
+                        <Badge variant="secondary" className="bg-zinc-100 text-zinc-700">{t('admin.posts.badgePrivate')}</Badge>
                       )}
                     </td>
                     <td className="whitespace-nowrap px-5 py-3.5 text-zinc-500">
@@ -324,8 +325,8 @@ export default function AdminPostsPage() {
                     </td>
                     <td className="px-5 py-3.5">
                       <div className="flex items-center justify-center gap-1">
-                        {post.published ? (
-                          <Link href={`/blog/${post.slug}`} title={t('admin.posts.viewPublishedTitle')}>
+                        {post.is_public ? (
+                          <Link href={`/blog/${post.slug}`} title={t('admin.posts.viewPublicTitle')}>
                             <Button variant="ghost" size="icon-sm" className="text-zinc-600 hover:bg-emerald-100 hover:text-emerald-700">
                               <Eye />
                             </Button>
@@ -343,12 +344,12 @@ export default function AdminPostsPage() {
                         <Button
                           variant="ghost"
                           size="icon-sm"
-                          disabled={busyId === post.id}
-                          onClick={() => togglePublished(post)}
-                          title={post.published ? t('admin.posts.unpublishTitle') : t('admin.posts.publishTitle')}
+                          disabled={busyId === post.id || !canPostBePublic(post)}
+                          onClick={() => toggleVisibility(post)}
+                          title={post.is_public ? t('admin.posts.makePrivateTitle') : t('admin.posts.makePublicTitle')}
                           className="text-zinc-600 hover:bg-emerald-100 hover:text-emerald-700"
                         >
-                          <Rss />
+                          <Globe />
                         </Button>
                         <Button
                           variant="ghost"
