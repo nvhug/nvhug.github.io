@@ -169,7 +169,7 @@ export function AdminTopBar() {
 
   async function handleLogout() {
     await fetch('/api/logout', { method: 'POST' })
-    window.location.href = '/login'
+    window.location.href = '/'
   }
 
   return (

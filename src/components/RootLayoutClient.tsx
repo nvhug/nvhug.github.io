@@ -184,7 +184,7 @@ export function RootLayoutClient({ children }: { children: React.ReactNode }) {
 
   async function handleLogout() {
     await fetch('/api/logout', { method: 'POST' })
-    window.location.href = '/login'
+    window.location.href = '/'
   }
 
   return (
@@ -266,7 +266,7 @@ export function RootLayoutClient({ children }: { children: React.ReactNode }) {
                   // Sign in, not sign out. The landing page sends strangers to /privacy,
                   // which keeps this chrome — and a Logout control offered to
                   // someone who has never had a session is nonsense to them and, worse,
-                  // hits /api/logout and dumps them on /login.
+                  // hits /api/logout for nothing.
                   <Link
                     href="/login"
                     className="ml-1 flex h-11 w-11 touch-manipulation items-center justify-center rounded-lg text-zinc-500 transition-colors hover:bg-emerald-50 hover:text-zinc-900 active:bg-emerald-50 active:text-zinc-900 sm:h-auto sm:w-auto sm:p-1.5"
