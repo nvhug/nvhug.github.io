@@ -8,17 +8,17 @@ import { WeightLog } from '@/types'
 import { ConfirmModal } from '@/components/ui/confirm-modal'
 import { useLanguage } from '@/lib/i18n/language-context'
 import { weightProgress } from '@/lib/weight-progress'
+import {
+  DEFAULT_WEIGHT_GOAL,
+  WEIGHT_GOAL_PROFILE_KEY,
+  parseWeightGoal,
+  parseWeightInput,
+  type WeightGoal,
+} from '@/lib/weight-goal'
 import { DatePicker } from '@/components/ui/date-picker'
 import { getIntlLocale } from '@/lib/i18n/locale'
 import type { Lang } from '@/lib/i18n/language-context'
 import { getTodayLocalISODate } from '@/lib/date'
-
-// A weight-loss goal: START is above TARGET. This was 61 -> 75 (a gain goal)
-// until feature 009, which seeds every new account with a "lose 5kg" starter
-// goal — see docs/DECISIONS.md. Still one pair of constants for every account,
-// which is a known limitation, not a per-user setting.
-const START_WEIGHT = 70
-const TARGET_WEIGHT = 65
 
 function todayDate() {
   return getTodayLocalISODate()
@@ -31,16 +31,15 @@ function formatDate(iso: string, lang: Lang) {
 }
 
 // Simple SVG line chart for last 30 entries
-function WeightChart({ logs }: { logs: WeightLog[] }) {
+function WeightChart({ logs, goal }: { logs: WeightLog[]; goal: WeightGoal }) {
   if (logs.length < 2) return null
 
   const sorted = [...logs].sort((a, b) => a.date.localeCompare(b.date)).slice(-30)
   const weights = sorted.map((l) => l.weight)
-  // Both guide lines must be inside the domain regardless of which constant is
-  // the larger — START is now above TARGET (a loss goal), so pinning min to
-  // START and max to TARGET would push one line outside the viewBox.
-  const minW = Math.min(...weights, START_WEIGHT, TARGET_WEIGHT) - 1
-  const maxW = Math.max(...weights, START_WEIGHT, TARGET_WEIGHT) + 1
+  // Both guide lines must be inside the domain regardless of which bound is
+  // the larger — the goal can point either way.
+  const minW = Math.min(...weights, goal.start, goal.target) - 1
+  const maxW = Math.max(...weights, goal.start, goal.target) + 1
 
   const W = 600
   const H = 160
@@ -55,8 +54,8 @@ function WeightChart({ logs }: { logs: WeightLog[] }) {
     .map((l, i) => `${i === 0 ? 'M' : 'L'} ${xOf(i).toFixed(1)} ${yOf(l.weight).toFixed(1)}`)
     .join(' ')
 
-  const targetY = yOf(TARGET_WEIGHT).toFixed(1)
-  const startY = yOf(START_WEIGHT).toFixed(1)
+  const targetY = yOf(goal.target).toFixed(1)
+  const startY = yOf(goal.start).toFixed(1)
 
   return (
     <div className="mt-4 overflow-x-auto">
@@ -65,13 +64,13 @@ function WeightChart({ logs }: { logs: WeightLog[] }) {
         <line x1={PAD.left} y1={targetY} x2={W - PAD.right} y2={targetY}
           stroke="#10b981" strokeWidth="1" strokeDasharray="4 3" />
         <text x={W - PAD.right - 2} y={Number(targetY) - 4} textAnchor="end"
-          fontSize="10" fill="#10b981">{TARGET_WEIGHT}kg</text>
+          fontSize="10" fill="#10b981">{goal.target}kg</text>
 
         {/* Start line */}
         <line x1={PAD.left} y1={startY} x2={W - PAD.right} y2={startY}
           stroke="#94a3b8" strokeWidth="1" strokeDasharray="4 3" />
         <text x={W - PAD.right - 2} y={Number(startY) - 4} textAnchor="end"
-          fontSize="10" fill="#94a3b8">{START_WEIGHT}kg</text>
+          fontSize="10" fill="#94a3b8">{goal.start}kg</text>
 
         {/* Weight line */}
         <path d={linePath} fill="none" stroke="#a05b35" strokeWidth="2" strokeLinejoin="round" />
@@ -98,6 +97,8 @@ function WeightChart({ logs }: { logs: WeightLog[] }) {
   )
 }
 
+type GoalField = keyof WeightGoal
+
 export function WeightTracker() {
   const { t, lang } = useLanguage()
   const [logs, setLogs] = useState<WeightLog[]>([])
@@ -108,9 +109,15 @@ export function WeightTracker() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  // The goal is per user (ADR-009 pattern: a key in user_profiles.profile_data).
+  // Until it loads — or if it was never set — the card shows the starter goal.
+  const [goal, setGoal] = useState<WeightGoal>(DEFAULT_WEIGHT_GOAL)
+  const [editingGoalField, setEditingGoalField] = useState<GoalField | null>(null)
+  const [goalDraft, setGoalDraft] = useState('')
 
   useEffect(() => {
     fetchLogs()
+    fetchGoal()
   }, [])
 
   async function fetchLogs() {
@@ -121,6 +128,54 @@ export function WeightTracker() {
       .limit(60)
     setLogs(data || [])
     setLoading(false)
+  }
+
+  async function fetchGoal() {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const { data } = await supabase
+      .from('user_profiles')
+      .select('profile_data')
+      .eq('id', user.id)
+      .maybeSingle()
+    const raw = (data?.profile_data as Record<string, unknown> | null)?.[WEIGHT_GOAL_PROFILE_KEY]
+    setGoal(parseWeightGoal(raw))
+  }
+
+  function startGoalEdit(field: GoalField) {
+    setEditingGoalField(field)
+    setGoalDraft(String(goal[field]))
+  }
+
+  async function commitGoalEdit() {
+    const field = editingGoalField
+    if (!field) return
+    setEditingGoalField(null)
+
+    const value = parseWeightInput(goalDraft)
+    if (value === null) { toast.error(t('weightTracker.invalidGoal')); return }
+    if (value === goal[field]) return
+
+    const previous = goal
+    const next = { ...goal, [field]: value }
+    setGoal(next)
+
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { toast.error(t('weightTracker.goalSaveFailed')); setGoal(previous); return }
+
+    // Merge, not replace: profile_data also holds the profile page's fields and
+    // the horoscope profile. Upsert because a fresh account may have no row yet.
+    const { data: existing, error: fetchError } = await supabase
+      .from('user_profiles')
+      .select('profile_data')
+      .eq('id', user.id)
+      .maybeSingle()
+    const mergedProfileData = { ...(existing?.profile_data ?? {}), [WEIGHT_GOAL_PROFILE_KEY]: next }
+    const { error } = fetchError
+      ? { error: fetchError }
+      : await supabase.from('user_profiles').upsert({ id: user.id, profile_data: mergedProfileData })
+    if (error) { toast.error(t('weightTracker.goalSaveFailed')); setGoal(previous); return }
+    toast.success(t('weightTracker.goalSaved'))
   }
 
   function startEdit(log: WeightLog) {
@@ -173,7 +228,42 @@ export function WeightTracker() {
   }
 
   const latest = logs[0]
-  const progress = latest ? weightProgress(latest.weight, START_WEIGHT, TARGET_WEIGHT) : null
+  const progress = latest ? weightProgress(latest.weight, goal.start, goal.target) : null
+
+  // "Lost" is progress on a loss goal and regression on a gain goal; "Gained"
+  // is the reverse. The label follows the direction the weight actually moved,
+  // and the colour follows whether that was toward the target.
+  const movedDown = progress ? (progress.direction === 'lose') === (progress.progressed >= 0) : true
+  const towardTarget = progress ? progress.progressed >= 0 : true
+
+  function renderGoalBound(field: GoalField, label: string) {
+    if (editingGoalField === field) {
+      return (
+        <input
+          className="h-6 w-20 rounded-md border border-emerald-300 bg-white px-1.5 text-xs text-zinc-900 outline-none focus:border-emerald-500"
+          inputMode="decimal"
+          value={goalDraft}
+          onChange={(e) => setGoalDraft(e.target.value)}
+          onBlur={() => void commitGoalEdit()}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') { e.preventDefault(); void commitGoalEdit() }
+            if (e.key === 'Escape') setEditingGoalField(null)
+          }}
+          autoFocus
+        />
+      )
+    }
+    return (
+      <button
+        type="button"
+        onDoubleClick={() => startGoalEdit(field)}
+        className="cursor-text rounded px-1 -mx-1 hover:bg-emerald-50"
+        title={t('weightTracker.editGoalHint')}
+      >
+        {label}
+      </button>
+    )
+  }
 
   return (
     <div className="space-y-4">
@@ -187,16 +277,12 @@ export function WeightTracker() {
             </div>
             <div>
               <p className="text-xs text-zinc-500">
-                {progress!.lost < 0 ? t('weightTracker.gainedBack') : t('weightTracker.lost')}
+                {movedDown ? t('weightTracker.lost') : t('weightTracker.gainedBack')}
               </p>
-              {/* A negative loss is a gain: it gets its own label and colour rather
-                  than "-2.0 kg" under "Lost" in the success colour. */}
               <p
-                className={`text-xl font-semibold ${
-                  progress!.lost < 0 ? 'text-rose-500' : 'text-emerald-600'
-                }`}
+                className={`text-xl font-semibold ${towardTarget ? 'text-emerald-600' : 'text-rose-500'}`}
               >
-                {Math.abs(progress!.lost).toFixed(1)} kg
+                {Math.abs(progress!.progressed).toFixed(1)} kg
               </p>
             </div>
             <div>
@@ -206,8 +292,8 @@ export function WeightTracker() {
           </div>
           <div className="mt-3">
             <div className="flex justify-between text-xs text-zinc-500 mb-1">
-              <span>{START_WEIGHT}kg</span>
-              <span>{t('weightTracker.targetLabel', { target: TARGET_WEIGHT })}</span>
+              {renderGoalBound('start', `${goal.start}kg`)}
+              {renderGoalBound('target', t('weightTracker.targetLabel', { target: goal.target }))}
             </div>
             <div className="h-2 w-full rounded-full bg-zinc-200">
               <div
@@ -217,7 +303,7 @@ export function WeightTracker() {
             </div>
             <p className="mt-1 text-right text-xs text-zinc-500">{progress!.percent.toFixed(0)}%</p>
           </div>
-          <WeightChart logs={logs} />
+          <WeightChart logs={logs} goal={goal} />
         </div>
       )}
 
