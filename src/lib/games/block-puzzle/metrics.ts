@@ -35,6 +35,7 @@ const TRAY_BUDGET_ROWS = 2
 
 /** The widest the board may get on a landscape screen, as a share of the width. */
 const DESKTOP_BOARD_WIDTH_SHARE = 0.6
+const DESKTOP_BOARD_MAX_PX = 480
 
 export interface MetricsInput {
   viewportWidth: number
@@ -85,7 +86,11 @@ export function computeBoardMetrics(input: MetricsInput): BoardMetrics {
     const heightForCells = availableHeight - budgetRows * TRAY_GAP_PX
     ideal = Math.min(cellByWidth, heightForCells / (grid + budgetRows * slotCells.h))
   } else {
-    const boardCap = Math.min(availableHeight, input.viewportWidth * DESKTOP_BOARD_WIDTH_SHARE)
+    const boardCap = Math.min(
+      availableHeight,
+      input.viewportWidth * DESKTOP_BOARD_WIDTH_SHARE,
+      DESKTOP_BOARD_MAX_PX,
+    )
     ideal = Math.min(boardCap / grid, (availableWidth - TRAY_MIN_WIDTH_PX) / grid)
   }
 

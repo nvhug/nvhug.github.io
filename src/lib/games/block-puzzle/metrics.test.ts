@@ -67,6 +67,17 @@ describe('computeBoardMetrics', () => {
     expect(m.trayMinHeightPx).toBe(0)
   })
 
+  it('keeps early-level boards compact on desktop', () => {
+    const m = computeBoardMetrics(input({
+      viewportWidth: 1440,
+      viewportHeight: 768,
+      grid: 5,
+      looseCount: 3,
+      slotCells: { w: 3, h: 2 },
+    }))
+    expect(m.boardPx).toBeLessThanOrEqual(480)
+  })
+
   it('reserves the tray height up front from the level piece count', () => {
     const many = computeBoardMetrics(input({ looseCount: 10 }))
     const few = computeBoardMetrics(input({ looseCount: 3 }))
