@@ -4,9 +4,9 @@ export type AppRole = (typeof APP_ROLES)[number]
 type ProtectedPage = { key: string; exact?: boolean }
 
 // Single source of truth for which route prefixes are gated by role.
-// Keep in sync with the seed rows in sql/47.phase4_roles_permissions.sql
-// (sql/63.finance_page_permission.sql for '/finance'). A key listed here
-// without a matching allowed row sends every user to /403.
+// Keep in sync with the seed rows in sql/03.page_permissions.sql
+// (sql/30.games.sql for '/games'). A key listed here without a matching
+// allowed row sends every user to /403.
 //
 // Nothing under /blog is listed, deliberately: the post list is the site's
 // public blog and serves the admin account's public posts to anyone (ADR-025),
@@ -17,6 +17,9 @@ export const PROTECTED_PAGES: readonly ProtectedPage[] = [
   { key: '/admin' },
   { key: '/admin/settings' },
   { key: '/finance' },
+  // One key for the whole games area: the hub, every game's map and every play
+  // URL live under it, so a second game needs no new key (spec 013 FR-051).
+  { key: '/games' },
   { key: '/notes' },
   { key: '/quotes' },
 ]

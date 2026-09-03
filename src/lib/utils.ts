@@ -16,6 +16,10 @@ export function canPostBePublic(post: Pick<Post, "is_seeded_copy">): boolean {
   return !post.is_seeded_copy
 }
 
+export function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value))
+}
+
 export function formatDate(isoDate: string): string {
   const date = new Date(isoDate)
   return new Intl.DateTimeFormat('en-US', {

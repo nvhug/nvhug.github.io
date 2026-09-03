@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { fireEvent, render, screen } from '@testing-library/react'
-import { BookOpen, NotebookPen, Quote } from 'lucide-react'
+import { BookOpen, Gamepad2, NotebookPen, Quote } from 'lucide-react'
 import { describe, expect, it, vi } from 'vitest'
 
 import { AccountMenu } from './RootLayoutClient'
@@ -33,6 +33,7 @@ describe('AccountMenu', () => {
           { href: '/notes', label: 'Notes', icon: NotebookPen },
           { href: '/blog', label: 'Blog', icon: BookOpen },
           { href: '/quotes', label: 'Quotes', icon: Quote },
+          { href: '/games', label: 'Games', icon: Gamepad2 },
         ]}
         pathname="/notes"
       />

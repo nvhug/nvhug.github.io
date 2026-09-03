@@ -18,6 +18,19 @@ export interface PagePermission {
   allowed: boolean
 }
 
+// One row of game_progress (sql/30.games.sql). Game-agnostic: a level-and-time
+// game fills best_time_ms, a score game fills best_score (spec 013 FR-050).
+export interface GameProgressRecord {
+  user_id: string
+  game_id: string
+  level_key: string
+  best_time_ms: number | null
+  best_score: number | null
+  completions: number
+  first_completed_at: string
+  updated_at: string
+}
+
 export interface Post {
   id: string
   title: string

@@ -16,11 +16,11 @@ function subscribe(onChange: () => void) {
  * Read through a store rather than an effect so the answer is correct on the FIRST
  * client render. An effect would paint the moving version for a frame before
  * correcting itself, which is exactly the flash the preference exists to prevent —
- * and on this page it would also mean fetching the three.js chunk before finding out
- * it was not wanted.
+ * and on the landing page it would also mean fetching the three.js chunk before
+ * finding out it was not wanted (ADR-023).
  *
- * The server snapshot is `false`: the preference is unknowable during SSR, and the
- * page's static fallback is what renders until hydration either way.
+ * The server snapshot is `false`: the preference is unknowable during SSR, and what
+ * renders until hydration is the static fallback either way.
  */
 export function useReducedMotion(): boolean {
   return useSyncExternalStore(

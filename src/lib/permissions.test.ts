@@ -81,6 +81,21 @@ describe('matchProtectedPage', () => {
   })
 })
 
+describe('the games area', () => {
+  // One key gates the hub, the level map and every play URL, so a second game
+  // under /games/<id> needs no new key and no new page_permissions row
+  // (spec 013 FR-002, FR-051; rows seeded by sql/30.games.sql).
+  it('resolves the hub, the map and a play URL to the single /games key', () => {
+    for (const pathname of ['/games', '/games/block-puzzle', '/games/block-puzzle/7']) {
+      expect(matchProtectedPage(pathname)?.key).toBe('/games')
+    }
+  })
+
+  it('does not match a path that merely starts with the same characters', () => {
+    expect(matchProtectedPage('/gamesx')).toBeUndefined()
+  })
+})
+
 describe('the public root', () => {
   // Regression guard, not a TDD cycle: this passes today and must keep passing.
   // Adding `{ key: '/' }` to PROTECTED_PAGES would gate the landing page behind a

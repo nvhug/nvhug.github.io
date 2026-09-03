@@ -40,6 +40,7 @@ export const en: Dictionary = {
     navNotes: 'Notes',
     navFinance: 'Finance Ledger',
     navTuVi: 'Horoscope',
+    navGames: 'Lego IQ',
     navQuotes: 'Quotes',
     admin: 'Admin',
     profile: 'Profile',
@@ -1283,5 +1284,75 @@ export const en: Dictionary = {
     errorImageType: 'The attached file must be an image.',
     errorImageSize: 'Image exceeds 3MB.',
     errorCaptcha: 'Please complete the puzzle slider to verify you are not a robot.',
+  },
+
+  games: {
+    hub: {
+      title: 'Games',
+      subtitle: 'A few minutes of play, right inside the app.',
+      continue: 'Continue',
+      start: 'Start',
+      progressLine: '{completed} / {total}',
+      starsLine: '★ {stars}',
+      bestScoreLine: 'Best score {score}',
+      completedLine: 'Completed {completed}',
+    },
+
+    catalog: {
+      blockPuzzle: {
+        name: 'Wooden Block Puzzle',
+        description: 'Fit the wooden blocks into the carved cavity. 100 levels across 5 tiers.',
+      },
+    },
+
+    categories: {
+      logic: 'Logic',
+      numbers: 'Numbers',
+      memory: 'Memory',
+    },
+
+    blockPuzzle: {
+      tiers: {
+        t1: 'Warm-up',
+        t2: 'Apprentice',
+        t3: 'Challenge',
+        t4: 'Expert',
+        t5: 'Master',
+      },
+      hud: {
+        level: 'Level {level}',
+        best: 'Best',
+        reset: 'Restart the level',
+        map: 'Level map',
+        saving: 'saving…',
+        saved: 'saved',
+        unsaved: 'not saved',
+        placedOf: 'Placed {n} of {total} pieces',
+      },
+      solved: {
+        title: 'Solved!',
+        time: 'Time',
+        newRecord: 'New record',
+        best: 'Best {time}',
+        next: 'Next level',
+        replay: 'Play again',
+        map: 'Map',
+        campaignComplete: 'You have finished the campaign',
+        stars: '{n} of 3 stars',
+      },
+      map: {
+        title: 'Level map',
+        total: '{completed} / {total} · ★ {stars} / {starsTotal}',
+        locked: 'Level {level}, locked',
+        current: 'Level {level}, up next',
+        done: 'Level {level}, completed',
+      },
+    },
+
+    errors: {
+      loadFailed: 'Could not load your progress.',
+      retry: 'Try again',
+      saveFailed: 'Could not save the result. You can keep playing.',
+    },
   },
 }

@@ -2,7 +2,7 @@
 
 import dynamic from 'next/dynamic'
 import { useEffect, useRef, useState } from 'react'
-import { useReducedMotion } from './useReducedMotion'
+import { useReducedMotion } from '@/hooks/useReducedMotion'
 
 /**
  * The gate in front of the hero's 3D field.

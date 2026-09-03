@@ -38,6 +38,7 @@ export const vi = {
     navNotes: 'Notes',
     navFinance: 'Sổ tài chính',
     navTuVi: 'Tử vi',
+    navGames: 'Lego IQ',
     navQuotes: 'Quotes',
     admin: 'Quản trị',
     profile: 'Hồ sơ',
@@ -1297,6 +1298,78 @@ export const vi = {
     errorImageType: 'File đính kèm phải là hình ảnh.',
     errorImageSize: 'Ảnh vượt quá 3MB.',
     errorCaptcha: 'Vui lòng kéo hoàn thành khối ghép để xác nhận bạn không phải robot.',
+  },
+
+  // Games Hub and the wooden block puzzle (spec 013). Nothing here is for sale:
+  // every level is open to every role on the same terms (FR-034).
+  games: {
+    hub: {
+      title: 'Games',
+      subtitle: 'Vài phút giải trí, ngay trong app.',
+      continue: 'Tiếp tục',
+      start: 'Bắt đầu',
+      progressLine: '{completed} / {total}',
+      starsLine: '★ {stars}',
+      bestScoreLine: 'Điểm cao nhất {score}',
+      completedLine: 'Đã hoàn thành {completed}',
+    },
+
+    catalog: {
+      blockPuzzle: {
+        name: 'Xếp khối gỗ',
+        description: 'Ghép các khối gỗ lấp kín khoang trên bảng. 100 level, 5 cấp độ.',
+      },
+    },
+
+    categories: {
+      logic: 'Logic',
+      numbers: 'Số học',
+      memory: 'Ghi nhớ',
+    },
+
+    blockPuzzle: {
+      tiers: {
+        t1: 'Khởi động',
+        t2: 'Tập sự',
+        t3: 'Thử thách',
+        t4: 'Cao thủ',
+        t5: 'Bậc thầy',
+      },
+      hud: {
+        level: 'Level {level}',
+        best: 'Tốt nhất',
+        reset: 'Chơi lại từ đầu',
+        map: 'Bản đồ level',
+        saving: 'đang lưu…',
+        saved: 'đã lưu',
+        unsaved: 'chưa lưu',
+        placedOf: 'Đã đặt {n} / {total} mảnh',
+      },
+      solved: {
+        title: 'Hoàn thành!',
+        time: 'Thời gian',
+        newRecord: 'Kỷ lục mới',
+        best: 'Tốt nhất {time}',
+        next: 'Level tiếp theo',
+        replay: 'Chơi lại',
+        map: 'Bản đồ',
+        campaignComplete: 'Bạn đã hoàn thành chiến dịch',
+        stars: '{n} / 3 sao',
+      },
+      map: {
+        title: 'Bản đồ level',
+        total: '{completed} / {total} · ★ {stars} / {starsTotal}',
+        locked: 'Level {level}, chưa mở khoá',
+        current: 'Level {level}, đang tới',
+        done: 'Level {level}, đã hoàn thành',
+      },
+    },
+
+    errors: {
+      loadFailed: 'Không tải được tiến độ của bạn.',
+      retry: 'Thử lại',
+      saveFailed: 'Không lưu được kết quả. Bạn vẫn chơi tiếp được.',
+    },
   },
 }
 

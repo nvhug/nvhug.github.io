@@ -1118,3 +1118,250 @@ button.btn-secondary:hover {
   .tpl-ink .tpl-content { font-size: 20px; }
   .tpl-ink .tpl-content h3 { font-size: 1.8rem; }
 }
+/* ══════════════════════════════════════════
+   GAMES — Games Hub and the Wooden Block Puzzle (spec 013)
+   Warm wooden objects on a cool workshop mat. Every value below is a plain
+   colour or gradient: no image, texture, model or font asset (FR-032, FR-048).
+   ══════════════════════════════════════════ */
+
+.games-shell {
+  /* Fallback only. GamesShell measures the rendered `.site-header` with a
+     ResizeObserver and overwrites this on the same element, so the board maths
+     never hard-codes a header height (plan R-3). */
+  --site-header-h: 69px;
+
+  --games-mat: #243038;
+  --games-mat-lift: #2f3f49;
+  --games-mat-text: #f1ece4;
+  --games-mat-muted: #a8b1b8;
+  --games-walnut: #8a5a34;
+  --games-walnut-deep: #6e4526;
+  --games-cavity: #3a2216;
+  --games-oak: #e8c9a0;
+  --games-oak-grain: #e3c297;
+  --games-oak-light: #f5e2c4;
+  --games-oak-edge: #c9a273;
+  --games-oak-fixed: #d6b487;
+  --games-brass: #d9a441;
+  --games-mint: #7dd3a4;
+  --games-ember: #e06c5b;
+
+  /* `Button` draws its focus ring from `--ring`, so retheming the token is all
+     it takes for every Button on the mat to focus in mint. */
+  --ring: var(--games-mint);
+
+  background:
+    radial-gradient(circle at 50% 0%, var(--games-mat-lift), transparent 55%),
+    var(--games-mat);
+  color: var(--games-mat-text);
+  overscroll-behavior: contain;
+}
+
+/* Wood grain: two near-identical oak tones at 3px, slightly angled. Reads as
+   wood at arm's length and disappears as a pattern up close. */
+/* The two rendered header heights (mobile: 44px nav row + py-3 + border;
+   sm: the 40px nav links + py-3 + border). GamesShell measures the real
+   element and overwrites this on the shell root, so these are only what the
+   first paint uses -- keeping them accurate is what makes the correction a
+   no-op instead of a layout shift (FR-047). */
+@media (min-width: 640px) {
+  .games-shell {
+    --site-header-h: 65px;
+  }
+}
+
+.games-oak-grain {
+  background-image: repeating-linear-gradient(
+    102deg,
+    var(--games-oak) 0px,
+    var(--games-oak) 2px,
+    var(--games-oak-grain) 2px,
+    var(--games-oak-grain) 3px
+  );
+}
+
+/* Letters routed into the wood: dark upper inner edge, light lower edge. The
+   glyph fill is the darker oak-edge tone so contrast does not depend on the
+   emboss shadows (a11y). */
+.games-carved {
+  color: var(--games-oak-edge);
+  text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.45), 0 1px 0 var(--games-oak-light);
+}
+
+/* Mint focus ring on the mat, replacing the app's emerald-on-white default.
+   Only for what is not styled as a `Button`: links and the map's own tiles.
+   `group/button` is the marker class every `buttonVariants()` element carries,
+   and those ring themselves from `--ring` above. */
+.games-shell :is(a, button, [role='button']):not(.group\/button):focus-visible {
+  outline: 2px solid var(--games-mint);
+  outline-offset: 2px;
+}
+
+.games-play-area {
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .games-shell *,
+  .games-shell *::before,
+  .games-shell *::after {
+    transition-duration: 0ms !important;
+    animation-duration: 0ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+/* ── The wooden pieces (DESIGN § Piece states) ──────────────────────────────
+   Depth is drawn: a `drop-shadow` filter on the container follows the
+   polyomino's silhouette, which is how a piece gets one continuous 3px edge and
+   one shadow instead of a seam under every cell. */
+
+.games-piece {
+  position: absolute;
+  cursor: grab;
+  touch-action: none;
+  -webkit-touch-callout: none;
+  transition: transform 150ms cubic-bezier(0.2, 0.8, 0.2, 1), filter 150ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.games-piece-cell {
+  position: absolute;
+  border-radius: 5px;
+  box-shadow:
+    inset 1.5px 1.5px 0 var(--games-oak-light),
+    inset -1.5px -1.5px 0 var(--games-oak-edge);
+}
+
+.games-piece-cell::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 5px;
+  background: transparent;
+  transition: background-color 100ms linear;
+}
+
+/* idle */
+.games-piece[data-piece-state='idle'] {
+  filter: drop-shadow(0 3px 0 var(--games-oak-edge)) drop-shadow(0 4px 10px rgba(0, 0, 0, 0.35));
+}
+
+/* hover — pointer devices only, so a tap can never leave a piece stuck in it */
+@media (hover: hover) and (pointer: fine) {
+  .games-piece[data-piece-state='idle']:hover,
+  .games-piece[data-piece-state='placed']:hover {
+    transform: translateY(-2px);
+    filter: drop-shadow(0 3px 0 var(--games-oak-edge)) drop-shadow(0 14px 18px rgba(0, 0, 0, 0.4));
+  }
+}
+
+/* dragging / valid / invalid — lifted off the board */
+.games-piece[data-piece-state='dragging'],
+.games-piece[data-piece-state='valid'],
+.games-piece[data-piece-state='invalid'] {
+  cursor: grabbing;
+}
+
+.games-piece[data-piece-state='dragging'],
+.games-piece[data-piece-state='invalid'] {
+  filter: drop-shadow(0 3px 0 var(--games-oak-edge)) drop-shadow(0 18px 30px rgba(0, 0, 0, 0.45));
+}
+
+.games-piece[data-piece-state='valid'] {
+  filter:
+    drop-shadow(0 0 1px var(--games-mint)) drop-shadow(0 0 1px var(--games-mint))
+    drop-shadow(0 18px 30px rgba(0, 0, 0, 0.45));
+}
+
+.games-piece[data-piece-state='invalid'] .games-piece-cell::after {
+  background-color: rgba(224, 108, 91, 0.35);
+}
+
+/* placed / pre-seated — sunk flush into the recess */
+.games-piece[data-piece-state='placed'],
+.games-piece[data-piece-state='fixed'] {
+  filter: drop-shadow(0 1px 0 var(--games-oak-edge));
+}
+
+.games-piece[data-piece-state='placed'] .games-piece-cell,
+.games-piece[data-piece-state='fixed'] .games-piece-cell {
+  box-shadow: inset 0 1px 0 var(--games-oak-light);
+}
+
+.games-piece[data-piece-state='fixed'] {
+  cursor: default;
+}
+
+.games-piece[data-piece-state='fixed'] .games-piece-cell {
+  background-image: repeating-linear-gradient(
+    102deg,
+    var(--games-oak-fixed) 0px,
+    var(--games-oak-fixed) 2px,
+    var(--games-oak-edge) 2px,
+    var(--games-oak-edge) 3px
+  );
+}
+
+/* ── The board ─────────────────────────────────────────────────────────────── */
+
+.games-board {
+  position: relative;
+  border-radius: 16px;
+  /* Padding comes from BOARD_FRAME_PX inline; see metrics.ts. */
+  background: linear-gradient(158deg, var(--games-walnut), var(--games-walnut-deep));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    0 22px 44px -18px rgba(0, 0, 0, 0.75);
+}
+
+.games-cell {
+  position: absolute;
+  border-radius: 4px;
+}
+
+.games-cell[data-cavity='false'] {
+  background: linear-gradient(158deg, var(--games-walnut), var(--games-walnut-deep));
+}
+
+.games-cell[data-cavity='true'] {
+  background: var(--games-cavity);
+  box-shadow: inset 0 6px 14px rgba(0, 0, 0, 0.55);
+}
+
+.games-cell[data-preview='true'] {
+  background: color-mix(in srgb, var(--games-mint) 45%, var(--games-cavity));
+  transition: background-color 100ms linear;
+}
+
+@keyframes games-seam-glow {
+  0% { box-shadow: inset 0 0 0 1px rgba(217, 164, 65, 0); }
+  40% { box-shadow: inset 0 0 0 2px rgba(217, 164, 65, 0.85); }
+  100% { box-shadow: inset 0 0 0 1px rgba(217, 164, 65, 0); }
+}
+
+.games-board[data-solved='true'] .games-cell[data-cavity='true'] {
+  animation: games-seam-glow 300ms ease-out 1;
+}
+
+/* ── The solved panel ──────────────────────────────────────────────────────── */
+
+@keyframes games-panel-rise {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.games-panel {
+  animation: games-panel-rise 250ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+/* The blanket rule above already zeroes every duration on the mat; a hover
+   translate is a transform, not a duration, so it is the one thing left. */
+@media (prefers-reduced-motion: reduce) {
+  .games-piece[data-piece-state='idle']:hover,
+  .games-piece[data-piece-state='placed']:hover {
+    transform: none;
+  }
+}

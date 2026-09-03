@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { BookOpen, CircleDollarSign, Coffee, Home, LogIn, LogOut, NotebookPen, Quote, Settings, Sparkles, User as UserIcon, type LucideIcon } from 'lucide-react'
+import { BookOpen, CircleDollarSign, Coffee, Gamepad2, Home, LogIn, LogOut, NotebookPen, Quote, Settings, Sparkles, User as UserIcon, type LucideIcon } from 'lucide-react'
 import { Toaster } from 'sonner'
 import { useEffect, useRef, useState } from 'react'
 import { getSupabaseBrowserClient } from '@/lib/supabase-browser'
@@ -47,7 +47,7 @@ export function AccountMenu({
   }, [open])
 
   return (
-    <div ref={containerRef} className="relative ml-1 sm:ml-2">
+    <div ref={containerRef} className="relative ml-1 shrink-0 sm:ml-2">
       {/* Avatar trigger */}
       <button
         type="button"
@@ -180,6 +180,7 @@ export function RootLayoutClient({ children }: { children: React.ReactNode }) {
     { href: '/quotes', label: t('header.navQuotes'), icon: Quote },
     { href: '/finance', label: t('header.navFinance'), icon: CircleDollarSign },
     { href: '/tu-vi', label: t('header.navTuVi'), icon: Sparkles },
+    { href: '/games', label: t('header.navGames'), icon: Gamepad2 },
   ]
 
   async function handleLogout() {
@@ -230,8 +231,12 @@ export function RootLayoutClient({ children }: { children: React.ReactNode }) {
                 </div>
               </div>
 
-              <div className="flex shrink-0 items-center gap-1">
-                <div className="hidden items-center gap-1 sm:flex">
+              <div className="flex min-w-0 items-center gap-1">
+                {/* Six labels do not fit next to the account controls at the
+                    narrow end of `sm:`. The row scrolls rather than pushing the
+                    avatar off the screen; its scrollbar is hidden because the
+                    labels are also in the account menu. */}
+                <div className="hidden min-w-0 items-center gap-1 overflow-x-auto [scrollbar-width:none] sm:flex [&::-webkit-scrollbar]:hidden">
                   {navItems.map((item) => {
                     const isActive = pathname.startsWith(item.href)
                     return (
@@ -256,7 +261,7 @@ export function RootLayoutClient({ children }: { children: React.ReactNode }) {
                   })}
                 </div>
 
-                <div className="ml-1 hidden sm:block">
+                <div className="ml-1 hidden shrink-0 sm:block">
                   <LanguageSwitch />
                 </div>
 
@@ -269,7 +274,7 @@ export function RootLayoutClient({ children }: { children: React.ReactNode }) {
                   // hits /api/logout for nothing.
                   <Link
                     href="/login"
-                    className="ml-1 flex h-11 w-11 touch-manipulation items-center justify-center rounded-lg text-zinc-500 transition-colors hover:bg-emerald-50 hover:text-zinc-900 active:bg-emerald-50 active:text-zinc-900 sm:h-auto sm:w-auto sm:p-1.5"
+                    className="ml-1 flex h-11 w-11 shrink-0 touch-manipulation items-center justify-center rounded-lg text-zinc-500 transition-colors hover:bg-emerald-50 hover:text-zinc-900 active:bg-emerald-50 active:text-zinc-900 sm:h-auto sm:w-auto sm:p-1.5"
                     aria-label={t('header.login')}
                   >
                     <LogIn className="h-4 w-4" />
