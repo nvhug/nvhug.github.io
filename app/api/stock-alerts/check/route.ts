@@ -77,7 +77,7 @@ async function sendTeamsAlert(alerts: AlertItem[]) {
 async function sendEmailAlert(alerts: AlertItem[]) {
   const apiKey = process.env.RESEND_API_KEY
   const to = process.env.ALERT_EMAIL_TO
-  const from = process.env.ALERT_EMAIL_FROM ?? 'alerts@noteviet.app'
+  const from = process.env.ALERT_EMAIL_FROM ?? 'alerts@notez.vn'
   if (!apiKey || !to) return
 
   const rows = alerts.map((a) => `

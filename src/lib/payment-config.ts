@@ -38,14 +38,14 @@ export function getPlan(id: string): Plan | undefined {
   return PLANS.find((p) => p.id === id) as Plan | undefined
 }
 
-/** Transfer note format: NOTEVIET EMAILPREFIX PLANID */
+/** Transfer note format: NOTEZ EMAILPREFIX PLANID */
 export function buildTransferNote(email: string, planId: PlanId): string {
   const prefix = email
     .split('@')[0]
     .slice(0, 10)
     .toUpperCase()
     .replace(/[^A-Z0-9]/g, '')
-  return `NOTEVIET ${prefix} ${planId.toUpperCase()}`
+  return `NOTEZ ${prefix} ${planId.toUpperCase()}`
 }
 
 export function buildVietQRUrl(
