@@ -12,7 +12,8 @@ export function useRequireAuth() {
 
   useEffect(() => {
     async function load() {
-      const { data: { user } } = await getSupabaseBrowserClient().auth.getUser()
+      const { data: { session } } = await getSupabaseBrowserClient().auth.getSession()
+      const user = session?.user ?? null
       if (!user) { router.replace('/login'); return }
       setUser(user)
       setLoading(false)

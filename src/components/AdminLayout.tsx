@@ -9,6 +9,7 @@ import {
   Coins,
   FileText,
   LayoutTemplate,
+  LifeBuoy,
   LogOut,
   Settings,
   Shield,
@@ -38,6 +39,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { LanguageSwitch } from '@/components/LanguageSwitch'
+import { AdminNotificationBell } from '@/components/support/AdminNotificationBell'
 import { useLanguage } from '@/lib/i18n/language-context'
 import { useUserRole } from '@/lib/useUserRole'
 
@@ -76,6 +78,7 @@ export function AdminSidebar() {
       ? [{ title: 'Nâng cấp', href: '/admin/settings/upgrades', icon: CreditCard }]
       : []),
     { title: t('admin.settings.aiUsage.tab'), href: '/admin/settings/ai-usage', icon: Coins },
+    { title: t('support.admin.pageTitle'), href: '/admin/settings/support', icon: LifeBuoy },
   ]
   const isSettingsActive = pathname.startsWith('/admin/settings')
 
@@ -188,6 +191,7 @@ export function AdminTopBar() {
         </div>
 
         <div className="flex items-center gap-2">
+          <AdminNotificationBell />
           <LanguageSwitch />
 
           <DropdownMenu>

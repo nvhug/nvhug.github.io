@@ -141,9 +141,8 @@ function buildMealEmailHtml(meal: MealNotifyRow) {
   })
 }
 
-// Shared by habits-notify and cron/meal-notification — both match `meals` rows
-// against a time window and route each one to its owner (Teams for admin,
-// email for paid/user).
+// Used by habits-notify — matches `meals` rows against a time window and routes
+// each one to its owner (Teams for admin, email for paid/user).
 export async function notifyMealRows(
   client: SupabaseClient,
   rows: MealNotifyRow[]

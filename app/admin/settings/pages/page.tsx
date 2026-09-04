@@ -189,6 +189,16 @@ export default function AdminPageAccessPage() {
         >
           {t('admin.settings.aiUsage.tab')}
         </Link>
+        <Link
+          href="/admin/settings/support"
+          className={`whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+            pathname === '/admin/settings/support'
+              ? 'bg-emerald-500 text-white'
+              : 'text-zinc-600 hover:bg-zinc-100'
+          }`}
+        >
+          {t('support.admin.pageTitle')}
+        </Link>
       </div>
 
       {/* Compact header */}

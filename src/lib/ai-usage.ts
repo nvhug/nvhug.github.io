@@ -11,7 +11,8 @@
 import { getServiceSupabaseClient } from '@/lib/supabase-admin'
 import { computeCostUsd, PRICING_VERSION } from '@/lib/ai-pricing'
 
-/** The six AI surfaces recorded, matching the CHECK constraint in sql/54.ai_usage_log.sql. */
+/** The AI surfaces recorded, matching the CHECK constraint in sql/24.ai_usage_log.sql
+ *  (widened by sql/31.support_chat.sql to add 'support_chat'). */
 export const SURFACES = [
   'notes_analyze',
   'food_analyze',
@@ -19,6 +20,7 @@ export const SURFACES = [
   'stock_suggestions',
   'tuvi_interpret',
   'tuvi_palaces',
+  'support_chat',
 ] as const
 
 export type Surface = (typeof SURFACES)[number]

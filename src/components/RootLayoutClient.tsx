@@ -2,13 +2,16 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { BookOpen, CircleDollarSign, Coffee, Gamepad2, Home, LogIn, LogOut, NotebookPen, Quote, Settings, Sparkles, User as UserIcon, type LucideIcon } from 'lucide-react'
+import { Bell, BookOpen, Bug, CircleDollarSign, Coffee, Gamepad2, Home, LogIn, LogOut, NotebookPen, Quote, Settings, Sparkles, User as UserIcon, type LucideIcon } from 'lucide-react'
 import { Toaster } from 'sonner'
 import { useEffect, useRef, useState } from 'react'
 import { getSupabaseBrowserClient } from '@/lib/supabase-browser'
 import { useLanguage } from '@/lib/i18n/language-context'
 import { LanguageSwitch } from '@/components/LanguageSwitch'
-import { BugReportButton } from '@/components/BugReportButton'
+import { BugReportModal } from '@/components/BugReportModal'
+import { SupportWidget, SUPPORT_OPEN_EVENT } from '@/components/support/SupportWidget'
+import { AdminNotificationBell } from '@/components/support/AdminNotificationBell'
+import { useUserRole } from '@/lib/useUserRole'
 import { DonateModal } from '@/components/DonateModal'
 import { getAvatarLetter, getAvatarLabel } from '@/lib/avatar'
 import type { User } from '@supabase/supabase-js'
@@ -152,8 +155,20 @@ export function RootLayoutClient({ children }: { children: React.ReactNode }) {
   // this chrome for navigation.
   const isBlogPost = pathname.startsWith('/blog/')
   const hideSiteChrome = isAdmin || isLogin || isLanding || isBlogPost
+  // The customer-facing widget must not float over the admin support inbox.
+  // Its launcher is fixed bottom-right at z-40 and physically covers the lower
+  // half of the inbox composer's Send button, so an admin answering a
+  // conversation clicks the widget instead of their own reply control. It also
+  // makes no sense there: this is the surface for reading the other side of
+  // that same conversation.
+  const isSupportInbox = pathname.startsWith('/admin/settings/support')
+  const { role, loading: roleLoading } = useUserRole()
+  // Published by SupportWidget, which already polls for it while the panel is
+  // closed — the header bell shows that count rather than opening a second poll.
+  const [supportUnread, setSupportUnread] = useState(0)
 
   const [user, setUser] = useState<User | null>(null)
+  const [showBugReport, setShowBugReport] = useState(false)
 
   useEffect(() => {
     // `user` only ever renders inside the AccountMenu in the header below, and
@@ -261,6 +276,38 @@ export function RootLayoutClient({ children }: { children: React.ReactNode }) {
                   })}
                 </div>
 
+                {/* One bell slot, two meanings, never both at once.
+                    An admin gets the inbox bell: conversations from other people
+                    waiting on them. Everyone else gets their own support bell —
+                    replies waiting in their own conversation, opening the chat
+                    panel. Rendering both would put two bells side by side that
+                    count different things, which is worse than either alone. */}
+                {/* Nothing until the role is known: `role` starts null, so rendering
+                    on it directly showed an admin the user bell for one paint and then
+                    swapped it. An empty slot for a moment reads as loading; the wrong
+                    icon reads as a bug. */}
+                {user && !roleLoading && (
+                  <div className="shrink-0">
+                    {role === 'admin' ? (
+                      <AdminNotificationBell />
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => window.dispatchEvent(new Event(SUPPORT_OPEN_EVENT))}
+                        aria-label={t('support.bell.label')}
+                        className="relative flex h-11 w-11 items-center justify-center rounded-lg text-zinc-500 transition-colors hover:bg-emerald-50 hover:text-zinc-900 sm:h-9 sm:w-9"
+                      >
+                        <Bell className="h-4 w-4" />
+                        {supportUnread > 0 && (
+                          <span className="absolute right-1.5 top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-semibold text-white ring-2 ring-white">
+                            {supportUnread > 9 ? '9+' : supportUnread}
+                          </span>
+                        )}
+                      </button>
+                    )}
+                  </div>
+                )}
+
                 <div className="ml-1 hidden shrink-0 sm:block">
                   <LanguageSwitch />
                 </div>
@@ -287,9 +334,7 @@ export function RootLayoutClient({ children }: { children: React.ReactNode }) {
       )}
       {children}
       <Toaster position="top-right" richColors />
-      {/* Not on the landing page: a stranger who has never used the app should not
-          be invited to report a bug in it. */}
-      {!isLanding && <BugReportButton />}
+      {!isLanding && !isSupportInbox && <SupportWidget onUnreadChange={setSupportUnread} />}
       {!hideSiteChrome && (
         <div className="border-t border-emerald-100 bg-white">
           <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-10 sm:px-6">
@@ -307,10 +352,22 @@ export function RootLayoutClient({ children }: { children: React.ReactNode }) {
                     {item.label}
                   </Link>
                 ))}
+                {/* The only way into the report form: the fixed launcher it replaced
+                    sat on top of the page on every screen, including the landing
+                    page's neighbours, for a form almost nobody opens. */}
+                <button
+                  type="button"
+                  onClick={() => setShowBugReport(true)}
+                  className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm text-zinc-600 transition-colors hover:bg-emerald-50 hover:text-zinc-900"
+                >
+                  <Bug className="h-4 w-4" />
+                  {t('bugReport.buttonLabel')}
+                </button>
               </div>
             </div>
             <p className="text-xs text-zinc-500">{t('footer.copyright')}</p>
           </div>
+          <BugReportModal open={showBugReport} onClose={() => setShowBugReport(false)} />
         </div>
       )}
     </>

@@ -498,6 +498,7 @@ export default function AiUsagePage() {
           ['/admin/settings/pages', t('admin.settings.pagesTab')],
           ['/admin/settings/nutrition-qa', t('admin.settings.nutritionTab')],
           ['/admin/settings/ai-usage', t('admin.settings.aiUsage.tab')],
+          ['/admin/settings/support', t('support.admin.pageTitle')],
         ].map(([href, label]) => (
           <Link
             key={href}

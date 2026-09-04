@@ -1300,6 +1300,126 @@ export const vi = {
     errorCaptcha: 'Vui lòng kéo hoàn thành khối ghép để xác nhận bạn không phải robot.',
   },
 
+  // "Chat with Us" (spec 014) — hybrid AI + human support widget and admin
+  // inbox. No upgrade CTA anywhere in here (ADR-017); the escalation copy
+  // never says the AI failed or shows an error (FR-025).
+  support: {
+    launcher: {
+      label: 'Trò chuyện với chúng tôi',
+    },
+    panel: {
+      title: 'Chat với chúng tôi',
+      close: 'Đóng',
+    },
+    status: {
+      aiActive: 'Trợ lý đang trả lời',
+      waitingAdmin: 'Đang chờ đội hỗ trợ',
+      adminActive: 'Đội hỗ trợ đang xử lý',
+      resolved: 'Đã giải quyết',
+      closed: 'Đã đóng',
+    },
+    typingAi: 'AI đang trả lời…',
+    typingAdmin: 'Đội hỗ trợ đang xem tin nhắn của bạn',
+    escalatedMessage: 'Đã chuyển cho đội hỗ trợ, sẽ phản hồi sớm',
+    humanHandlingMessage: 'Trợ lý AI tạm dừng ở hội thoại này — đội hỗ trợ sẽ trả lời bạn.',
+    senderAi: 'Trợ lý',
+    bell: { label: 'Thông báo hỗ trợ' },
+    loadOlder: 'Tải tin nhắn cũ hơn',
+    composer: {
+      placeholder: 'Nhập tin nhắn...',
+      send: 'Gửi',
+      charHint: '{count}/4000',
+    },
+    emptyState: 'Hỏi chúng tôi về app',
+    loading: 'Đang tải cuộc trò chuyện...',
+    sendFailed: 'Gửi thất bại',
+    retry: 'Gửi lại',
+    offline: 'Không có kết nối',
+    rateLimited: 'Bạn đang gửi hơi nhanh, vui lòng đợi một chút',
+    admin: {
+      pageTitle: 'Hỗ trợ',
+      filters: {
+        status: 'Trạng thái',
+        priority: 'Mức độ',
+        assignment: 'Phân công',
+        search: 'Tìm kiếm',
+      },
+      statusOptions: {
+        all: 'Tất cả',
+        waitingAdmin: 'Đang chờ đội hỗ trợ',
+        adminActive: 'Đội hỗ trợ đang xử lý',
+        aiActive: 'Trợ lý đang trả lời',
+        resolved: 'Đã giải quyết',
+        closed: 'Đã đóng',
+      },
+      priorityOptions: {
+        low: 'Thấp',
+        normal: 'Bình thường',
+        high: 'Cao',
+        urgent: 'Khẩn cấp',
+      },
+      assignmentOptions: {
+        mine: 'Của tôi',
+        unassigned: 'Chưa phân công',
+        all: 'Tất cả',
+      },
+      reply: 'Trả lời',
+      internalNote: 'Ghi chú nội bộ',
+      internalNoteHint: 'Ghi chú nội bộ · chỉ admin thấy',
+      metrics: {
+        total: 'Tổng số',
+        open: 'Đang mở',
+        waiting: 'Đang chờ',
+        urgent: 'Khẩn cấp',
+        aiResolved: 'AI giải quyết',
+        humanResolved: 'Người giải quyết',
+        abandoned: 'Bỏ dở',
+        escalationRate: 'Tỷ lệ chuyển tiếp',
+        aiResolutionRate: 'Tỷ lệ AI giải quyết',
+        medianFirstResponse: 'Thời gian phản hồi đầu (trung vị)',
+        medianResolution: 'Thời gian giải quyết (trung vị)',
+      },
+      filtersButton: 'Bộ lọc',
+      retry: 'Thử lại',
+      loadError: 'Không tải được dữ liệu.',
+      pagePrev: 'Trang trước',
+      pageNext: 'Trang sau',
+      time: {
+        justNow: 'Vừa xong',
+        minutesAgo: '{count} phút trước',
+        hoursAgo: '{count} giờ trước',
+        daysAgo: '{count} ngày trước',
+      },
+      duration: {
+        minutes: '{count} phút',
+        hours: '{count} giờ',
+        days: '{count} ngày',
+      },
+      list: {
+        empty: 'Không có cuộc trò chuyện nào phù hợp.',
+        unread: 'Chưa đọc',
+        assignee: 'Người phụ trách',
+        noPreview: 'Chưa có tin nhắn',
+        you: 'Bạn',
+      },
+      thread: {
+        empty: 'Chọn một cuộc trò chuyện để xem chi tiết.',
+        backToList: 'Quay lại danh sách',
+        sendNote: 'Lưu ghi chú',
+        notePlaceholder: 'Ghi chú nội bộ, chỉ admin nhìn thấy...',
+        actionError: 'Không thực hiện được thao tác này.',
+        moreActions: 'Thao tác khác',
+      },
+      notifications: {
+        buttonLabel: 'Thông báo hỗ trợ',
+        title: 'Thông báo',
+        empty: 'Không có thông báo mới.',
+        loadError: 'Không tải được thông báo.',
+        noPreview: 'Chưa có tin nhắn',
+      },
+    },
+  },
+
   // Games Hub and the wooden block puzzle (spec 013). Nothing here is for sale:
   // every level is open to every role on the same terms (FR-034).
   games: {

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
+import dynamic from 'next/dynamic'
 
 import { toast } from 'sonner'
 
@@ -19,15 +20,16 @@ import { useNotesData } from './_hooks/useNotesData'
 import { useNotesPreferences } from './_hooks/useNotesPreferences'
 import { useNotesViewModel } from './_hooks/useNotesViewModel'
 import { useTodosActions } from './_hooks/useTodosActions'
-import { CaloTab } from './_components/tabs/CaloTab'
-import { CalendarTab } from './_components/tabs/CalendarTab'
-import { GoalsTab } from './_components/tabs/GoalsTab'
-import { HealthTab } from './_components/tabs/HealthTab'
-import { NotesTab } from './_components/tabs/NotesTab'
-import { StatsTab } from './_components/tabs/StatsTab'
-import { TrackerTab } from './_components/tabs/TrackerTab'
-import { TodosTab } from './_components/tabs/TodosTab'
 import type { BuyPickFormState, GoalDraft, GoalItemDraft, NoteEditDraft, NotesDraft, TabType, TodoFilter } from './_components/tabs/types'
+
+const NotesTab = dynamic(() => import('./_components/tabs/NotesTab').then((module) => module.NotesTab))
+const TodosTab = dynamic(() => import('./_components/tabs/TodosTab').then((module) => module.TodosTab))
+const GoalsTab = dynamic(() => import('./_components/tabs/GoalsTab').then((module) => module.GoalsTab))
+const CaloTab = dynamic(() => import('./_components/tabs/CaloTab').then((module) => module.CaloTab))
+const HealthTab = dynamic(() => import('./_components/tabs/HealthTab').then((module) => module.HealthTab))
+const StatsTab = dynamic(() => import('./_components/tabs/StatsTab').then((module) => module.StatsTab))
+const TrackerTab = dynamic(() => import('./_components/tabs/TrackerTab').then((module) => module.TrackerTab))
+const CalendarTab = dynamic(() => import('./_components/tabs/CalendarTab').then((module) => module.CalendarTab))
 
 type Draft = NotesDraft
 type EditDraft = NoteEditDraft

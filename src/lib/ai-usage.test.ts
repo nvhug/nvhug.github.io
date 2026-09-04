@@ -8,15 +8,22 @@ afterEach(() => {
 })
 
 describe('SURFACES', () => {
-  it('lists exactly the six recorded AI surfaces', () => {
+  it('lists exactly the seven recorded AI surfaces', () => {
     expect([...SURFACES].sort()).toEqual([
       'food_analyze',
       'notes_analyze',
       'stock_analyze',
       'stock_suggestions',
+      'support_chat',
       'tuvi_interpret',
       'tuvi_palaces',
     ])
+  })
+
+  // sql/31.support_chat.sql's drift guard: a value in one and not the other
+  // fails at insert time, in production, on a route that must not fail.
+  it('contains support_chat, matching sql/31.support_chat.sql\'s widened CHECK constraint', () => {
+    expect(SURFACES).toContain('support_chat')
   })
 })
 
