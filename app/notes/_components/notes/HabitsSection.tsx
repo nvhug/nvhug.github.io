@@ -81,6 +81,30 @@ export function HabitsSection({
         )}
       </div>
       <div className="px-4 py-3 space-y-2">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault()
+            addHabit()
+          }}
+          className="flex items-center gap-2"
+        >
+          <input
+            type="text"
+            value={pinnedDraft}
+            onChange={(e) => setPinnedDraft(e.target.value)}
+            placeholder={t('notes.habits.addPlaceholder')}
+            className="flex-1 rounded-lg border border-dashed border-emerald-200 bg-transparent px-3 py-1.5 text-sm text-zinc-700 outline-none placeholder:text-zinc-400 focus:border-emerald-400 focus:bg-white"
+          />
+          <button
+            type="submit"
+            disabled={savingPinned || !pinnedDraft.trim()}
+            className="inline-flex items-center gap-1 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-100 disabled:opacity-40"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            {t('common.add')}
+          </button>
+        </form>
+
         {pinnedNotes.length === 0 && !savingPinned && (
           <p className="text-xs text-zinc-400 italic">{t('notes.habits.empty')}</p>
         )}
@@ -222,29 +246,6 @@ export function HabitsSection({
             </div>
           </div>
         ))}
-        <form
-          onSubmit={(e) => {
-            e.preventDefault()
-            addHabit()
-          }}
-          className="flex items-center gap-2"
-        >
-          <input
-            type="text"
-            value={pinnedDraft}
-            onChange={(e) => setPinnedDraft(e.target.value)}
-            placeholder={t('notes.habits.addPlaceholder')}
-            className="flex-1 rounded-lg border border-dashed border-emerald-200 bg-transparent px-3 py-1.5 text-sm text-zinc-700 outline-none placeholder:text-zinc-400 focus:border-emerald-400 focus:bg-white"
-          />
-          <button
-            type="submit"
-            disabled={savingPinned || !pinnedDraft.trim()}
-            className="inline-flex items-center gap-1 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-100 disabled:opacity-40"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            {t('common.add')}
-          </button>
-        </form>
       </div>
     </section>
   )

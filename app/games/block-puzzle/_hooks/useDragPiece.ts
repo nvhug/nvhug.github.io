@@ -281,6 +281,12 @@ export function useDragPiece({
       cancel()
     }
 
+    function handleLostPointerCapture(event: PointerEvent) {
+      const active = activeRef.current
+      if (!active || event.pointerId !== active.pointerId || active.settling) return
+      cancel()
+    }
+
     function handleContextMenu(event: Event) {
       if (activeRef.current) event.preventDefault()
     }
@@ -288,6 +294,7 @@ export function useDragPiece({
     dragLayer.addEventListener('pointermove', handleMove)
     dragLayer.addEventListener('pointerup', handleUp)
     dragLayer.addEventListener('pointercancel', handleCancel)
+    dragLayer.addEventListener('lostpointercapture', handleLostPointerCapture)
     window.addEventListener('blur', cancel)
     window.addEventListener('resize', cancel)
     window.addEventListener('orientationchange', cancel)
@@ -297,6 +304,7 @@ export function useDragPiece({
       dragLayer.removeEventListener('pointermove', handleMove)
       dragLayer.removeEventListener('pointerup', handleUp)
       dragLayer.removeEventListener('pointercancel', handleCancel)
+      dragLayer.removeEventListener('lostpointercapture', handleLostPointerCapture)
       window.removeEventListener('blur', cancel)
       window.removeEventListener('resize', cancel)
       window.removeEventListener('orientationchange', cancel)

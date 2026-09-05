@@ -96,7 +96,24 @@ export function TodosTab({
             })}
           </div>
 
-          <div className="space-y-2 mb-4">
+          <div className="mb-4 flex gap-2">
+            <Input
+              type="text"
+              placeholder={ui.t('notes.todos.addPlaceholder')}
+              value={state.todoDraft}
+              onChange={(e) => actions.setTodoDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') void actions.addTodo()
+              }}
+              className="flex-1"
+            />
+            <Button onClick={() => void actions.addTodo()} disabled={state.savingTodo || !state.todoDraft.trim()} className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white">
+              <Plus className="h-4 w-4" />
+              {ui.t('common.add')}
+            </Button>
+          </div>
+
+          <div className="space-y-2">
             {filteredTodos.map((todo) => (
               <div key={todo.id} className="flex items-center gap-3 rounded-lg border border-emerald-100 bg-white p-3 hover:bg-emerald-50 transition-colors">
                 <button onClick={() => void actions.toggleTodo(todo)} className="shrink-0 text-emerald-600 hover:text-emerald-700 transition-colors">
@@ -163,22 +180,6 @@ export function TodosTab({
             )}
           </div>
 
-          <div className="flex gap-2 border-t border-emerald-100 pt-4">
-            <Input
-              type="text"
-              placeholder={ui.t('notes.todos.addPlaceholder')}
-              value={state.todoDraft}
-              onChange={(e) => actions.setTodoDraft(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') void actions.addTodo()
-              }}
-              className="flex-1"
-            />
-            <Button onClick={() => void actions.addTodo()} disabled={state.savingTodo || !state.todoDraft.trim()} className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white">
-              <Plus className="h-4 w-4" />
-              {ui.t('common.add')}
-            </Button>
-          </div>
         </div>
       </section>
 
