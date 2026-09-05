@@ -227,19 +227,26 @@ function drawPuddle(ctx: CanvasRenderingContext2D, screenX: number) {
   ctx.bezierCurveTo(screenX + 58, y + 3, screenX + 44, y + 6, screenX + 26, y + 6)
   ctx.bezierCurveTo(screenX + 10, y + 6, screenX - 2, y + 3, screenX, y)
   ctx.closePath()
-  ctx.fillStyle = '#4a5f68'
-  ctx.globalAlpha = 0.55
+  // A top-to-bottom gradient instead of a flat tint, for a wet-asphalt depth read.
+  const waterGradient = ctx.createLinearGradient(0, y - 7, 0, y + 6)
+  waterGradient.addColorStop(0, '#5b7480')
+  waterGradient.addColorStop(1, '#33454e')
+  ctx.fillStyle = waterGradient
+  ctx.globalAlpha = 0.6
   ctx.fill()
   ctx.globalAlpha = 1
   ctx.lineWidth = HAZARD_OUTLINE_PX
   ctx.strokeStyle = PALETTE.ink
   ctx.stroke()
-  // A reflection streak, drawn inside the near edge so it can never soften it (§11).
-  ctx.beginPath()
-  ctx.ellipse(screenX + 22, y - 1, 12, 2, -0.1, 0, Math.PI * 2)
-  ctx.fillStyle = '#cfe6ee'
-  ctx.globalAlpha = 0.5
-  ctx.fill()
+  // Two reflection streaks (was one) — drawn inside the near edge so they can
+  // never soften it (§11) — for a proper wet-sheen read instead of one flat smear.
+  for (const [dx, w] of [[20, 12], [38, 5]] as const) {
+    ctx.beginPath()
+    ctx.ellipse(screenX + dx, y - 1, w, 2, -0.1, 0, Math.PI * 2)
+    ctx.fillStyle = '#cfe6ee'
+    ctx.globalAlpha = 0.5
+    ctx.fill()
+  }
   ctx.globalAlpha = 1
 }
 
@@ -247,21 +254,45 @@ function drawPuddle(ctx: CanvasRenderingContext2D, screenX: number) {
 function drawBicycle(ctx: CanvasRenderingContext2D, screenX: number) {
   const wheelY = GROUND_Y - 9
   const steel = '#5b7a8c'
-  // Wheels: scenery — no outline, so the world grammar itself says "harmless".
-  ctx.strokeStyle = steel
-  ctx.lineWidth = 2
+  const steelDark = '#3f5866'
+  const tire = '#2f3d45'
+  const rim = '#a9bec6'
+
+  // Wheels: scenery — filled tire + rim ring + a few spokes, no outline, so
+  // the world grammar itself still says "harmless"; a solid disc instead of
+  // a bare stroke circle so it reads as an actual wheel, not a wireframe.
   for (const dx of [9, 33]) {
+    const cx = screenX + dx
     ctx.beginPath()
-    ctx.arc(screenX + dx, wheelY, 9, 0, Math.PI * 2)
+    ctx.arc(cx, wheelY, 9, 0, Math.PI * 2)
+    ctx.fillStyle = tire
+    ctx.fill()
+    ctx.beginPath()
+    ctx.arc(cx, wheelY, 6, 0, Math.PI * 2)
+    ctx.strokeStyle = rim
+    ctx.lineWidth = 1.25
     ctx.stroke()
+    ctx.strokeStyle = rim
+    ctx.lineWidth = 1
+    for (const angle of [0, Math.PI / 2, Math.PI / 4, -Math.PI / 4]) {
+      ctx.beginPath()
+      ctx.moveTo(cx - Math.cos(angle) * 5, wheelY - Math.sin(angle) * 5)
+      ctx.lineTo(cx + Math.cos(angle) * 5, wheelY + Math.sin(angle) * 5)
+      ctx.stroke()
+    }
     ctx.beginPath()
-    ctx.arc(screenX + dx, wheelY, 2, 0, Math.PI * 2)
-    ctx.fillStyle = steel
+    ctx.arc(cx, wheelY, 1.6, 0, Math.PI * 2)
+    ctx.fillStyle = rim
     ctx.fill()
   }
-  // Frame: two triangles between the axles and the seat/handlebar posts — scenery.
+
+  // Frame: two triangles between the axles and the seat/handlebar posts —
+  // scenery. Rounded, thicker strokes plus a thin darker edge line give the
+  // tubing a solid, tapered read instead of a flat single-width line.
+  ctx.lineCap = 'round'
+  ctx.lineJoin = 'round'
   ctx.strokeStyle = steel
-  ctx.lineWidth = 2.5
+  ctx.lineWidth = 3
   ctx.beginPath()
   ctx.moveTo(screenX + 9, wheelY)
   ctx.lineTo(screenX + 21, GROUND_Y - 30)
@@ -273,11 +304,23 @@ function drawBicycle(ctx: CanvasRenderingContext2D, screenX: number) {
   ctx.moveTo(screenX + 21, GROUND_Y - 30)
   ctx.lineTo(screenX + 33, wheelY)
   ctx.stroke()
-  // Seat post up to the danger band.
+  ctx.strokeStyle = steelDark
+  ctx.lineWidth = 1
+  ctx.beginPath()
+  ctx.moveTo(screenX + 9, wheelY - 1.5)
+  ctx.lineTo(screenX + 21, GROUND_Y - 31.5)
+  ctx.stroke()
+  // Seat post up to the danger band, with a small saddle.
+  ctx.strokeStyle = steel
+  ctx.lineWidth = 3
   ctx.beginPath()
   ctx.moveTo(screenX + 21, GROUND_Y - 30)
   ctx.lineTo(screenX + 17, GROUND_Y - 46)
   ctx.stroke()
+  ctx.beginPath()
+  ctx.ellipse(screenX + 15, GROUND_Y - 48, 4, 2, -0.3, 0, Math.PI * 2)
+  ctx.fillStyle = steelDark
+  ctx.fill()
   // Handlebar: the one part that actually carries the hazard outline — the
   // overhead projection the duck line is judged against (§11).
   roundRectPath(ctx, screenX + 5, GROUND_Y - 50, 22, 7, 3)
@@ -322,7 +365,12 @@ function drawPothole(ctx: CanvasRenderingContext2D, screenX: number) {
   ctx.moveTo(cx + points[0][0], y + points[0][1])
   for (const [dx, dy] of points.slice(1)) ctx.lineTo(cx + dx, y + dy)
   ctx.closePath()
-  ctx.fillStyle = PALETTE.ink
+  // A radial gradient instead of a flat fill, so the hole reads as a
+  // depression rather than a black sticker on the road.
+  const holeGradient = ctx.createRadialGradient(cx, y, 2, cx, y, 22)
+  holeGradient.addColorStop(0, '#181008')
+  holeGradient.addColorStop(1, PALETTE.ink)
+  ctx.fillStyle = holeGradient
   ctx.fill()
   ctx.lineWidth = HAZARD_OUTLINE_PX
   ctx.strokeStyle = '#e9e2d4'

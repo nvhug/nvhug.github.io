@@ -2,24 +2,23 @@
 
 /**
  * The signature element (docs/DESIGN.md § Signature element — the chase
- * strip): a ten-pawprint track with a cat mark walking toward a dog mark.
- * Reading is position + count, never colour alone (§22) — colour and the
- * band label are reinforcement only.
+ * strip): a health bar tracking the pursuit gap — full and `--games-mint`
+ * green at gap 100 (safe), draining and shading to `--games-ember` red as
+ * the cat closes in. Reading is never colour alone (§22 still holds): the
+ * *fill width* is the actual reading, colour and the band label are
+ * reinforcement, and the exact number lives in this element's `aria-label`
+ * regardless of what the bar looks like.
  */
 
 import { PawPrint, Dog as DogIcon } from 'lucide-react'
 import { useLanguage } from '@/lib/i18n/language-context'
-import { cn } from '@/lib/utils'
 import { pursuitBandFor } from '@/lib/games/lost-dog/config'
-
-const PRINT_COUNT = 10
+import { healthBarColor } from '@/lib/games/lost-dog/hud'
 
 export function ChaseStrip({ gap }: { gap: number }) {
   const { t } = useLanguage()
   const clamped = Math.max(0, Math.min(100, gap))
-  const litPrints = Math.round((clamped / 100) * PRINT_COUNT)
   const band = pursuitBandFor(clamped)
-  const alarmed = band === 'danger' || band === 'critical'
 
   const label = band === 'danger' ? t('games.lostDog.pursuit.danger') : band === 'critical' ? t('games.lostDog.pursuit.critical') : ''
 
@@ -30,22 +29,14 @@ export function ChaseStrip({ gap }: { gap: number }) {
       aria-label={t('games.lostDog.pursuit.ariaLabel', { gap: Math.round(clamped) })}
     >
       <PawPrint className="h-4 w-4 text-(--games-mat-muted)" aria-hidden />
-      <div className="flex items-center gap-1" style={{ transition: 'color 250ms' }}>
-        {Array.from({ length: PRINT_COUNT }, (_, i) => {
-          const lit = i < litPrints
-          return (
-            <span
-              key={i}
-              aria-hidden
-              className={cn(
-                'h-3 w-3 rounded-full transition-colors duration-250',
-                lit && alarmed && 'bg-(--games-ember)',
-                lit && !alarmed && 'bg-(--games-oak-light)',
-                !lit && 'bg-(--games-mat-muted)/35',
-              )}
-            />
-          )
-        })}
+      <div
+        aria-hidden
+        className="h-3 w-30 overflow-hidden rounded-full bg-(--games-mat-muted)/35 shadow-[inset_0_1px_2px_rgba(0,0,0,0.4)]"
+      >
+        <div
+          className="h-full rounded-full transition-[width,background-color] duration-250 ease-out"
+          style={{ width: `${clamped}%`, backgroundColor: healthBarColor(clamped) }}
+        />
       </div>
       <DogIcon className="h-4 w-4 text-(--games-oak-light)" aria-hidden />
       {/* Reserved to the longest band-label string across vi/en so score never shifts when it appears. */}
