@@ -79,6 +79,11 @@ export const TUNING = Object.freeze({
   pursuit: Object.freeze({
     startGap: 75,
     hitCosts: Object.freeze({ standard: 22, puddle: 16 }),
+    /** Gap restored per food item collected (§14 follow-up, explicit user request:
+     *  food now credits survival, not just score), scaled with each kind's rarity/
+     *  basePoints ratio (10:25:50) but kept modest — two chicken legs undo one
+     *  standard hit, never trivializing the chase. Capped at 100 by applyFoodHeal. */
+    foodHeal: Object.freeze({ bone: 5, sausage: 10, chickenLeg: 18 }) satisfies Readonly<Record<FoodKind, number>>,
     recoveryPerSecond: 2,
     recoveryDelayMs: 1500,
     bands: Object.freeze({

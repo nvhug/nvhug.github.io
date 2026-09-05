@@ -12,7 +12,7 @@ import { resolveEntities } from './collision'
 import { applyComboReset, collectFood, distanceScore, initialCombo, metresTravelled } from './combo'
 import { evaluateEvents } from './event-director'
 import { initialDogPhysics, stepDogPhysics } from './physics'
-import { applyHit, initialPursuit, tickPursuit } from './pursuit'
+import { applyFoodHeal, applyHit, initialPursuit, tickPursuit } from './pursuit'
 import { pickFoodKindFromRng, pickValidPattern } from './spawner'
 import { transition, type PursuitRunningState } from './state-machine'
 import { handlingFactorFor, weatherForEvent } from './weather'
@@ -283,7 +283,7 @@ function advanceActive(run: Run, intent: Intent, dtMs: number): Run {
 
   for (const id of resolved.collectedFoodIds) {
     const item = resolved.food.find((f) => f.id === id)
-    if (item) next = collectFood(next, item.kind, band.comboCap)
+    if (item) next = applyFoodHeal(collectFood(next, item.kind, band.comboCap), item.kind)
   }
 
   let landedHits = 0
@@ -340,7 +340,7 @@ function advanceHitReaction(run: Run, dtMs: number): Run {
 
   for (const id of resolved.collectedFoodIds) {
     const item = resolved.food.find((f) => f.id === id)
-    if (item) next = collectFood(next, item.kind, band.comboCap)
+    if (item) next = applyFoodHeal(collectFood(next, item.kind, band.comboCap), item.kind)
   }
   // Any obstacle resolved here is still within the invulnerability window from
   // the hit that caused this very reaction (invulnerabilityMs > reactionLockMs),

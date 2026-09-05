@@ -3,9 +3,13 @@
  * carrying at least `ComboSlice`'s fields — the same pattern pursuit.ts and
  * state-machine.ts use, so `Run` satisfies it without a circular import.
  *
- * Nothing here reads or writes the pursuit gap: food is optional reward and
- * never a recovery mechanic (§14's "never gates survival, pursuit recovery or
- * event progression"). combo.test.ts asserts that directly.
+ * Nothing *here* reads or writes the pursuit gap — `collectFood` is still
+ * only ever about score/combo, and combo.test.ts still asserts that
+ * directly. §14's original "food never gates survival or pursuit recovery"
+ * no longer holds at the feature level, though: an explicit user request
+ * made food credit survival too, via a separate `applyFoodHeal` call
+ * (pursuit.ts) that `run.ts` makes alongside this module's `collectFood` at
+ * every food-collection site — two calls, two modules, one event.
  */
 
 import { TUNING, comboMultiplierFor, type FoodKind, type FoodTuning } from './config'

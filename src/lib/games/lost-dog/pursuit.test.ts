@@ -1,11 +1,29 @@
 import { describe, expect, it } from 'vitest'
 import { TUNING, pursuitBandFor } from './config'
-import { applyHit, canApplyHit, initialPursuit, tickPursuit } from './pursuit'
+import { applyFoodHeal, applyHit, canApplyHit, initialPursuit, tickPursuit } from './pursuit'
 
 describe('initialPursuit', () => {
   it('starts at gap 75, per §9', () => {
     expect(initialPursuit().pursuitGap).toBe(TUNING.pursuit.startGap)
     expect(initialPursuit().pursuitGap).toBe(75)
+  })
+})
+
+describe('applyFoodHeal', () => {
+  it('restores gap by each kind\'s configured amount', () => {
+    expect(applyFoodHeal(initialPursuit(), 'bone').pursuitGap).toBe(75 + TUNING.pursuit.foodHeal.bone)
+    expect(applyFoodHeal(initialPursuit(), 'sausage').pursuitGap).toBe(75 + TUNING.pursuit.foodHeal.sausage)
+    expect(applyFoodHeal(initialPursuit(), 'chickenLeg').pursuitGap).toBe(75 + TUNING.pursuit.foodHeal.chickenLeg)
+  })
+
+  it('never exceeds the 100 gap ceiling', () => {
+    const after = applyFoodHeal({ ...initialPursuit(), pursuitGap: 95 }, 'chickenLeg')
+    expect(after.pursuitGap).toBe(100)
+  })
+
+  it('never touches msSinceLastHit — healing is not a hit-recovery event', () => {
+    const before = { ...initialPursuit(), msSinceLastHit: 42 }
+    expect(applyFoodHeal(before, 'bone').msSinceLastHit).toBe(42)
   })
 })
 

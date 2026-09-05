@@ -5,7 +5,7 @@
  * state-machine.ts uses, so `Run` satisfies it without a circular import.
  */
 
-import { TUNING } from './config'
+import { TUNING, type FoodKind } from './config'
 
 export interface PursuitSlice {
   pursuitGap: number
@@ -30,6 +30,16 @@ export function applyHit<T extends PursuitSlice>(run: T, kind: 'standard' | 'pud
   if (!canApplyHit(run.msSinceLastHit)) return run
   const cost = TUNING.pursuit.hitCosts[kind]
   return { ...run, pursuitGap: Math.max(0, run.pursuitGap - cost), msSinceLastHit: 0 }
+}
+
+/**
+ * Restores gap on collecting food (§14 follow-up, explicit user request): a
+ * modest, kind-scaled amount so food credits survival without trivializing
+ * the chase. Never touches `msSinceLastHit` — a heal is not a hit-recovery
+ * event, and must never reset or extend an active invulnerability window.
+ */
+export function applyFoodHeal<T extends PursuitSlice>(run: T, kind: FoodKind): T {
+  return { ...run, pursuitGap: Math.min(100, run.pursuitGap + TUNING.pursuit.foodHeal[kind]) }
 }
 
 /**

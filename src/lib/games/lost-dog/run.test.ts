@@ -21,6 +21,10 @@ function withObstacle(run: Run, x: number, family: Run['obstacles'][number]['fam
   return { ...run, obstacles: [{ id: 999, family, x, resolved: false }] }
 }
 
+function withFood(run: Run, x: number, kind: Run['food'][number]['kind'] = 'bone'): Run {
+  return { ...run, food: [{ id: 998, kind, x, collected: false }] }
+}
+
 describe('initialRun', () => {
   it('starts in BOOT with the documented pursuit start gap and an empty world', () => {
     const run = initialRun(1)
@@ -56,6 +60,22 @@ describe('advance — jumping clears an obstacle', () => {
   })
 })
 
+describe('advance — collecting food heals the gap', () => {
+  it('restores gap by the collected kind\'s configured heal amount (§14 follow-up)', () => {
+    const run = withFood(startedRun(2.5), 0, 'sausage')
+    const after = advance(run, HOLD, STEP)
+    expect(after.foodCollected).toBe(1)
+    expect(after.pursuitGap).toBeGreaterThanOrEqual(TUNING.pursuit.startGap + TUNING.pursuit.foodHeal.sausage)
+  })
+
+  it('never exceeds the 100 gap ceiling even near-full', () => {
+    let run = withFood(startedRun(2.6), 0, 'chickenLeg')
+    run = { ...run, pursuitGap: 95 }
+    const after = advance(run, HOLD, STEP)
+    expect(after.pursuitGap).toBeLessThanOrEqual(100)
+  })
+})
+
 describe('advance — colliding with an obstacle', () => {
   it('reduces the gap by the standard cost and enters HIT_REACTION', () => {
     const run = withObstacle(startedRun(2), 0)
@@ -68,6 +88,15 @@ describe('advance — colliding with an obstacle', () => {
     const run = withObstacle(startedRun(3), 0, 'puddle')
     const after = advance(run, HOLD, STEP)
     expect(after.pursuitGap).toBe(TUNING.pursuit.startGap - TUNING.pursuit.hitCosts.puddle)
+  })
+
+  it('a collision and a heal on the same tick both land — the two are independent events', () => {
+    let run = withObstacle(withFood(startedRun(3.5), 0, 'chickenLeg'), 0)
+    run = advance(run, HOLD, STEP)
+    expect(run.pursuitGap).toBe(
+      TUNING.pursuit.startGap - TUNING.pursuit.hitCosts.standard + TUNING.pursuit.foodHeal.chickenLeg,
+    )
+    expect(run.foodCollected).toBe(1)
   })
 
   it('resolves back to the band-appropriate state once the reaction lock elapses', () => {

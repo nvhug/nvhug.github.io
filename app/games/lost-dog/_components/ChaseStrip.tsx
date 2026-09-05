@@ -6,8 +6,9 @@
  * green at gap 100 (safe), draining and shading to `--games-ember` red as
  * the cat closes in. Reading is never colour alone (§22 still holds): the
  * *fill width* is the actual reading, colour and the band label are
- * reinforcement, and the exact number lives in this element's `aria-label`
- * regardless of what the bar looks like.
+ * reinforcement — the exact number is now also printed next to the bar
+ * (explicit user request), on top of always living in this element's
+ * `aria-label` regardless of what the bar looks like.
  */
 
 import { PawPrint, Dog as DogIcon } from 'lucide-react'
@@ -38,6 +39,9 @@ export function ChaseStrip({ gap }: { gap: number }) {
           style={{ width: `${clamped}%`, backgroundColor: healthBarColor(clamped) }}
         />
       </div>
+      <span aria-hidden className="font-tuvi-mono min-w-[3ch] text-xs tabular-nums text-(--games-mat-text)">
+        {Math.round(clamped)}
+      </span>
       <DogIcon className="h-4 w-4 text-(--games-oak-light)" aria-hidden />
       {/* Reserved to the longest band-label string across vi/en so score never shifts when it appears. */}
       <span className="min-w-[9ch] text-xs text-(--games-oak-light)">{label}</span>
