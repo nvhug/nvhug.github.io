@@ -52,6 +52,7 @@ import { useGameProgress } from '../_hooks/useGameProgress'
 import { durationBucket, flushLostDogEvents, scoreBucket, trackLostDogEvent } from './_analytics/track'
 import { AudioEngine } from './_audio/AudioEngine'
 import { Hud } from './_components/Hud'
+import { HowToPlayPanel } from './_components/HowToPlayPanel'
 import { LiveRegion } from './_components/LiveRegion'
 import { PausePanel } from './_components/PausePanel'
 import { ResultPanel } from './_components/ResultPanel'
@@ -95,6 +96,7 @@ export default function LostDogPage() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const apertureRef = useRef<HTMLDivElement>(null)
   const pauseButtonRef = useRef<HTMLButtonElement>(null)
+  const howToButtonRef = useRef<HTMLButtonElement>(null)
   /** Aggregate action counters for the post-run analytics batch (§26 forbids one event per action). */
   const actionsRef = useRef({ first: false, jumps: 0, ducks: 0 })
   const audioRef = useRef<AudioEngine | null>(null)
@@ -134,6 +136,7 @@ export default function LostDogPage() {
   const [finished, setFinished] = useState<FinishedRun | null>(null)
   const [prevPursuitBand, setPrevPursuitBand] = useState<PursuitBand>(() => pursuitBandFor(run.pursuitGap))
   const [prevEventKey, setPrevEventKey] = useState<string | null>(null)
+  const [howToOpen, setHowToOpen] = useState(false)
 
   const input = useInputAdapter(apertureRef)
 
@@ -466,6 +469,16 @@ export default function LostDogPage() {
               <Link href={GAMES_PATH} className={cn(buttonVariants({ variant: 'ghost' }), QUIET_BUTTON)}>
                 {t('games.lostDog.ready.back')}
               </Link>
+              <Button
+                type="button"
+                ref={howToButtonRef}
+                variant="ghost"
+                className={cn(buttonVariants({ variant: 'ghost' }), QUIET_BUTTON, 'px-3')}
+                aria-label={t('games.lostDog.howTo.openLabel')}
+                onClick={() => setHowToOpen(true)}
+              >
+                ?
+              </Button>
             </div>
           </div>
         )}
@@ -493,6 +506,8 @@ export default function LostDogPage() {
       {run.state === 'PAUSED' && (
         <PausePanel onResume={resume} onQuit={() => router.push(GAMES_PATH)} returnFocusRef={pauseButtonRef} />
       )}
+
+      {howToOpen && <HowToPlayPanel onClose={() => setHowToOpen(false)} returnFocusRef={howToButtonRef} />}
 
       {run.state === 'RESULT' && finished && (
         <ResultPanel

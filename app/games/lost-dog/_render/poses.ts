@@ -17,14 +17,6 @@ export const GROUND_Y = 380
 export const LANE_TOP_Y = 300
 export const LANE_BOTTOM_Y = 420
 
-function outlinedRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, fill: string) {
-  ctx.fillStyle = fill
-  ctx.fillRect(x, y, w, h)
-  ctx.lineWidth = HAZARD_OUTLINE_PX
-  ctx.strokeStyle = PALETTE.ink
-  ctx.strokeRect(x, y, w, h)
-}
-
 export function drawLane(ctx: CanvasRenderingContext2D, width: number) {
   ctx.fillStyle = PALETTE.lane
   ctx.fillRect(0, LANE_TOP_Y, width, LANE_BOTTOM_Y - LANE_TOP_Y)
@@ -181,42 +173,183 @@ export function drawParticles(ctx: CanvasRenderingContext2D, particles: readonly
  * never the outline weight or silhouette class (enforced here by always
  * drawing the outline the same way regardless of family-specific fill).
  */
+/** lowFence: a picket rail — level picket tops read as one clean jump line. */
+function drawLowFence(ctx: CanvasRenderingContext2D, screenX: number) {
+  const top = GROUND_Y - 38
+  const wood = '#c2603f'
+  const woodDark = '#96482f'
+  // Two horizontal rails behind the pickets.
+  ctx.fillStyle = woodDark
+  ctx.fillRect(screenX, top + 8, 38, 5)
+  ctx.fillRect(screenX, top + 26, 38, 5)
+  // Four pickets, flat-topped and level — the collision-relevant silhouette.
+  for (let i = 0; i < 4; i++) {
+    const px = screenX + 2 + i * 9
+    roundRectPath(ctx, px, top, 7, 40, [1, 1, 0, 0])
+    fillWithOutline(ctx, wood, PALETTE.ink, HAZARD_OUTLINE_PX)
+  }
+}
+
+/** planter: a wide-rimmed pot, flat top, with a few leaves as thin detail above it — never widening the jump-relevant silhouette. */
+function drawPlanter(ctx: CanvasRenderingContext2D, screenX: number) {
+  const rimY = GROUND_Y - 50
+  const potTop = rimY + 4
+  // Pot: a trapezoid, wider at the rim than the base.
+  ctx.beginPath()
+  ctx.moveTo(screenX + 3, potTop)
+  ctx.lineTo(screenX + 25, potTop)
+  ctx.lineTo(screenX + 21, GROUND_Y)
+  ctx.lineTo(screenX + 7, GROUND_Y)
+  ctx.closePath()
+  fillWithOutline(ctx, '#b5691f', PALETTE.ink, HAZARD_OUTLINE_PX)
+  // Rim: the flat top edge a jump is actually judged against.
+  roundRectPath(ctx, screenX, rimY, 28, 6, 2)
+  fillWithOutline(ctx, '#8a5a34', PALETTE.ink, HAZARD_OUTLINE_PX)
+  // Leaves: three simple blades, thin enough to never read as the jump line.
+  ctx.fillStyle = '#4f7d52'
+  for (const [dx, h, lean] of [[6, 16, -0.3], [14, 22, 0], [21, 15, 0.35]] as const) {
+    ctx.save()
+    ctx.translate(screenX + dx, rimY)
+    ctx.rotate(lean)
+    ctx.beginPath()
+    ctx.ellipse(0, -h / 2, 3, h / 2, 0, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.restore()
+  }
+}
+
+/** puddle: an irregular reflective blob, ground-level, hard near edge — never a vertical mass. */
+function drawPuddle(ctx: CanvasRenderingContext2D, screenX: number) {
+  const y = GROUND_Y - 4
+  ctx.beginPath()
+  ctx.moveTo(screenX, y)
+  ctx.bezierCurveTo(screenX + 6, y - 6, screenX + 40, y - 7, screenX + 50, y - 1)
+  ctx.bezierCurveTo(screenX + 58, y + 3, screenX + 44, y + 6, screenX + 26, y + 6)
+  ctx.bezierCurveTo(screenX + 10, y + 6, screenX - 2, y + 3, screenX, y)
+  ctx.closePath()
+  ctx.fillStyle = '#4a5f68'
+  ctx.globalAlpha = 0.55
+  ctx.fill()
+  ctx.globalAlpha = 1
+  ctx.lineWidth = HAZARD_OUTLINE_PX
+  ctx.strokeStyle = PALETTE.ink
+  ctx.stroke()
+  // A reflection streak, drawn inside the near edge so it can never soften it (§11).
+  ctx.beginPath()
+  ctx.ellipse(screenX + 22, y - 1, 12, 2, -0.1, 0, Math.PI * 2)
+  ctx.fillStyle = '#cfe6ee'
+  ctx.globalAlpha = 0.5
+  ctx.fill()
+  ctx.globalAlpha = 1
+}
+
+/** bicycle: a real side-on frame — wheels are undecorated scenery; only the handlebar/seat band above the duck line carries the hazard outline. */
+function drawBicycle(ctx: CanvasRenderingContext2D, screenX: number) {
+  const wheelY = GROUND_Y - 9
+  const steel = '#5b7a8c'
+  // Wheels: scenery — no outline, so the world grammar itself says "harmless".
+  ctx.strokeStyle = steel
+  ctx.lineWidth = 2
+  for (const dx of [9, 33]) {
+    ctx.beginPath()
+    ctx.arc(screenX + dx, wheelY, 9, 0, Math.PI * 2)
+    ctx.stroke()
+    ctx.beginPath()
+    ctx.arc(screenX + dx, wheelY, 2, 0, Math.PI * 2)
+    ctx.fillStyle = steel
+    ctx.fill()
+  }
+  // Frame: two triangles between the axles and the seat/handlebar posts — scenery.
+  ctx.strokeStyle = steel
+  ctx.lineWidth = 2.5
+  ctx.beginPath()
+  ctx.moveTo(screenX + 9, wheelY)
+  ctx.lineTo(screenX + 21, GROUND_Y - 30)
+  ctx.lineTo(screenX + 33, wheelY)
+  ctx.lineTo(screenX + 21, wheelY)
+  ctx.closePath()
+  ctx.stroke()
+  ctx.beginPath()
+  ctx.moveTo(screenX + 21, GROUND_Y - 30)
+  ctx.lineTo(screenX + 33, wheelY)
+  ctx.stroke()
+  // Seat post up to the danger band.
+  ctx.beginPath()
+  ctx.moveTo(screenX + 21, GROUND_Y - 30)
+  ctx.lineTo(screenX + 17, GROUND_Y - 46)
+  ctx.stroke()
+  // Handlebar: the one part that actually carries the hazard outline — the
+  // overhead projection the duck line is judged against (§11).
+  roundRectPath(ctx, screenX + 5, GROUND_Y - 50, 22, 7, 3)
+  fillWithOutline(ctx, steel, PALETTE.ink, HAZARD_OUTLINE_PX)
+}
+
+/** trashBin: a can with a domed lid — the lid's flat top is what a jump clears; the body reads as "bin", not "pot" or "fence". */
+function drawTrashBin(ctx: CanvasRenderingContext2D, screenX: number) {
+  const lidY = GROUND_Y - 40
+  // Body: a slightly tapered can.
+  ctx.beginPath()
+  ctx.moveTo(screenX + 2, lidY + 8)
+  ctx.lineTo(screenX + 28, lidY + 8)
+  ctx.lineTo(screenX + 25, GROUND_Y)
+  ctx.lineTo(screenX + 5, GROUND_Y)
+  ctx.closePath()
+  fillWithOutline(ctx, '#4f7d52', PALETTE.ink, HAZARD_OUTLINE_PX)
+  // Ribbing detail — cosmetic only, never a second outline.
+  ctx.strokeStyle = '#3d6140'
+  ctx.lineWidth = 1
+  ctx.beginPath()
+  ctx.moveTo(screenX + 15, lidY + 10)
+  ctx.lineTo(screenX + 14, GROUND_Y - 2)
+  ctx.stroke()
+  // Lid: domed, slightly wider than the body — the flat-topped silhouette a jump clears.
+  roundRectPath(ctx, screenX - 2, lidY, 34, 9, 3)
+  fillWithOutline(ctx, '#c2603f', PALETTE.ink, HAZARD_OUTLINE_PX)
+  ctx.beginPath()
+  ctx.arc(screenX + 15, lidY, 3, 0, Math.PI * 2)
+  ctx.fillStyle = '#c2603f'
+  ctx.fill()
+}
+
+/** pothole: a jagged broken-asphalt hole, ground-level, high-contrast rim — never covered by a foreground layer (§11). */
+function drawPothole(ctx: CanvasRenderingContext2D, screenX: number) {
+  const y = GROUND_Y - 2
+  const cx = screenX + 20
+  const points: readonly [number, number][] = [
+    [-22, -1], [-14, -6], [-2, -3], [10, -7], [20, -2], [22, 3], [12, 6], [-4, 5], [-16, 6],
+  ]
+  ctx.beginPath()
+  ctx.moveTo(cx + points[0][0], y + points[0][1])
+  for (const [dx, dy] of points.slice(1)) ctx.lineTo(cx + dx, y + dy)
+  ctx.closePath()
+  ctx.fillStyle = PALETTE.ink
+  ctx.fill()
+  ctx.lineWidth = HAZARD_OUTLINE_PX
+  ctx.strokeStyle = '#e9e2d4'
+  ctx.stroke()
+  // A crack reaching toward the near edge, reinforcing "broken ground" at a glance.
+  ctx.beginPath()
+  ctx.moveTo(cx - 6, y + 4)
+  ctx.lineTo(cx - 16, y + 12)
+  ctx.lineWidth = 1.5
+  ctx.strokeStyle = PALETTE.ink
+  ctx.stroke()
+}
+
 export function drawObstacle(ctx: CanvasRenderingContext2D, obstacle: Obstacle, screenX: number) {
   switch (obstacle.family) {
     case 'lowFence':
-      outlinedRect(ctx, screenX, GROUND_Y - 40, 36, 40, '#c2603f')
-      return
+      return drawLowFence(ctx, screenX)
     case 'planter':
-      outlinedRect(ctx, screenX, GROUND_Y - 55, 28, 55, '#4f7d52')
-      return
+      return drawPlanter(ctx, screenX)
     case 'puddle':
-      ctx.fillStyle = PALETTE.ink
-      ctx.globalAlpha = 0.15
-      ctx.fillRect(screenX, GROUND_Y - 6, 56, 6)
-      ctx.globalAlpha = 1
-      ctx.lineWidth = HAZARD_OUTLINE_PX
-      ctx.strokeStyle = PALETTE.ink
-      ctx.strokeRect(screenX, GROUND_Y - 6, 56, 6)
-      return
-    case 'bicycle': {
-      // Overhead projection (handlebar) above the duck line; wheels are pure scenery below it.
-      ctx.fillStyle = '#5b7a8c'
-      ctx.fillRect(screenX, GROUND_Y - 34, 4, 34) // frame post
-      outlinedRect(ctx, screenX - 6, GROUND_Y - 46, 24, 8, '#5b7a8c') // handlebar danger zone
-      return
-    }
+      return drawPuddle(ctx, screenX)
+    case 'bicycle':
+      return drawBicycle(ctx, screenX)
     case 'trashBin':
-      outlinedRect(ctx, screenX, GROUND_Y - 42, 30, 42, '#4f7d52')
-      return
+      return drawTrashBin(ctx, screenX)
     case 'pothole':
-      ctx.fillStyle = PALETTE.ink
-      ctx.beginPath()
-      ctx.ellipse(screenX + 20, GROUND_Y - 3, 22, 6, 0, 0, Math.PI * 2)
-      ctx.fill()
-      ctx.lineWidth = HAZARD_OUTLINE_PX
-      ctx.strokeStyle = '#e9e2d4'
-      ctx.stroke()
-      return
+      return drawPothole(ctx, screenX)
   }
 }
 

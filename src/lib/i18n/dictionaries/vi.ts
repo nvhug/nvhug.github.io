@@ -1460,6 +1460,27 @@ export const vi = {
         start: 'Bắt đầu',
         back: 'Về Games',
       },
+      howTo: {
+        title: 'Cách chơi',
+        openLabel: 'Xem hướng dẫn',
+        obstaclesHeading: 'Chướng ngại vật — cần né',
+        foodHeading: 'Đồ ăn — nhặt để ghi điểm',
+        close: 'Đóng',
+        obstacles: {
+          lowFence: { name: 'Hàng rào thấp', action: 'Nhảy qua' },
+          planter: { name: 'Chậu cây', action: 'Nhảy qua' },
+          puddle: { name: 'Vũng nước', action: 'Nhảy qua — trúng thì chỉ trượt nhẹ' },
+          bicycle: { name: 'Xe đạp dựng', action: 'Cúi xuống để né tay lái' },
+          trashBin: { name: 'Thùng rác', action: 'Nhảy qua' },
+          pothole: { name: 'Ổ gà', action: 'Nhảy qua' },
+        },
+        food: {
+          bone: { name: 'Xương' },
+          sausage: { name: 'Xúc xích' },
+          chickenLeg: { name: 'Đùi gà' },
+          points: '+{points} điểm',
+        },
+      },
       hud: {
         pause: 'Tạm dừng',
         mute: 'Tắt tiếng',

@@ -1441,6 +1441,27 @@ export const en: Dictionary = {
         start: 'Start',
         back: 'Back to Games',
       },
+      howTo: {
+        title: 'How to play',
+        openLabel: 'View instructions',
+        obstaclesHeading: 'Obstacles — avoid these',
+        foodHeading: 'Food — collect for points',
+        close: 'Close',
+        obstacles: {
+          lowFence: { name: 'Low fence', action: 'Jump over it' },
+          planter: { name: 'Potted plant', action: 'Jump over it' },
+          puddle: { name: 'Puddle', action: 'Jump over it — a hit only slips you' },
+          bicycle: { name: 'Parked bicycle', action: 'Duck to clear the handlebar' },
+          trashBin: { name: 'Trash bin', action: 'Jump over it' },
+          pothole: { name: 'Pothole', action: 'Jump over it' },
+        },
+        food: {
+          bone: { name: 'Bone' },
+          sausage: { name: 'Sausage' },
+          chickenLeg: { name: 'Chicken leg' },
+          points: '+{points} points',
+        },
+      },
       hud: {
         pause: 'Pause',
         mute: 'Mute',
