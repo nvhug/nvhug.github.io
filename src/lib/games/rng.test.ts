@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { GENERATOR_VERSION, createRng, randInt, seedFor, shuffle } from './rng'
+import { createRng, deriveSeed, randInt, seedFor, shuffle } from './rng'
 
 describe('createRng', () => {
   it('yields the same sequence for the same seed', () => {
@@ -29,16 +29,29 @@ describe('createRng', () => {
 })
 
 describe('seedFor', () => {
-  it('gives every level its own seed', () => {
-    const seeds = new Set(Array.from({ length: 100 }, (_, i) => seedFor(i + 1)))
+  it('gives every input its own seed for a fixed version', () => {
+    const seeds = new Set(Array.from({ length: 100 }, (_, i) => seedFor(i + 1, 1)))
     expect(seeds.size).toBe(100)
   })
 
-  it('folds the generator version into the seed', () => {
-    // Bumping GENERATOR_VERSION is a deliberate reset of every puzzle; the seed
-    // must change with it so the change is visible, never silent.
-    expect(GENERATOR_VERSION).toBe(1)
-    expect(seedFor(7)).not.toBe(seedFor(7, GENERATOR_VERSION + 1))
+  it('folds the version into the seed, so bumping it is a deliberate reset', () => {
+    expect(seedFor(7, 1)).not.toBe(seedFor(7, 2))
+  })
+})
+
+describe('deriveSeed', () => {
+  it('gives independent streams for different stream ids off the same root', () => {
+    const gameplay = deriveSeed(42, 'gameplay')
+    const cosmetic = deriveSeed(42, 'cosmetic')
+    expect(gameplay).not.toBe(cosmetic)
+  })
+
+  it('is itself deterministic for the same root seed and stream id', () => {
+    expect(deriveSeed(42, 'gameplay')).toBe(deriveSeed(42, 'gameplay'))
+  })
+
+  it('changes with the root seed for the same stream id', () => {
+    expect(deriveSeed(1, 'gameplay')).not.toBe(deriveSeed(2, 'gameplay'))
   })
 })
 

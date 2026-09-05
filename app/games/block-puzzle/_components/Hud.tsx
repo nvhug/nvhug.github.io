@@ -15,10 +15,9 @@ import { useLanguage } from '@/lib/i18n/language-context'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { CarvedText } from '../../_components/CarvedText'
+import { CONTROL_CLASS, type SaveState } from '../../_components/gameChrome'
 
-export type SaveState = 'idle' | 'saving' | 'saved' | 'unsaved'
-
-const CONTROL_CLASS = 'text-(--games-mat-text) hover:bg-white/10 hover:text-(--games-mat-text)'
+export type { SaveState }
 
 export function Hud({
   level,

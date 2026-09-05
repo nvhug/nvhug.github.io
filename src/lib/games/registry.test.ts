@@ -62,6 +62,29 @@ describe('block puzzle summary', () => {
   })
 })
 
+describe('lost dog summary', () => {
+  const lostDog = GAMES.find((g) => g.id === 'lost-dog')!
+
+  it('registers as an arcade game at /games/lost-dog', () => {
+    expect(lostDog.category).toBe('arcade')
+    expect(lostDog.path).toBe('/games/lost-dog')
+    expect(lostDog.i18nKey).toBe('games.catalog.lostDog')
+  })
+
+  it('does not invent a best score for a new account', () => {
+    const s = lostDog.summarize([])
+    expect(s).toMatchObject({ completed: 0, bestScore: null, continueHref: '/games/lost-dog' })
+    expect(s.completions).toBeUndefined()
+  })
+
+  it('reports the saved best score and completed-run count', () => {
+    const s = lostDog.summarize([
+      record('lost-dog', 'endless', { best_time_ms: 90_000, best_score: 4200, completions: 3 }),
+    ])
+    expect(s).toMatchObject({ completed: 1, bestScore: 4200, completions: 3, continueHref: '/games/lost-dog' })
+  })
+})
+
 describe('the hub as a portal', () => {
   it('summarises a score-based game from the same record shape', () => {
     const s = stubScoreGame.summarize([record('2048', 'classic', { best_time_ms: null, best_score: 4096, completions: 3 })])
@@ -74,9 +97,9 @@ describe('the hub as a portal', () => {
       record('2048', 'classic', { best_time_ms: null, best_score: 512 }),
       record('block-puzzle', '1'),
     ])
-    const summaries = registry.map((g) => g.summarize(rows.get(g.id) ?? []))
-    expect(summaries[0].completed).toBe(1)
-    expect(summaries[0].total).toBe(100)
-    expect(summaries[1].bestScore).toBe(512)
+    const summaries = new Map(registry.map((g) => [g.id, g.summarize(rows.get(g.id) ?? [])]))
+    expect(summaries.get('block-puzzle')!.completed).toBe(1)
+    expect(summaries.get('block-puzzle')!.total).toBe(100)
+    expect(summaries.get('2048')!.bestScore).toBe(512)
   })
 })

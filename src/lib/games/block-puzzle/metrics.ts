@@ -100,13 +100,32 @@ export function computeBoardMetrics(input: MetricsInput): BoardMetrics {
   const cellPx = Math.max(1, Math.min(Math.floor(cellByWidth), floored))
   const boardPx = cellPx * grid
 
-  const trayColumns = placement === 'below' ? TRAY_COLUMNS_BELOW : looseCount > 5 ? 2 : 1
   const trayMinHeightPx = placement === 'below'
     ? rows * slotCells.h * cellPx + Math.max(0, rows - 1) * TRAY_GAP_PX
     : 0
   const trayWidthPx = placement === 'beside'
     ? clamp(availableWidth - boardPx - TRAY_GAP_PX * 2, TRAY_MIN_WIDTH_PX, TRAY_MAX_WIDTH_PX)
     : 0
+
+  // Beside the board, a fixed 1-or-2 columns left a short piece list stacked in
+  // one tall column that ran past the bottom of the screen. Instead, use as many
+  // columns as the reserved tray width and the vertical budget both allow, so the
+  // whole tray fits in the one visible frame beside the board (no scrolling to
+  // find the rest of the pieces).
+  const trayColumns = placement === 'below'
+    ? TRAY_COLUMNS_BELOW
+    : (() => {
+        const colsByWidth = Math.max(
+          1,
+          Math.floor((trayWidthPx + TRAY_GAP_PX) / (slotCells.w * cellPx + TRAY_GAP_PX)),
+        )
+        const rowsByHeight = Math.max(
+          1,
+          Math.floor((availableHeight + TRAY_GAP_PX) / (slotCells.h * cellPx + TRAY_GAP_PX)),
+        )
+        const minColumnsForHeight = Math.ceil(looseCount / rowsByHeight)
+        return Math.max(1, Math.min(colsByWidth, minColumnsForHeight))
+      })()
 
   return { cellPx, boardPx, trayPlacement: placement, trayMinHeightPx, trayWidthPx, trayColumns }
 }

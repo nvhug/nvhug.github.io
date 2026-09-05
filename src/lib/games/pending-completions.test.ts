@@ -51,4 +51,23 @@ describe('pending completions', () => {
     expect(snapshot).toHaveLength(1)
     expect(list()).toEqual([])
   })
+
+  it('accepts a score-only entry with no time', () => {
+    const entry = enqueue({ gameId: 'lost-dog', levelKey: 'endless', score: 4200 })
+    expect(entry.timeMs).toBeUndefined()
+    expect(entry.score).toBe(4200)
+    expect(list()).toEqual([entry])
+  })
+
+  it('accepts a time-only entry with no score (existing block-puzzle shape)', () => {
+    const entry = enqueue({ gameId: 'block-puzzle', levelKey: '1', timeMs: 5000 })
+    expect(entry.score).toBeUndefined()
+    expect(entry.timeMs).toBe(5000)
+  })
+
+  it('accepts an entry carrying both time and score', () => {
+    const entry = enqueue({ gameId: 'lost-dog', levelKey: 'endless', timeMs: 90000, score: 4200 })
+    expect(entry.timeMs).toBe(90000)
+    expect(entry.score).toBe(4200)
+  })
 })

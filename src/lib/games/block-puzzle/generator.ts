@@ -13,8 +13,11 @@
  */
 
 import { cellKey, type Cell, type Level, type Piece } from './board'
-import { createRng, randInt, seedFor, shuffle, type Rng } from './rng'
+import { createRng, randInt, seedFor, shuffle, type Rng } from '../rng'
 import { CAMPAIGN_LEVELS, gridFor, looseCountFor, parTimeMs, tierOf } from './tiers'
+
+/** Bumping this is a deliberate, visible reset of every puzzle for every player. */
+export const GENERATOR_VERSION = 1
 
 const CAVITY_ATTEMPTS = 40
 const PARTITION_ATTEMPTS = 25
@@ -28,7 +31,7 @@ export function generateLevel(level: number): Level {
   const tier = tierOf(level)
   const size = gridFor(level)
   const pieceCount = looseCountFor(level) + tier.fixed
-  const rng = createRng(seedFor(level))
+  const rng = createRng(seedFor(level, GENERATOR_VERSION))
 
   let groups: Cell[][] | null = null
   let fallback = false

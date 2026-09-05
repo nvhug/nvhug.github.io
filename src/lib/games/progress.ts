@@ -54,7 +54,7 @@ export function bestFor(records: readonly GameProgressRecord[], level: number): 
  */
 export function withPending(
   records: readonly GameProgressRecord[],
-  pending: readonly Pick<PendingCompletion, 'gameId' | 'levelKey' | 'timeMs'>[],
+  pending: readonly Pick<PendingCompletion, 'gameId' | 'levelKey' | 'timeMs' | 'score'>[],
 ): GameProgressRecord[] {
   if (pending.length === 0) return [...records]
   const merged = new Map(records.map((row) => [`${row.game_id}/${row.level_key}`, row]))
@@ -65,9 +65,21 @@ export function withPending(
       merged.set(key, {
         ...existing,
         best_time_ms:
-          existing.best_time_ms === null
-            ? entry.timeMs
-            : Math.min(existing.best_time_ms, entry.timeMs),
+          entry.timeMs === undefined
+            ? existing.best_time_ms
+            : existing.best_time_ms === null
+              ? entry.timeMs
+              : Math.min(existing.best_time_ms, entry.timeMs),
+        best_score:
+          entry.score === undefined
+            ? existing.best_score
+            : existing.best_score === null
+              ? entry.score
+              : Math.max(existing.best_score, entry.score),
+        // A pending entry is a run that finished but hasn't synced yet — it
+        // still counts as a completion, or a card reading `completions` (as
+        // lost-dog's does) under-reports the run that is sitting right here.
+        completions: existing.completions + 1,
       })
       continue
     }
@@ -75,8 +87,8 @@ export function withPending(
       user_id: '',
       game_id: entry.gameId,
       level_key: entry.levelKey,
-      best_time_ms: entry.timeMs,
-      best_score: null,
+      best_time_ms: entry.timeMs ?? null,
+      best_score: entry.score ?? null,
       completions: 1,
       first_completed_at: '',
       updated_at: '',

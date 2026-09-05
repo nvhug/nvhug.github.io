@@ -11,13 +11,18 @@ import {
   withPending,
 } from './progress'
 
-function record(level: number, bestMs: number | null, gameId = 'block-puzzle'): GameProgressRecord {
+function record(
+  level: number,
+  bestMs: number | null,
+  gameId = 'block-puzzle',
+  bestScore: number | null = null,
+): GameProgressRecord {
   return {
     user_id: 'u1',
     game_id: gameId,
     level_key: String(level),
     best_time_ms: bestMs,
-    best_score: null,
+    best_score: bestScore,
     completions: 1,
     first_completed_at: '2026-09-03T00:00:00Z',
     updated_at: '2026-09-03T00:00:00Z',
@@ -171,5 +176,51 @@ describe('withPending', () => {
   it('labels the synthetic record with the queued game id', () => {
     const effective = withPending([], [pending(1, 5000, '2048')])
     expect(effective[0].game_id).toBe('2048')
+  })
+
+  it('widens an existing best score and never narrows it', () => {
+    const withHigher = withPending(
+      [record(1, null, 'lost-dog', 4000)],
+      [{ gameId: 'lost-dog', levelKey: '1', score: 4200 }],
+    )
+    expect(withHigher[0].best_score).toBe(4200)
+
+    const withLower = withPending(
+      [record(1, null, 'lost-dog', 4000)],
+      [{ gameId: 'lost-dog', levelKey: '1', score: 3000 }],
+    )
+    expect(withLower[0].best_score).toBe(4000)
+  })
+
+  it('carries a score-only pending entry into a synthetic record with a null time', () => {
+    const effective = withPending([], [{ gameId: 'lost-dog', levelKey: '1', score: 4200 }])
+    expect(effective[0]).toMatchObject({ best_score: 4200, best_time_ms: null })
+  })
+
+  it('merges time and score independently on the same entry', () => {
+    const effective = withPending(
+      [record(1, 90_000, 'lost-dog', 4000)],
+      [{ gameId: 'lost-dog', levelKey: '1', timeMs: 80_000, score: 3000 }],
+    )
+    expect(effective[0]).toMatchObject({ best_time_ms: 80_000, best_score: 4000 })
+  })
+
+  it('counts a pending entry against an existing row as one more completion, not zero', () => {
+    const existing = record(1, 90_000, 'lost-dog', 4000)
+    expect(existing.completions).toBe(1)
+    const effective = withPending([existing], [{ gameId: 'lost-dog', levelKey: '1', score: 3000 }])
+    expect(effective[0].completions).toBe(2)
+  })
+
+  it('counts two queued pending entries against the same row as two more completions', () => {
+    const existing = record(1, 90_000, 'lost-dog', 4000)
+    const effective = withPending(
+      [existing],
+      [
+        { gameId: 'lost-dog', levelKey: '1', score: 3000 },
+        { gameId: 'lost-dog', levelKey: '1', score: 5000 },
+      ],
+    )
+    expect(effective[0].completions).toBe(3)
   })
 })

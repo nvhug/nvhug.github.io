@@ -22,11 +22,7 @@ import { Button, buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { useEffect, useRef } from 'react'
 import { CarvedText } from '../../_components/CarvedText'
-
-const OAK_BUTTON =
-  'bg-(--games-oak) text-(--games-cavity) hover:bg-(--games-oak-light) shadow-[0_3px_0_var(--games-oak-edge)]'
-const QUIET_BUTTON =
-  'border border-white/15 bg-white/5 text-(--games-mat-text) hover:bg-white/10 hover:text-(--games-mat-text)'
+import { OAK_BUTTON, QUIET_BUTTON } from '../../_components/gameChrome'
 
 export function SolvedPanel({
   stars,

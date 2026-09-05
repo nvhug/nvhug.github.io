@@ -1439,12 +1439,73 @@ export const vi = {
         name: 'Xếp khối gỗ',
         description: 'Ghép các khối gỗ lấp kín khoang trên bảng. 100 level, 5 cấp độ.',
       },
+      lostDog: {
+        name: 'Cún đi lạc',
+        description: 'Dẫn chú Corgi chạy qua khu phố, né chướng ngại vật, tránh chú mèo đang đuổi theo.',
+      },
+    },
+
+    lostDog: {
+      pursuit: {
+        ariaLabel: 'Khoảng cách với mèo: {gap} trên 100',
+        safe: 'An toàn',
+        watch: 'Coi chừng, mèo đang lại gần',
+        danger: 'Mèo đang tới!',
+        critical: 'Sắp bị bắt!',
+      },
+      ready: {
+        title: 'Cún đi lạc',
+        promptKeyboard: 'Space hoặc ↑ để nhảy · Giữ ↓ để cúi',
+        promptTouch: 'Chạm để nhảy · Giữ để cúi',
+        start: 'Bắt đầu',
+        back: 'Về Games',
+      },
+      hud: {
+        pause: 'Tạm dừng',
+        mute: 'Tắt tiếng',
+        unmute: 'Bật tiếng',
+        best: 'Kỷ lục',
+        saving: 'đang lưu…',
+        saved: 'đã lưu',
+        unsaved: 'chưa lưu',
+        retryLoad: 'Tải lại kỷ lục',
+        jump: 'NHẢY',
+        duck: 'CÚI',
+      },
+      paused: {
+        title: 'Tạm dừng',
+        resume: 'Tiếp tục',
+        back: 'Về Games',
+      },
+      result: {
+        newRecord: 'Kỷ lục mới!',
+        best: 'Kỷ lục {score}',
+        distance: 'Quãng đường {distance} m',
+        time: 'Thời gian {time}',
+        food: 'Đồ ăn {count} món',
+        combo: 'Combo cao nhất ×{combo}',
+        hits: 'Va chạm {hits} lần',
+        replay: 'Chơi lại',
+        back: 'Về Games',
+        retrySave: 'Lưu lại',
+      },
+      events: {
+        rainShower: 'Trời sắp mưa',
+        foodBonus: 'Có người phía trước đang cho ăn',
+      },
+      liveRegion: {
+        started: 'Bắt đầu chạy',
+        paused: 'Đã tạm dừng',
+        resumed: 'Tiếp tục chạy',
+        gameOver: 'Kết thúc, điểm số {score}',
+      },
     },
 
     categories: {
       logic: 'Logic',
       numbers: 'Số học',
       memory: 'Ghi nhớ',
+      arcade: 'Arcade',
     },
 
     blockPuzzle: {

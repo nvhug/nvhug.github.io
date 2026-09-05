@@ -16,7 +16,9 @@ export interface PendingCompletion {
   id: number
   gameId: string
   levelKey: string
-  timeMs: number
+  /** Both are optional: a score-based game may have no time, and vice versa. */
+  timeMs?: number
+  score?: number
 }
 
 let queue: PendingCompletion[] = []

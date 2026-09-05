@@ -86,6 +86,20 @@ describe('computeBoardMetrics', () => {
     expect(many.trayColumns).toBe(2)
   })
 
+  it('grows the desktop tray into more columns so a short piece list fits in one frame instead of one tall column', () => {
+    const m = computeBoardMetrics(input({
+      viewportWidth: 1440,
+      viewportHeight: 800,
+      headerPx: 69,
+      chromePx: 96,
+      grid: 8,
+      looseCount: 4,
+      slotCells: { w: 3, h: 4 },
+    }))
+    expect(m.trayPlacement).toBe('beside')
+    expect(m.trayColumns).toBe(2)
+  })
+
   it('never returns a smaller cell for a strictly larger viewport', () => {
     let previous = 0
     for (const size of [320, 360, 420, 600, 900, 1200]) {

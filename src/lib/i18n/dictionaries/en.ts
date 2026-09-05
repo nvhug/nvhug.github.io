@@ -1420,12 +1420,73 @@ export const en: Dictionary = {
         name: 'Wooden Block Puzzle',
         description: 'Fit the wooden blocks into the carved cavity. 100 levels across 5 tiers.',
       },
+      lostDog: {
+        name: 'Lost Dog',
+        description: 'Guide a Corgi through a lively neighborhood, dodge obstacles, and stay ahead of the chasing cat.',
+      },
+    },
+
+    lostDog: {
+      pursuit: {
+        ariaLabel: 'Distance from the cat: {gap} of 100',
+        safe: 'Safe',
+        watch: 'Watch out, the cat is closing in',
+        danger: 'The cat is catching up!',
+        critical: 'About to be caught!',
+      },
+      ready: {
+        title: 'Lost Dog',
+        promptKeyboard: 'Space or Up to jump · Hold Down to duck',
+        promptTouch: 'Tap to jump · Hold to duck',
+        start: 'Start',
+        back: 'Back to Games',
+      },
+      hud: {
+        pause: 'Pause',
+        mute: 'Mute',
+        unmute: 'Unmute',
+        best: 'Best',
+        saving: 'saving…',
+        saved: 'saved',
+        unsaved: 'unsaved',
+        retryLoad: 'Reload best score',
+        jump: 'JUMP',
+        duck: 'DUCK',
+      },
+      paused: {
+        title: 'Paused',
+        resume: 'Resume',
+        back: 'Back to Games',
+      },
+      result: {
+        newRecord: 'New best!',
+        best: 'Best {score}',
+        distance: 'Distance {distance} m',
+        time: 'Time {time}',
+        food: 'Food {count} items',
+        combo: 'Best combo x{combo}',
+        hits: 'Hits {hits}',
+        replay: 'Replay',
+        back: 'Back to Games',
+        retrySave: 'Save again',
+      },
+      events: {
+        rainShower: 'Rain is coming',
+        foodBonus: 'Someone ahead is sharing food',
+      },
+      liveRegion: {
+        started: 'Run started',
+        paused: 'Paused',
+        resumed: 'Resumed',
+        gameOver: 'Game over, score {score}',
+      },
     },
 
     categories: {
       logic: 'Logic',
       numbers: 'Numbers',
       memory: 'Memory',
+      arcade: 'Arcade',
     },
 
     blockPuzzle: {

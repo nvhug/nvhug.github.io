@@ -37,7 +37,9 @@ export function GameCard({
       return parts.join(' · ')
     }
     if (summary.bestScore !== null && summary.bestScore !== undefined) {
-      return t('games.hub.bestScoreLine', { score: summary.bestScore })
+      const parts = [t('games.hub.bestScoreLine', { score: summary.bestScore })]
+      if (summary.completions !== undefined) parts.push(t('games.hub.completedLine', { completed: summary.completions }))
+      return parts.join(' · ')
     }
     // No campaign length and no score: the count is all there is. Reusing the
     // '{completed} / {total}' line here would render '4 / 4' and read as a
