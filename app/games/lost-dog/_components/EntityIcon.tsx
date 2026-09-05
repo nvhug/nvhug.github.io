@@ -25,13 +25,16 @@ interface IconBox {
   readonly h: number
 }
 
+// Boxes reach a little higher than each shape's own top to leave room for
+// the required-action cue badge (poses.ts's drawActionCue), which floats
+// ~12-18px above every hazard.
 const OBSTACLE_BOX: Readonly<Record<ObstacleFamily, IconBox>> = {
-  lowFence: { x: -2, y: 340, w: 42, h: 44 },
+  lowFence: { x: -2, y: 316, w: 42, h: 68 },
   planter: { x: -3, y: 304, w: 35, h: 80 },
-  puddle: { x: -4, y: 366, w: 66, h: 20 },
-  bicycle: { x: -3, y: 327, w: 48, h: 56 },
-  trashBin: { x: -5, y: 334, w: 40, h: 49 },
-  pothole: { x: -5, y: 368, w: 50, h: 25 },
+  puddle: { x: -4, y: 345, w: 66, h: 41 },
+  bicycle: { x: -3, y: 303, w: 48, h: 80 },
+  trashBin: { x: -5, y: 315, w: 40, h: 68 },
+  pothole: { x: -5, y: 351, w: 50, h: 42 },
 }
 
 const FOOD_BOX: Readonly<Record<FoodKind, IconBox>> = {

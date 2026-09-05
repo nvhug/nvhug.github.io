@@ -173,6 +173,44 @@ export function drawParticles(ctx: CanvasRenderingContext2D, particles: readonly
  * never the outline weight or silhouette class (enforced here by always
  * drawing the outline the same way regardless of family-specific fill).
  */
+
+/**
+ * The required-reaction cue (docs/DESIGN.md § The world's grammar, follow-up):
+ * a small ink-on-cream badge floating above every hazard, chevron pointing
+ * the direction of the fix — up for jump, down for duck. Pure shape and
+ * light/dark contrast, the same two colours the hazard outline and the kerb
+ * already use, so it survives grayscale and colour-vision simulation exactly
+ * like the outline does (§22) — never a colour-only signal. Added because
+ * the outline/silhouette distinction alone did not read fast enough during
+ * real play, and a duck-only obstacle among five jump-only ones was reading
+ * as unbeatable rather than as "the one that wants a different reaction."
+ */
+function drawActionCue(ctx: CanvasRenderingContext2D, cx: number, cy: number, direction: 'up' | 'down') {
+  ctx.beginPath()
+  ctx.arc(cx, cy, 9, 0, Math.PI * 2)
+  ctx.fillStyle = PALETTE.cream
+  ctx.fill()
+  ctx.lineWidth = 1.25
+  ctx.strokeStyle = PALETTE.ink
+  ctx.stroke()
+
+  ctx.beginPath()
+  if (direction === 'up') {
+    ctx.moveTo(cx - 4, cy + 2)
+    ctx.lineTo(cx, cy - 3)
+    ctx.lineTo(cx + 4, cy + 2)
+  } else {
+    ctx.moveTo(cx - 4, cy - 2)
+    ctx.lineTo(cx, cy + 3)
+    ctx.lineTo(cx + 4, cy - 2)
+  }
+  ctx.lineWidth = 2
+  ctx.lineCap = 'round'
+  ctx.lineJoin = 'round'
+  ctx.strokeStyle = PALETTE.ink
+  ctx.stroke()
+}
+
 /** lowFence: a picket rail — level picket tops read as one clean jump line. */
 function drawLowFence(ctx: CanvasRenderingContext2D, screenX: number) {
   const top = GROUND_Y - 38
@@ -188,6 +226,7 @@ function drawLowFence(ctx: CanvasRenderingContext2D, screenX: number) {
     roundRectPath(ctx, px, top, 7, 40, [1, 1, 0, 0])
     fillWithOutline(ctx, wood, PALETTE.ink, HAZARD_OUTLINE_PX)
   }
+  drawActionCue(ctx, screenX + 19, top - 12, 'up')
 }
 
 /** planter: a wide-rimmed pot, flat top, with a few leaves as thin detail above it — never widening the jump-relevant silhouette. */
@@ -216,6 +255,7 @@ function drawPlanter(ctx: CanvasRenderingContext2D, screenX: number) {
     ctx.fill()
     ctx.restore()
   }
+  drawActionCue(ctx, screenX + 14, rimY - 10, 'up')
 }
 
 /** puddle: an irregular reflective blob, ground-level, hard near edge — never a vertical mass. */
@@ -248,6 +288,7 @@ function drawPuddle(ctx: CanvasRenderingContext2D, screenX: number) {
     ctx.fill()
   }
   ctx.globalAlpha = 1
+  drawActionCue(ctx, screenX + 28, y - 18, 'up')
 }
 
 /** bicycle: a real side-on frame — wheels are undecorated scenery; only the handlebar/seat band above the duck line carries the hazard outline. */
@@ -325,6 +366,9 @@ function drawBicycle(ctx: CanvasRenderingContext2D, screenX: number) {
   // overhead projection the duck line is judged against (§11).
   roundRectPath(ctx, screenX + 5, GROUND_Y - 50, 22, 7, 3)
   fillWithOutline(ctx, steel, PALETTE.ink, HAZARD_OUTLINE_PX)
+  // The one family in duck's direction, among five in jump's — the cue that
+  // actually matters most (§11 follow-up).
+  drawActionCue(ctx, screenX + 16, GROUND_Y - 64, 'down')
 }
 
 /** trashBin: a can with a domed lid — the lid's flat top is what a jump clears; the body reads as "bin", not "pot" or "fence". */
@@ -352,6 +396,7 @@ function drawTrashBin(ctx: CanvasRenderingContext2D, screenX: number) {
   ctx.arc(screenX + 15, lidY, 3, 0, Math.PI * 2)
   ctx.fillStyle = '#c2603f'
   ctx.fill()
+  drawActionCue(ctx, screenX + 15, lidY - 12, 'up')
 }
 
 /** pothole: a jagged broken-asphalt hole, ground-level, high-contrast rim — never covered by a foreground layer (§11). */
@@ -382,6 +427,7 @@ function drawPothole(ctx: CanvasRenderingContext2D, screenX: number) {
   ctx.lineWidth = 1.5
   ctx.strokeStyle = PALETTE.ink
   ctx.stroke()
+  drawActionCue(ctx, cx, y - 14, 'up')
 }
 
 export function drawObstacle(ctx: CanvasRenderingContext2D, obstacle: Obstacle, screenX: number) {
