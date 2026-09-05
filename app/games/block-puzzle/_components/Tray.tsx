@@ -22,7 +22,6 @@ export const Tray = memo(function Tray({
   state,
   cellPx,
   slotCells,
-  columns,
   minHeightPx,
   widthPx,
   placement,
@@ -34,7 +33,6 @@ export const Tray = memo(function Tray({
   state: BoardState
   cellPx: number
   slotCells: { w: number; h: number }
-  columns: number
   minHeightPx: number
   widthPx: number
   placement: 'below' | 'beside'
@@ -47,11 +45,10 @@ export const Tray = memo(function Tray({
 
   return (
     <div
-      className="grid shrink-0 justify-center gap-2"
+      className="flex shrink-0 flex-wrap content-start justify-center gap-2"
       style={{
-        gridTemplateColumns: `repeat(${columns}, ${slotW}px)`,
         minHeight: placement === 'below' ? minHeightPx : undefined,
-        width: placement === 'beside' ? widthPx : undefined,
+        width: widthPx,
       }}
     >
       {level.trayOrder.map((pieceId) => {

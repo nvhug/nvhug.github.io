@@ -63,8 +63,14 @@ describe('computeBoardMetrics', () => {
     const m = computeBoardMetrics(input({ viewportWidth: 2560, viewportHeight: 1400 }))
     expect(m.boardPx).toBeLessThanOrEqual(2560 * 0.6)
     expect(m.trayWidthPx).toBeGreaterThanOrEqual(160)
-    expect(m.trayWidthPx).toBeLessThanOrEqual(460)
     expect(m.trayMinHeightPx).toBe(0)
+  })
+
+  it('gives the tray far more width on an ultra-wide monitor instead of clipping it to a flat cap, while the board stays at its usual size', () => {
+    const wide = computeBoardMetrics(input({ viewportWidth: 3648, viewportHeight: 1048 }))
+    const modest = computeBoardMetrics(input({ viewportWidth: 900, viewportHeight: 700 }))
+    expect(wide.boardPx).toBe(modest.boardPx)
+    expect(wide.trayWidthPx).toBeGreaterThan(modest.trayWidthPx)
   })
 
   it('keeps early-level boards compact on desktop', () => {
@@ -83,10 +89,9 @@ describe('computeBoardMetrics', () => {
     const few = computeBoardMetrics(input({ looseCount: 3 }))
     expect(many.trayMinHeightPx).toBeGreaterThan(few.trayMinHeightPx)
     expect(few.trayMinHeightPx).toBeGreaterThan(0)
-    expect(many.trayColumns).toBe(2)
   })
 
-  it('grows the desktop tray into more columns so a short piece list fits in one frame instead of one tall column', () => {
+  it('gives the desktop tray column enough width to sit a piece two-across, so a short piece list wraps horizontally instead of stacking in one tall column', () => {
     const m = computeBoardMetrics(input({
       viewportWidth: 1440,
       viewportHeight: 800,
@@ -97,7 +102,14 @@ describe('computeBoardMetrics', () => {
       slotCells: { w: 3, h: 4 },
     }))
     expect(m.trayPlacement).toBe('beside')
-    expect(m.trayColumns).toBe(2)
+    const slotWidthPx = 3 * m.cellPx
+    expect(m.trayWidthPx).toBeGreaterThanOrEqual(slotWidthPx * 2 + 8)
+  })
+
+  it('gives the below-the-board tray the same width as the board, so its slots wrap within that width', () => {
+    const m = computeBoardMetrics(input({ viewportWidth: 390, viewportHeight: 844 }))
+    expect(m.trayPlacement).toBe('below')
+    expect(m.trayWidthPx).toBe(m.boardPx)
   })
 
   it('never returns a smaller cell for a strictly larger viewport', () => {

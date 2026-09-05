@@ -269,7 +269,6 @@ function PlayLevel({
           state={state}
           cellPx={metrics.cellPx}
           slotCells={slotCells}
-          columns={metrics.trayColumns}
           minHeightPx={metrics.trayMinHeightPx}
           widthPx={metrics.trayWidthPx}
           placement={metrics.trayPlacement}
