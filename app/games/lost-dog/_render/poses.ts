@@ -33,45 +33,145 @@ export function drawSky(ctx: CanvasRenderingContext2D, width: number, skyHeight:
   ctx.fillRect(0, 0, width, skyHeight)
 }
 
+interface FarProfile {
+  readonly w: number
+  readonly h: number
+  readonly kind: 'flat' | 'gabled' | 'tree'
+}
+
+/** A small, fixed (never random — the renderer never reads either RNG stream, plan
+ *  R4) set of rooftop/tree silhouettes, cycled by position so the skyline reads as
+ *  a real, varied street instead of one shape stamped on a loop. */
+const FAR_PROFILES: readonly FarProfile[] = [
+  { w: 76, h: 96, kind: 'flat' },
+  { w: 46, h: 134, kind: 'gabled' },
+  { w: 34, h: 62, kind: 'tree' },
+  { w: 58, h: 78, kind: 'flat' },
+  { w: 40, h: 108, kind: 'gabled' },
+  { w: 30, h: 54, kind: 'tree' },
+]
+const FAR_GAP = 20
+
 /**
- * The far layer: rooftops, cool and flat. No outline, ever — scenery cannot
- * touch you and the world's grammar says so by leaving the ink off (DESIGN §
- * World grammar). `scroll` is 0 under reduced motion, which renders the same
- * shapes as a static backdrop.
+ * The far layer: a real skyline — flat and gabled rooftops plus a few trees,
+ * cool and flat colour, no outline, ever (scenery cannot touch you, and the
+ * world's grammar says so by leaving the ink off — DESIGN § World grammar).
+ * `scroll` is 0 under reduced motion, which renders the same shapes as a
+ * static backdrop.
  */
 export function drawFarLayer(ctx: CanvasRenderingContext2D, width: number, scroll: number) {
-  const period = 160
-  const offset = ((scroll % period) + period) % period
+  const groupWidth = FAR_PROFILES.reduce((sum, p) => sum + p.w + FAR_GAP, 0)
+  const offset = ((scroll % groupWidth) + groupWidth) % groupWidth
+  const base = LANE_TOP_Y
   ctx.fillStyle = PALETTE.far
-  for (let x = -offset; x < width + period; x += period) {
-    ctx.fillRect(x, LANE_TOP_Y - 120, 90, 120)
-    ctx.fillRect(x + 100, LANE_TOP_Y - 78, 44, 78)
+
+  for (let groupX = -offset; groupX < width + groupWidth; groupX += groupWidth) {
+    let x = groupX
+    for (const p of FAR_PROFILES) {
+      const top = base - p.h
+      if (p.kind === 'tree') {
+        ctx.fillRect(x + p.w * 0.4, base - p.h * 0.4, p.w * 0.2, p.h * 0.4)
+        ctx.beginPath()
+        ctx.ellipse(x + p.w / 2, base - p.h * 0.65, p.w * 0.55, p.h * 0.42, 0, 0, Math.PI * 2)
+        ctx.fill()
+      } else if (p.kind === 'gabled') {
+        ctx.beginPath()
+        ctx.moveTo(x, top + 16)
+        ctx.lineTo(x + p.w / 2, top)
+        ctx.lineTo(x + p.w, top + 16)
+        ctx.lineTo(x + p.w, base)
+        ctx.lineTo(x, base)
+        ctx.closePath()
+        ctx.fill()
+      } else {
+        ctx.fillRect(x, top, p.w, p.h)
+      }
+      x += p.w + FAR_GAP
+    }
   }
 }
 
-/** The middle layer: storefronts and lamps, warmer and taller, scrolling faster than the far one. */
+interface MidProfile {
+  readonly w: number
+  readonly h: number
+  readonly awning: boolean
+}
+
+const MID_PROFILES: readonly MidProfile[] = [
+  { w: 100, h: 82, awning: true },
+  { w: 66, h: 58, awning: false },
+  { w: 118, h: 96, awning: true },
+  { w: 52, h: 48, awning: false },
+]
+const MID_GAP = 28
+/** Reserved trailing space in each group for the one lamp post per group. */
+const MID_LAMP_SLOT = 40
+
+/**
+ * The middle layer: storefronts, lit windows and awnings, one lamp post per
+ * group, warmer and taller than the far layer, scrolling faster. Varied
+ * storefront sizes (cycled, not random — same reasoning as the far layer)
+ * replace what used to be one repeating rectangle.
+ */
 export function drawMidLayer(ctx: CanvasRenderingContext2D, width: number, scroll: number) {
-  const period = 220
-  const offset = ((scroll % period) + period) % period
-  ctx.fillStyle = PALETTE.mid
-  for (let x = -offset; x < width + period; x += period) {
-    ctx.fillRect(x, LANE_TOP_Y - 86, 128, 86)
-    ctx.fillRect(x + 150, LANE_TOP_Y - 54, 8, 54) // lamp post
-    ctx.fillRect(x + 142, LANE_TOP_Y - 60, 24, 8) // lamp head
+  const groupWidth = MID_PROFILES.reduce((sum, p) => sum + p.w + MID_GAP, 0) + MID_LAMP_SLOT
+  const offset = ((scroll % groupWidth) + groupWidth) % groupWidth
+  const base = LANE_TOP_Y
+
+  for (let groupX = -offset; groupX < width + groupWidth; groupX += groupWidth) {
+    let x = groupX
+    for (const p of MID_PROFILES) {
+      const top = base - p.h
+      ctx.fillStyle = PALETTE.mid
+      ctx.fillRect(x, top, p.w, p.h)
+
+      // Windows: dim recessed squares, a texture cue only — never an outline,
+      // so they can never be mistaken for the hazard grammar.
+      ctx.fillStyle = PALETTE.ink
+      ctx.globalAlpha = 0.22
+      const cols = Math.max(1, Math.floor((p.w - 12) / 26))
+      for (let c = 0; c < cols; c++) {
+        ctx.fillRect(x + 10 + c * 26, top + 10, 12, 14)
+      }
+      ctx.globalAlpha = 1
+
+      if (p.awning) {
+        ctx.fillStyle = '#a67c52'
+        ctx.fillRect(x - 2, top + p.h - 12, p.w + 4, 7)
+      }
+      x += p.w + MID_GAP
+    }
+    // One lamp post per group, in the trailing slot.
+    ctx.fillStyle = PALETTE.mid
+    ctx.fillRect(x + 14, base - 54, 8, 54)
+    ctx.fillRect(x + 6, base - 60, 24, 8)
   }
 }
 
 /**
  * The foreground band, drawn under the kerb so it never crosses the reaction
  * zone (§17's "foreground decoration never crosses the reaction zone" is
- * satisfied geometrically: it lives entirely below LANE_BOTTOM_Y).
+ * satisfied geometrically: it lives entirely below LANE_BOTTOM_Y). Two
+ * alternating shapes — a low curb segment and a slim bollard — instead of
+ * one repeating dash.
  */
 export function drawForegroundLayer(ctx: CanvasRenderingContext2D, width: number, scroll: number) {
-  const period = 90
-  const offset = ((scroll % period) + period) % period
+  const profiles = [
+    { w: 54, h: 16, bollard: false },
+    { w: 10, h: 22, bollard: true },
+  ] as const
+  const gap = 34
+  const groupWidth = profiles.reduce((sum, p) => sum + p.w + gap, 0)
+  const offset = ((scroll % groupWidth) + groupWidth) % groupWidth
   ctx.fillStyle = PALETTE.foreground
-  for (let x = -offset; x < width + period; x += period) {
-    ctx.fillRect(x, LANE_BOTTOM_Y + 26, 54, 16)
+
+  for (let groupX = -offset; groupX < width + groupWidth; groupX += groupWidth) {
+    let x = groupX
+    for (const p of profiles) {
+      const y = p.bollard ? LANE_BOTTOM_Y + 20 : LANE_BOTTOM_Y + 26
+      ctx.fillRect(x, y, p.w, p.h)
+      x += p.w + gap
+    }
   }
 }
 
