@@ -170,6 +170,10 @@ export const TUNING = Object.freeze({
     patternIntervalBaseSec: 6,
     /** Entities this far behind the dog are pruned, keeping the pool bounded (§24). */
     cleanupUnits: -120,
+    /** The cat's screen-space offset behind the dog at gap 100 (mostly off-frame, §9's Safe row). */
+    catFarUnits: -170,
+    /** The cat's screen-space offset behind the dog at gap 0 (caught). */
+    catNearUnits: -6,
   }),
   instinct: Object.freeze({
     /** Food further ahead than this is outside the clear look-ahead zone and is never advertised (§14). */
@@ -225,6 +229,21 @@ export function pursuitBandFor(gap: number): PursuitBand {
   if (gap <= bands.danger[1]) return 'danger'
   if (gap <= bands.watch[1]) return 'watch'
   return 'safe'
+}
+
+/**
+ * The cat's screen-space offset behind the dog, purely a function of the
+ * pursuit gap — linear from `catFarUnits` at gap 100 (mostly off-frame) to
+ * `catNearUnits` at gap 0 (caught). Not stored gameplay state: deriving it
+ * fresh every frame is what makes the cat actually visible closing the
+ * distance as the gap shrinks, instead of sitting at one fixed position for
+ * the whole run (§9's "cat mostly off-frame" / "visible behind dog" rows
+ * describe a moving relationship, not a static one).
+ */
+export function catOffsetFor(gap: number): number {
+  const clamped = Math.max(0, Math.min(100, gap))
+  const { catFarUnits, catNearUnits } = TUNING.world
+  return catFarUnits + (catNearUnits - catFarUnits) * (1 - clamped / 100)
 }
 
 /** Classifies a consecutive-collection count into its §14 combo multiplier. */

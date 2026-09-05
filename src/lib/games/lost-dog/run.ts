@@ -51,7 +51,6 @@ export function initialRun(runSeed: number): Run {
     lastEventEndedAtMs: null,
     lastEventKind: null,
     dog: initialDogPhysics(),
-    cat: { x: -20 },
     obstacles: [],
     food: [],
     particles: [],

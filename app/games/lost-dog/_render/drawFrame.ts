@@ -127,7 +127,7 @@ export function drawFrame(
 
   drawParticles(ctx, snapshot.particles, DOG_SCREEN_X)
   drawCat(ctx, snapshot.cat, DOG_SCREEN_X + snapshot.cat.x)
-  drawDog(ctx, snapshot.dog, DOG_SCREEN_X, reactionFor(snapshot), reducedMotion)
+  drawDog(ctx, snapshot.dog, DOG_SCREEN_X, reactionFor(snapshot), reducedMotion, snapshot.elapsedActiveMs)
   drawForegroundLayer(ctx, APERTURE_WIDTH, scroll * PARALLAX.foreground)
 
   if (snapshot.weather === 'rain') {

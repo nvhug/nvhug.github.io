@@ -90,7 +90,9 @@ export interface Run {
   /** The previous event's kind, so the director can refuse a back-to-back repeat (§29). */
   readonly lastEventKind: DirectedEventKind | null
   readonly dog: DogPhysics
-  readonly cat: CatState
+  // No `cat` field here on purpose: the cat's rendered position is a pure
+  // function of `pursuitGap` (config.ts's `catOffsetFor`), computed fresh in
+  // `toSnapshot` — there is nothing about it to store or mutate per tick.
   readonly obstacles: readonly Obstacle[]
   readonly food: readonly Food[]
   readonly particles: readonly Particle[]

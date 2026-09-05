@@ -4,7 +4,7 @@
  * itself, so neither can reach `gameplayRng`/`cosmeticRng` or mutate state.
  */
 
-import { bandForElapsed, comboMultiplierFor, pursuitBandFor } from './config'
+import { bandForElapsed, catOffsetFor, comboMultiplierFor, pursuitBandFor } from './config'
 import { instinctTarget } from './instinct'
 import type { Run, Snapshot } from './types'
 
@@ -30,7 +30,9 @@ export function toSnapshot(run: Run, alpha: number): Snapshot {
     activeEvent: run.activeEvent,
     shakeMs: run.shakeMs,
     dog: run.dog,
-    cat: run.cat,
+    // The cat's rendered position is a pure function of the pursuit gap —
+    // there is no `Run.cat` to read (see catOffsetFor's own doc for why).
+    cat: { x: catOffsetFor(run.pursuitGap) },
     obstacles: run.obstacles,
     food: run.food,
     particles: run.particles,

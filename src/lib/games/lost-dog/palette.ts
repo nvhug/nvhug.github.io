@@ -18,8 +18,14 @@ export const PALETTE = Object.freeze({
   kerb: '#e9e2d4',
   ink: '#2b2119',
   corgiBody: '#e08b3c',
+  /** A shade darker than corgiBody — the back/ear-tip/leg shading, not a new hue. */
+  corgiBodyShade: '#b5691f',
   corgiCream: '#fdf3e2',
   cat: '#3d3550',
+  /** A shade darker than cat — the back/ear/tail shading, not a new hue. */
+  catShade: '#2a2438',
+  /** Cat eyes only — the one glowing accent on an otherwise silhouette mass. */
+  catEye: '#d9a441',
   /** Must equal --games-brass in globals.css. */
   brass: '#d9a441',
   /** Must equal --games-ember in globals.css. */

@@ -324,13 +324,85 @@ export function drawInstinctTrail(
  */
 export type DogReaction = 'running' | 'collecting' | 'hit' | 'threatened' | 'tired'
 
-/** Running / airborne / ducking silhouettes stay distinct from each other without color (§17). */
+/** A filled path with a stroked outline in one call — every solid shape below uses this. */
+function fillWithOutline(ctx: CanvasRenderingContext2D, fill: string, outline: string, outlineWidth: number) {
+  ctx.fillStyle = fill
+  ctx.fill()
+  ctx.lineWidth = outlineWidth
+  ctx.strokeStyle = outline
+  ctx.stroke()
+}
+
+/**
+ * Starts a rounded-rectangle path, using the native `ctx.roundRect` where
+ * available and a manual `arcTo` construction otherwise — `roundRect` is
+ * unsupported on Safari < 16.4 and some older WebViews, and this is the only
+ * place in the codebase that draws one, so there is no other call site to
+ * miss. `radii` matches the native API's per-corner form: one number for all
+ * four corners, or `[topLeft, topRight, bottomRight, bottomLeft]`.
+ */
+function roundRectPath(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  radii: number | readonly number[],
+) {
+  ctx.beginPath()
+  if (typeof ctx.roundRect === 'function') {
+    ctx.roundRect(x, y, w, h, radii as number[])
+    return
+  }
+  const [tl, tr, br, bl] = Array.isArray(radii) ? radii : [radii, radii, radii, radii]
+  ctx.moveTo(x + tl, y)
+  ctx.lineTo(x + w - tr, y)
+  ctx.arcTo(x + w, y, x + w, y + tr, tr)
+  ctx.lineTo(x + w, y + h - br)
+  ctx.arcTo(x + w, y + h, x + w - br, y + h, br)
+  ctx.lineTo(x + bl, y + h)
+  ctx.arcTo(x, y + h, x, y + h - bl, bl)
+  ctx.lineTo(x, y + tl)
+  ctx.arcTo(x, y, x + tl, y, tl)
+  ctx.closePath()
+}
+
+/** A stubby leg: a rounded capsule, angled slightly back when running, tucked flat when airborne. */
+function drawLeg(ctx: CanvasRenderingContext2D, hipX: number, hipY: number, tuck: number, swing: number) {
+  const len = 12 * (1 - tuck)
+  if (len <= 0.5) return
+  const footX = hipX + swing * len * 0.4
+  const footY = hipY + len
+  ctx.beginPath()
+  ctx.moveTo(hipX - 3, hipY)
+  ctx.lineTo(footX - 3, footY)
+  ctx.quadraticCurveTo(footX, footY + 3, footX + 3, footY)
+  ctx.lineTo(hipX + 3, hipY)
+  ctx.closePath()
+  fillWithOutline(ctx, PALETTE.corgiBodyShade, PALETTE.ink, 1)
+}
+
+/**
+ * The Corgi (§17): a low, long "loaf" body — the breed's signature silhouette
+ * — a rounded head with the big upright ears, a tapered snout, a fluffed
+ * curled tail, and two visible stubby legs. Running / airborne / ducking
+ * stay distinct from each other by silhouette alone, without colour (§17);
+ * the reaction vocabulary (ears/eye/tail/tongue) rides on top of it and can
+ * never change the footprint DogPhysics/collision.ts actually collide
+ * against — every number here is cosmetic geometry around that footprint,
+ * never a substitute for it.
+ */
 export function drawDog(
   ctx: CanvasRenderingContext2D,
   dog: DogPhysics,
   dogScreenX: number,
   reaction: DogReaction = 'running',
   reducedMotion = false,
+  /** Drives the grounded run-cycle leg swing — any steadily-increasing clock
+   *  works (the caller passes `elapsedActiveMs`). `dog.airborneMs` cannot be
+   *  used for this: it is pinned to exactly 0 whenever the dog is grounded
+   *  (physics.ts), so a swing driven by it would never actually move. */
+  runCyclePhaseMs = 0,
 ) {
   // Under reduced motion the jump still occupies exactly the same airtime and
   // still passes through crouch/rise/apex/fall at the same instants — it snaps
@@ -339,53 +411,202 @@ export function drawDog(
   // untouched either way: collision reads DogPhysics, never this height.
   const raw = jumpHeightFraction(dog)
   const height = reducedMotion ? Math.round(raw * 2) / 2 : raw
+  const airborne = !dog.grounded
   const liftPx = height * 60
-  const duckSquash = (reducedMotion ? Math.round(dog.duckProgress) : dog.duckProgress) * 12
+  const duckProgress = reducedMotion ? Math.round(dog.duckProgress) : dog.duckProgress
+  const duckSquash = duckProgress * 12
 
   const bodyW = 48
   const bodyH = 30 - duckSquash
-  const y = GROUND_Y - bodyH - liftPx
+  const bodyX = dogScreenX
+  const bodyY = GROUND_Y - bodyH - liftPx - 10 // -10: legs occupy the space between body and GROUND_Y
   // A stumble tips the body forward; nothing here changes the collision profile,
   // which is computed from DogPhysics alone (§17's "never distort the collision contract").
   const tilt = reaction === 'hit' ? 0.22 : 0
 
   ctx.save()
-  ctx.translate(dogScreenX + bodyW / 2, y + bodyH / 2)
+  ctx.translate(bodyX + bodyW / 2, bodyY + bodyH / 2)
   ctx.rotate(tilt)
-  ctx.translate(-(dogScreenX + bodyW / 2), -(y + bodyH / 2))
+  ctx.translate(-(bodyX + bodyW / 2), -(bodyY + bodyH / 2))
 
-  ctx.fillStyle = PALETTE.corgiBody
-  ctx.fillRect(dogScreenX, y, bodyW, bodyH)
+  // Legs: two visible, planted when grounded, swept back and tucked when
+  // airborne or ducking (a Corgi's legs disappear under its low body when it
+  // crouches, which is exactly what ducking should read as).
+  const legTuck = airborne ? 0.85 : duckProgress * 0.5
+  const runSwing = airborne || reducedMotion ? 0 : Math.sin(runCyclePhaseMs * 0.012) * 0.6
+  drawLeg(ctx, bodyX + 10, bodyY + bodyH - 2, legTuck, -1 - runSwing)
+  drawLeg(ctx, bodyX + bodyW - 14, bodyY + bodyH - 2, legTuck, 1 + runSwing)
+
+  // Body: a rounded "loaf" — long, low, generous corner radius front and back.
+  roundRectPath(ctx, bodyX, bodyY, bodyW, bodyH, [bodyH * 0.55, bodyH * 0.4, bodyH * 0.4, bodyH * 0.3])
+  fillWithOutline(ctx, PALETTE.corgiBody, PALETTE.ink, 1.25)
+
+  // Back shading: a subtle darker cap along the spine, not a new hue.
+  roundRectPath(ctx, bodyX + 3, bodyY + 1, bodyW - 10, bodyH * 0.32, bodyH * 0.2)
+  ctx.fillStyle = PALETTE.corgiBodyShade
+  ctx.globalAlpha = 0.35
+  ctx.fill()
+  ctx.globalAlpha = 1
+
+  // Chest/blaze: the cream patch, low on the front of the body.
+  ctx.beginPath()
+  ctx.ellipse(bodyX + bodyW - 10, bodyY + bodyH - 4, 9, bodyH * 0.42, 0, 0, Math.PI * 2)
   ctx.fillStyle = PALETTE.corgiCream
-  ctx.fillRect(dogScreenX + bodyW - 14, y - 6, 12, 10) // head/blaze silhouette accent
+  ctx.fill()
 
-  // Ears: up and forward when the instinct cue is live, flat back when ducking
-  // or threatened, drooped when tired.
-  const earLift = reaction === 'collecting' ? 9 : reaction === 'threatened' ? 3 : reaction === 'tired' ? 1 : 6
-  const earLean = reaction === 'collecting' ? 3 : reaction === 'threatened' ? -3 : 0
-  ctx.fillStyle = PALETTE.corgiBody
-  ctx.fillRect(dogScreenX + bodyW - 12 + earLean, y - 6 - earLift, 4, earLift)
-  ctx.fillRect(dogScreenX + bodyW - 6 + earLean, y - 6 - earLift, 4, earLift)
+  // Head: a rounded blob at the front-top of the body, overlapping it so the
+  // silhouette reads as one animal, not a body with a box stuck on it.
+  const headCx = bodyX + bodyW - 6
+  const headCy = bodyY - 2
+  const headR = 12
+  ctx.beginPath()
+  ctx.arc(headCx, headCy, headR, 0, Math.PI * 2)
+  fillWithOutline(ctx, PALETTE.corgiBody, PALETTE.ink, 1.25)
 
-  // Eye leads toward the target while collecting; a plain dot otherwise.
+  // Snout: a tapered wedge off the front of the head.
+  ctx.beginPath()
+  ctx.moveTo(headCx + headR - 2, headCy - 4)
+  ctx.lineTo(headCx + headR + 9, headCy + 1)
+  ctx.lineTo(headCx + headR - 2, headCy + 6)
+  ctx.closePath()
+  fillWithOutline(ctx, PALETTE.corgiCream, PALETTE.ink, 1)
+  // Nose: the one pure-ink mark on the whole animal.
+  ctx.beginPath()
+  ctx.arc(headCx + headR + 8, headCy + 1, 1.6, 0, Math.PI * 2)
   ctx.fillStyle = PALETTE.ink
-  ctx.fillRect(dogScreenX + bodyW - (reaction === 'collecting' ? 5 : 8), y - 2, 3, 3)
+  ctx.fill()
 
-  // Tail: raised when noticing food, tucked under threat.
-  const tailY = reaction === 'threatened' ? y + bodyH - 4 : y + 2
+  // Ears: the Corgi's signature big upright triangles. Up and forward when the
+  // instinct cue is live, flattened back when ducking/threatened, drooped
+  // when tired — always a shape change, never a colour change (§17).
+  const earUp = reaction === 'collecting' ? 1 : reaction === 'threatened' ? 0.3 : reaction === 'tired' ? 0.15 : 0.75
+  const earLean = reaction === 'collecting' ? 3 : reaction === 'threatened' ? -4 : -1
+  for (const side of [-1, 1] as const) {
+    const baseX = headCx + side * 6
+    const tipX = baseX + earLean * side * 0.4 + side * 2
+    const tipY = headCy - headR - 14 * earUp
+    ctx.beginPath()
+    ctx.moveTo(baseX - 4, headCy - headR + 3)
+    ctx.lineTo(tipX, tipY)
+    ctx.lineTo(baseX + 4, headCy - headR + 3)
+    ctx.closePath()
+    fillWithOutline(ctx, PALETTE.corgiBody, PALETTE.ink, 1)
+    // Inner-ear shade, only readable when the ear is actually raised.
+    if (earUp > 0.4) {
+      ctx.beginPath()
+      ctx.moveTo(baseX - 1.5, headCy - headR + 1)
+      ctx.lineTo(tipX, tipY + 4)
+      ctx.lineTo(baseX + 1.5, headCy - headR + 1)
+      ctx.closePath()
+      ctx.fillStyle = PALETTE.corgiBodyShade
+      ctx.fill()
+    }
+  }
+
+  // Eye: a real circle with a highlight, leading toward the target while
+  // collecting rather than a plain dot.
+  const eyeX = headCx + (reaction === 'collecting' ? 6 : 3)
+  ctx.beginPath()
+  ctx.arc(eyeX, headCy - 1, 2.4, 0, Math.PI * 2)
+  ctx.fillStyle = PALETTE.ink
+  ctx.fill()
+  ctx.beginPath()
+  ctx.arc(eyeX + 0.7, headCy - 1.7, 0.8, 0, Math.PI * 2)
   ctx.fillStyle = PALETTE.corgiCream
-  ctx.fillRect(dogScreenX - 8, tailY, 9, 5)
+  ctx.fill()
+
+  // Tail: a curled, fluffed sweep instead of a flat rectangle — raised and
+  // curled forward when noticing food, tucked low under threat.
+  const tailLift = reaction === 'threatened' ? -0.15 : reaction === 'collecting' ? 0.85 : 0.45
+  const tailBaseX = bodyX + 4
+  const tailBaseY = bodyY + bodyH * 0.4
+  const tailTipX = tailBaseX - 14
+  const tailTipY = tailBaseY - 16 * tailLift
+  ctx.beginPath()
+  ctx.moveTo(tailBaseX, tailBaseY - 3)
+  ctx.quadraticCurveTo(tailBaseX - 12, tailBaseY - 6 - 10 * tailLift, tailTipX, tailTipY)
+  ctx.quadraticCurveTo(tailBaseX - 6, tailBaseY + 2 - 6 * tailLift, tailBaseX, tailBaseY + 4)
+  ctx.closePath()
+  fillWithOutline(ctx, PALETTE.corgiCream, PALETTE.ink, 1)
 
   // Tongue out on sustained speed (§17's fatigue read).
   if (reaction === 'tired') {
+    ctx.beginPath()
+    ctx.ellipse(headCx + headR + 4, headCy + 6, 2, 4, 0.3, 0, Math.PI * 2)
     ctx.fillStyle = PALETTE.ember
-    ctx.fillRect(dogScreenX + bodyW - 2, y + 1, 5, 3)
+    ctx.fill()
   }
 
   ctx.restore()
 }
 
+/**
+ * The cat (§17): one deep violet-charcoal mass with brass eyes (DESIGN §
+ * Palette), but a crouched, prowling *silhouette* — an arched back, pointed
+ * ears, a curled tail — not a rectangle. It stays legible at a glance and in
+ * grayscale precisely because it is a shape, not a colour.
+ */
 export function drawCat(ctx: CanvasRenderingContext2D, cat: CatState, catScreenX: number) {
-  ctx.fillStyle = PALETTE.cat
-  ctx.fillRect(catScreenX, GROUND_Y - 26, 34, 26)
+  const bodyW = 34
+  const bodyH = 22
+  const x = catScreenX
+  const y = GROUND_Y - bodyH
+
+  ctx.save()
+
+  // Body: a crouching arch — low at the haunches, rising toward the shoulders.
+  ctx.beginPath()
+  ctx.moveTo(x, y + bodyH)
+  ctx.quadraticCurveTo(x, y + 6, x + 8, y + 4)
+  ctx.quadraticCurveTo(x + bodyW * 0.55, y - 6, x + bodyW - 6, y + 3)
+  ctx.quadraticCurveTo(x + bodyW, y + 8, x + bodyW, y + bodyH)
+  ctx.closePath()
+  fillWithOutline(ctx, PALETTE.cat, PALETTE.ink, 1.25)
+
+  // Haunch shading — a darker patch at the rear, the one bit of depth on the mass.
+  ctx.beginPath()
+  ctx.ellipse(x + 7, y + bodyH - 5, 7, 8, 0.2, 0, Math.PI * 2)
+  ctx.fillStyle = PALETTE.catShade
+  ctx.globalAlpha = 0.5
+  ctx.fill()
+  ctx.globalAlpha = 1
+
+  // Head: a smaller rounded mass at the shoulder, low and forward (a prowling
+  // cat carries its head level with its back, not above it).
+  const headCx = x + bodyW - 4
+  const headCy = y + 2
+  ctx.beginPath()
+  ctx.arc(headCx, headCy, 7, 0, Math.PI * 2)
+  fillWithOutline(ctx, PALETTE.cat, PALETTE.ink, 1)
+
+  // Ears: sharp triangles, taller and narrower than the dog's.
+  for (const side of [-1, 1] as const) {
+    const baseX = headCx + side * 3.5
+    ctx.beginPath()
+    ctx.moveTo(baseX - 2.5, headCy - 5)
+    ctx.lineTo(baseX + side * 1.5, headCy - 13)
+    ctx.lineTo(baseX + 2.5, headCy - 5)
+    ctx.closePath()
+    fillWithOutline(ctx, PALETTE.cat, PALETTE.ink, 1)
+  }
+
+  // Eyes: the one glowing accent on the whole silhouette.
+  for (const side of [-1, 1] as const) {
+    ctx.beginPath()
+    ctx.ellipse(headCx + side * 2.6, headCy - 0.5, 1.3, 0.9, 0, 0, Math.PI * 2)
+    ctx.fillStyle = PALETTE.catEye
+    ctx.fill()
+  }
+
+  // Tail: a curled sweep rising behind the haunches.
+  ctx.beginPath()
+  ctx.moveTo(x + 2, y + bodyH - 6)
+  ctx.quadraticCurveTo(x - 10, y + bodyH - 10, x - 9, y + 2)
+  ctx.quadraticCurveTo(x - 8, y - 4, x - 2, y - 2)
+  ctx.lineWidth = 4
+  ctx.lineCap = 'round'
+  ctx.strokeStyle = PALETTE.cat
+  ctx.stroke()
+
+  ctx.restore()
 }

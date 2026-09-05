@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createRng, deriveSeed } from '../rng'
+import { TUNING, catOffsetFor } from './config'
 import { initialDogPhysics } from './physics'
 import { toSnapshot } from './snapshot'
 import type { Run } from './types'
@@ -33,7 +34,6 @@ function makeRun(overrides: Partial<Run> = {}): Run {
     lastEventEndedAtMs: null,
     lastEventKind: null,
     dog: initialDogPhysics(),
-    cat: { x: 0 },
     obstacles: [],
     food: [],
     particles: [],
@@ -64,5 +64,15 @@ describe('toSnapshot', () => {
     const obstacles = [{ id: 1, family: 'lowFence' as const, x: 100, resolved: false }]
     const snap = toSnapshot(makeRun({ obstacles }), 0)
     expect(snap.obstacles).toBe(obstacles)
+  })
+
+  it("derives the cat's rendered position purely from the pursuit gap", () => {
+    const snap = toSnapshot(makeRun({ pursuitGap: 40 }), 0)
+    expect(snap.cat.x).toBe(catOffsetFor(40))
+  })
+
+  it('places the cat far behind at gap 100 and nearly touching at gap 0', () => {
+    expect(toSnapshot(makeRun({ pursuitGap: 100 }), 0).cat.x).toBe(TUNING.world.catFarUnits)
+    expect(toSnapshot(makeRun({ pursuitGap: 0 }), 0).cat.x).toBe(TUNING.world.catNearUnits)
   })
 })

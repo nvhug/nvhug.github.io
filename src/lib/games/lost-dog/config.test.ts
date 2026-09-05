@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { GAMEPLAY_VERSION, TUNING, bandForElapsed, comboMultiplierFor, pursuitBandFor } from './config'
+import { GAMEPLAY_VERSION, TUNING, bandForElapsed, catOffsetFor, comboMultiplierFor, pursuitBandFor } from './config'
 
 describe('GAMEPLAY_VERSION', () => {
   it('is a positive integer', () => {
@@ -123,6 +123,26 @@ describe('pursuitBandFor', () => {
     expect(pursuitBandFor(25)).toBe('critical')
     expect(pursuitBandFor(1)).toBe('critical')
     expect(pursuitBandFor(0)).toBe('caught')
+  })
+})
+
+describe('catOffsetFor', () => {
+  it('is far behind the dog at gap 100 and nearly touching at gap 0', () => {
+    expect(catOffsetFor(100)).toBe(TUNING.world.catFarUnits)
+    expect(catOffsetFor(0)).toBe(TUNING.world.catNearUnits)
+  })
+
+  it('moves monotonically closer as the gap shrinks', () => {
+    expect(catOffsetFor(75)).toBeGreaterThan(catOffsetFor(100))
+    expect(catOffsetFor(50)).toBeGreaterThan(catOffsetFor(75))
+    expect(catOffsetFor(25)).toBeGreaterThan(catOffsetFor(50))
+    expect(catOffsetFor(0)).toBeGreaterThan(catOffsetFor(25))
+  })
+
+  it('never reads ahead of the dog (always <= catNearUnits, i.e. still negative)', () => {
+    for (const gap of [100, 75, 50, 25, 10, 1, 0]) {
+      expect(catOffsetFor(gap)).toBeLessThanOrEqual(TUNING.world.catNearUnits)
+    }
   })
 })
 
